@@ -479,10 +479,38 @@ async function init() {
     // Supabase初期化
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // LIFF初期化
-    await liff.init({ liffId: LIFF_ID });
+    // LIFF初期化（タイムアウト付き）
+    const liffInitPromise = liff.init({ liffId: LIFF_ID });
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('LIFF timeout')), 8000)
+    );
+
+    try {
+      await Promise.race([liffInitPromise, timeoutPromise]);
+    } catch (liffError) {
+      console.warn('LIFF init failed or timeout:', liffError);
+      // LIFFが失敗してもダミーユーザーで続行（開発用）
+      currentUser = {
+        line_uid: 'dev_' + Math.random().toString(36).substr(2, 9),
+        line_name: 'テストユーザー',
+      };
+      hideLoading();
+      showScreen('screen-start');
+      return;
+    }
 
     if (!liff.isLoggedIn()) {
+      // LINEアプリ外からのアクセスの場合
+      if (!liff.isInClient()) {
+        // ブラウザアクセス：開発用ダミーで続行
+        currentUser = {
+          line_uid: 'dev_' + Math.random().toString(36).substr(2, 9),
+          line_name: 'ブラウザテスト',
+        };
+        hideLoading();
+        showScreen('screen-start');
+        return;
+      }
       liff.login();
       return;
     }
@@ -499,10 +527,8 @@ async function init() {
     const savedGroupId = localStorage.getItem('sl_group_id');
 
     if (savedMemberId && savedGroupId) {
-      // 既存メンバーとして復帰
       await restoreSession(savedMemberId, savedGroupId);
     } else {
-      // 新規：スタート画面へ
       hideLoading();
       showScreen('screen-start');
     }
