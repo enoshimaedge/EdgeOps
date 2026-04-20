@@ -455,7 +455,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════════
-// 設定（ここにの情報を入れる）
+// 設定
 // ═══════════════════════════════════════════════════════
 const SUPABASE_URL = 'https://fibrgvbpnelywnptvgwx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpYnJndmJwbmVseXducHR2Z3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjY1NDksImV4cCI6MjA5MjE0MjU0OX0.y-gzEBwJSFMHOwR29zlJGkzMktDPoM_A324oE4ofwaU';
@@ -464,21 +464,20 @@ const LIFF_ID = '2009827936-jvYNcPNH';
 // ═══════════════════════════════════════════════════════
 // グローバル状態
 // ═══════════════════════════════════════════════════════
-let currentUser = null; // { line_uid, display_name, line_name }
-let currentGroup = null; // { id, group_id, expires_at }
+let currentUser = null;
+let currentGroup = null;
 let currentMemberId = null;
 let messages = [];
 let members = [];
+let realtimeChannel = null; // ★ リアルタイム購読チャンネル
 
 // ═══════════════════════════════════════════════════════
 // 初期化
 // ═══════════════════════════════════════════════════════
 async function init() {
   try {
-    // Supabase初期化
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // LIFF初期化（タイムアウト付き）
     const liffInitPromise = liff.init({ liffId: LIFF_ID });
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('LIFF timeout')), 8000)
@@ -488,7 +487,6 @@ async function init() {
       await Promise.race([liffInitPromise, timeoutPromise]);
     } catch (liffError) {
       console.warn('LIFF init failed or timeout:', liffError);
-      // LIFFが失敗してもダミーユーザーで続行（開発用）
       currentUser = {
         line_uid: 'dev_' + Math.random().toString(36).substr(2, 9),
         line_name: 'テストユーザー',
@@ -499,9 +497,7 @@ async function init() {
     }
 
     if (!liff.isLoggedIn()) {
-      // LINEアプリ外からのアクセスの場合
       if (!liff.isInClient()) {
-        // ブラウザアクセス：開発用ダミーで続行
         currentUser = {
           line_uid: 'dev_' + Math.random().toString(36).substr(2, 9),
           line_name: 'ブラウザテスト',
@@ -514,14 +510,12 @@ async function init() {
       return;
     }
 
-    // LINEプロフィール取得
     const profile = await liff.getProfile();
     currentUser = {
       line_uid: profile.userId,
       line_name: profile.displayName,
     };
 
-    // ローカルストレージから既存セッション確認
     const savedMemberId = localStorage.getItem('sl_member_id');
     const savedGroupId = localStorage.getItem('sl_group_id');
 
@@ -587,10 +581,7 @@ async function createGroup() {
   try {
     showToast('グループを作成中...');
 
-    // グループID生成
     const groupId = generateGroupId();
-
-    // グループセッション作成
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
@@ -602,7 +593,6 @@ async function createGroup() {
 
     if (groupError) throw groupError;
 
-    // メンバー追加（作成者は自動承認）
     const { data: member, error: memberError } = await supabase
       .from('group_members')
       .insert({
@@ -616,7 +606,6 @@ async function createGroup() {
 
     if (memberError) throw memberError;
 
-    // セッション保存
     localStorage.setItem('sl_member_id', member.id);
     localStorage.setItem('sl_group_id', groupId);
 
@@ -646,7 +635,6 @@ async function joinGroup() {
   try {
     showToast('グループを検索中...');
 
-    // グループ検索
     const { data: group, error } = await supabase
       .from('group_sessions')
       .select('*')
@@ -659,7 +647,6 @@ async function joinGroup() {
       return;
     }
 
-    // メンバー数チェック
     const { count } = await supabase
       .from('group_members')
       .select('*', { count: 'exact', head: true })
@@ -671,7 +658,6 @@ async function joinGroup() {
       return;
     }
 
-    // 既存メンバーチェック
     const { data: existing } = await supabase
       .from('group_members')
       .select('*')
@@ -699,7 +685,6 @@ async function joinGroup() {
       }
     }
 
-    // 参加申請
     const { data: member, error: memberError } = await supabase
       .from('group_members')
       .insert({
@@ -761,6 +746,71 @@ async function loadHome() {
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
 
   await loadMessages();
+  startRealtime(); // ★ リアルタイム購読を開始
+}
+
+// ═══════════════════════════════════════════════════════
+// ★ リアルタイム更新
+// ═══════════════════════════════════════════════════════
+function startRealtime() {
+  // 既存のチャンネルがあれば一旦切断
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+  }
+
+  realtimeChannel = supabase
+    .channel('stafflink-realtime-' + currentGroup.id)
+
+    // メッセージの追加・更新を監視
+    .on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `group_session_id=eq.${currentGroup.id}`
+      },
+      () => {
+        if (document.getElementById('screen-home').classList.contains('active')) {
+          loadMessages();
+        }
+      }
+    )
+
+    // 既読の追加を監視
+    .on('postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'read_receipts'
+      },
+      () => {
+        if (document.getElementById('screen-home').classList.contains('active')) {
+          loadMessages();
+        }
+      }
+    )
+
+    // メンバーの追加・承認を監視
+    .on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'group_members',
+        filter: `group_session_id=eq.${currentGroup.id}`
+      },
+      () => {
+        if (document.getElementById('screen-home').classList.contains('active')) {
+          loadMessages();
+        }
+        if (document.getElementById('screen-approval').classList.contains('active')) {
+          loadApprovals();
+        }
+      }
+    )
+
+    .subscribe((status) => {
+      console.log('Realtime status:', status);
+    });
 }
 
 async function loadMessages() {
@@ -773,7 +823,6 @@ async function loadMessages() {
 
     messages = data || [];
 
-    // メンバー一覧も取得
     const { data: memberData } = await supabase
       .from('group_members')
       .select('*')
@@ -784,7 +833,6 @@ async function loadMessages() {
 
     renderMessages();
 
-    // 承認待ち件数チェック
     const { count } = await supabase
       .from('group_members')
       .select('*', { count: 'exact', head: true })
@@ -792,8 +840,9 @@ async function loadMessages() {
       .eq('status', 'pending');
 
     if (count > 0) {
-      // 承認バッジ表示（簡易）
       document.querySelector('[onclick="showScreen(\'screen-approval\')"]').textContent = `👥${count}`;
+    } else {
+      document.querySelector('[onclick="showScreen(\'screen-approval\')"]').textContent = `👥`;
     }
   } catch (e) {
     console.error(e);
@@ -824,7 +873,7 @@ function renderMessages() {
           <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
           <div class="read-count">${msg.read_count || 0}/${totalMembers}人既読</div>
         </div>
-        ${unreadCount > 0 ? `<div class="unread-names">❌ 未読：${getUnreadNames(msg.id, msg.read_count || 0)}</div>` : ''}
+        ${unreadCount > 0 ? `<div class="unread-names">❌ 未読：詳細を確認してください</div>` : ''}
       </div>
     `;
   }).join('');
@@ -852,9 +901,9 @@ async function sendMessage() {
     if (error) throw error;
 
     document.getElementById('compose-body').value = '';
-    await loadMessages();
     showScreen('screen-home');
     showToast('送信しました！');
+    // ★ リアルタイムで自動更新されるので手動loadMessages不要
   } catch (e) {
     console.error(e);
     showToast('送信に失敗しました。');
@@ -868,10 +917,8 @@ async function showDetail(messageId) {
   const msg = messages.find(m => m.id === messageId);
   if (!msg) return;
 
-  // 既読記録
   await recordRead(messageId);
 
-  // 既読詳細取得
   const { data: reads } = await supabase
     .from('read_receipts')
     .select('*')
@@ -883,7 +930,6 @@ async function showDetail(messageId) {
   const readCount = readUids.size;
   const unreadMembers = members.filter(m => !readUids.has(m.line_uid));
 
-  // 画面更新
   document.getElementById('detail-title').textContent = msg.body.substring(0, 20) + (msg.body.length > 20 ? '...' : '');
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_line_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').textContent = msg.body;
@@ -891,7 +937,6 @@ async function showDetail(messageId) {
   document.getElementById('detail-unread-count').textContent = totalMembers - readCount;
   document.getElementById('detail-total-count').textContent = totalMembers;
 
-  // 既読リスト
   const readListEl = document.getElementById('detail-read-list');
   if (reads && reads.length > 0) {
     readListEl.innerHTML = reads.map(r => {
@@ -908,7 +953,6 @@ async function showDetail(messageId) {
     readListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も読んでいません</div>';
   }
 
-  // 未読リスト
   const unreadListEl = document.getElementById('detail-unread-list');
   if (unreadMembers.length > 0) {
     unreadListEl.innerHTML = unreadMembers.map(m => `
@@ -926,7 +970,6 @@ async function showDetail(messageId) {
 
 async function recordRead(messageId) {
   try {
-    // 既読チェック
     const { data: existing } = await supabase
       .from('read_receipts')
       .select('id')
@@ -934,16 +977,14 @@ async function recordRead(messageId) {
       .eq('line_uid', currentUser.line_uid)
       .single();
 
-    if (existing) return; // 既に既読
+    if (existing) return;
 
-    // 既読記録
     await supabase.from('read_receipts').insert({
       message_id: messageId,
       line_uid: currentUser.line_uid,
       read_at: new Date().toISOString()
     });
 
-    // read_countを更新
     const msg = messages.find(m => m.id === messageId);
     if (msg) {
       await supabase.from('messages')
@@ -996,7 +1037,7 @@ async function approveMember(memberId, displayName) {
 
     showToast(`${displayName}さんを承認しました`);
     await loadApprovals();
-    await loadMessages(); // メンバー数更新
+    await loadMessages();
   } catch (e) {
     showToast('エラーが発生しました。');
   }
@@ -1034,6 +1075,11 @@ function showProfile() {
 async function leaveGroup() {
   if (!confirm('グループを退出しますか？')) return;
   try {
+    // リアルタイム購読を切断
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
     await supabase.from('group_members')
       .update({ status: 'left' })
       .eq('id', currentMemberId);
@@ -1066,11 +1112,6 @@ function generateGroupId() {
 function getMemberName(lineUid) {
   const member = members.find(m => m.line_uid === lineUid);
   return member?.display_name || '不明';
-}
-
-function getUnreadNames(messageId, readCount) {
-  // 簡易表示（詳細は詳細画面で確認）
-  return '詳細を確認してください';
 }
 
 function formatTime(isoString) {
