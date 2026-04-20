@@ -32,11 +32,9 @@
     margin: 0 auto;
   }
 
-  /* ── スクリーン管理 ── */
   .screen { display: none; flex-direction: column; min-height: 100vh; }
   .screen.active { display: flex; }
 
-  /* ── ヘッダー ── */
   .header {
     background: var(--navy);
     padding: 16px;
@@ -65,10 +63,8 @@
     width: 32px; display: flex; align-items: center; justify-content: center;
   }
 
-  /* ── コンテンツ ── */
   .content { flex: 1; padding: 16px; overflow-y: auto; }
 
-  /* ── カード ── */
   .card {
     background: var(--white);
     border-radius: 14px;
@@ -77,7 +73,6 @@
     margin-bottom: 12px;
   }
 
-  /* ── ボタン ── */
   .btn {
     width: 100%;
     padding: 14px;
@@ -98,7 +93,6 @@
   .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   .btn-danger { background: var(--red); color: white; }
 
-  /* ── 入力フォーム ── */
   .form-group { margin-bottom: 16px; }
   .form-label {
     font-size: 12px; font-weight: 700; color: var(--text-mid);
@@ -115,7 +109,6 @@
   .form-input:focus, .form-textarea:focus { border-color: var(--green); }
   .form-textarea { resize: none; min-height: 100px; line-height: 1.6; }
 
-  /* ── メッセージカード ── */
   .msg-card {
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
@@ -128,9 +121,7 @@
   .msg-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
   .msg-meta { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
 
-  .msg-read-bar {
-    display: flex; align-items: center; gap: 8px;
-  }
+  .msg-read-bar { display: flex; align-items: center; gap: 8px; }
   .bar { flex: 1; height: 5px; background: #eef0f5; border-radius: 3px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 3px; background: var(--green); transition: width 0.3s; }
   .bar-fill.warn { background: #f59e0b; }
@@ -143,7 +134,6 @@
     flex-wrap: wrap;
   }
 
-  /* ── 既読詳細 ── */
   .person-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 16px; border-bottom: 1px solid var(--border);
@@ -154,16 +144,13 @@
   .check-yes { color: var(--green); font-size: 18px; }
   .check-no { color: var(--red); font-size: 18px; }
 
-  /* ── 通知バナー ── */
   .banner {
     padding: 12px 16px; border-radius: 12px;
     font-size: 13px; margin-bottom: 12px;
     display: flex; align-items: center; gap: 8px;
   }
   .banner-info { background: #e3f2fd; color: #1565c0; }
-  .banner-warn { background: #fff8e1; color: #b45309; }
 
-  /* ── ローディング ── */
   .loading {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
@@ -178,7 +165,6 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── グループID表示 ── */
   .group-id-box {
     background: var(--navy); color: white;
     border-radius: 12px; padding: 16px;
@@ -193,19 +179,6 @@
     font-size: 12px; cursor: pointer; font-family: inherit;
   }
 
-  /* ── タブ ── */
-  .tabs {
-    display: flex; background: var(--navy);
-    padding: 0 16px 12px; gap: 8px;
-  }
-  .tab {
-    padding: 6px 16px; border-radius: 20px;
-    font-size: 13px; font-weight: 500;
-    color: rgba(255,255,255,0.5); cursor: pointer;
-  }
-  .tab.active { background: var(--green); color: white; }
-
-  /* ── 承認待ち ── */
   .approval-item {
     padding: 14px 16px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
@@ -219,7 +192,6 @@
     font-weight: 600; cursor: pointer; font-family: inherit;
   }
 
-  /* ── フロート送信ボタン ── */
   .fab {
     position: fixed; bottom: 24px; right: 24px;
     width: 56px; height: 56px;
@@ -232,7 +204,6 @@
   }
   .fab:active { transform: scale(0.92); }
 
-  /* ── 空状態 ── */
   .empty {
     text-align: center; padding: 60px 20px;
     color: var(--text-light);
@@ -240,7 +211,6 @@
   .empty-icon { font-size: 48px; margin-bottom: 12px; }
   .empty-text { font-size: 15px; }
 
-  /* ── トースト ── */
   #toast {
     position: fixed; bottom: 90px; left: 50%;
     transform: translateX(-50%) translateY(20px);
@@ -255,13 +225,11 @@
 </head>
 <body>
 
-<!-- ローディング -->
 <div class="loading" id="loading">
   <div class="spinner"></div>
   <div style="color:#4a6080; font-size:14px;">StaffLink を起動中...</div>
 </div>
 
-<!-- トースト通知 -->
 <div id="toast"></div>
 
 <!-- ══ 画面①：起動・グループ選択 ══ -->
@@ -279,19 +247,16 @@
       <div style="font-size:18px; font-weight:700; margin-bottom:8px;">はじめましょう</div>
       <div style="font-size:14px; color:var(--text-light);">グループを作成するか、既存のグループに参加してください</div>
     </div>
-
     <div class="form-group">
       <label class="form-label">表示名（本名を入力してください）</label>
       <input class="form-input" id="input-display-name" type="text" placeholder="例：山田 太郎" maxlength="20">
     </div>
-
     <div style="margin-bottom:16px;">
       <button class="btn btn-primary" onclick="createGroup()" style="margin-bottom:10px;">
         ✨ 新しいグループを作る
       </button>
       <div style="text-align:center; color:var(--text-light); font-size:13px; margin-bottom:10px;">または</div>
     </div>
-
     <div class="card" style="padding:16px;">
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">グループIDを入力して参加</label>
@@ -328,7 +293,7 @@
   </div>
 </div>
 
-<!-- ══ 画面③：ホーム（タイムライン） ══ -->
+<!-- ══ 画面③：ホーム ══ -->
 <div class="screen" id="screen-home">
   <div class="header">
     <div class="header-logo">🏨</div>
@@ -337,18 +302,16 @@
       <div class="header-sub" id="home-group-id-display"></div>
     </div>
     <div style="display:flex; gap:8px;">
-      <div style="cursor:pointer; color:white; font-size:20px;" onclick="showScreen('screen-approval')" title="承認待ち">👥</div>
+      <div style="cursor:pointer; color:white; font-size:20px;" id="approval-btn" onclick="showScreen('screen-approval')" title="承認待ち">👥</div>
       <div style="cursor:pointer; color:white; font-size:20px;" onclick="showProfile()" title="プロフィール">👤</div>
     </div>
   </div>
-
   <div class="content" id="home-messages">
     <div class="empty">
       <div class="empty-icon">📭</div>
       <div class="empty-text">まだメッセージがありません</div>
     </div>
   </div>
-
   <button class="fab" onclick="showScreen('screen-compose')" title="新しいメッセージ">✏️</button>
 </div>
 
@@ -367,7 +330,7 @@
   </div>
 </div>
 
-<!-- ══ 画面⑤：メッセージ詳細・既読確認 ══ -->
+<!-- ══ 画面⑤：メッセージ詳細 ══ -->
 <div class="screen" id="screen-detail">
   <div class="header">
     <div class="back-btn" onclick="showScreen('screen-home')">‹</div>
@@ -378,27 +341,24 @@
       <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="detail-meta"></div>
       <div style="font-size:15px; line-height:1.7;" id="detail-body"></div>
     </div>
-
     <div style="display:flex; gap:10px; margin-bottom:16px;">
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
-        <div style="font-size:28px; font-weight:700; color:var(--green); font-family:'DM Sans',sans-serif;" id="detail-read-count">0</div>
+        <div style="font-size:28px; font-weight:700; color:var(--green);" id="detail-read-count">0</div>
         <div style="font-size:12px; color:var(--text-light);">既読</div>
       </div>
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
-        <div style="font-size:28px; font-weight:700; color:var(--red); font-family:'DM Sans',sans-serif;" id="detail-unread-count">0</div>
+        <div style="font-size:28px; font-weight:700; color:var(--red);" id="detail-unread-count">0</div>
         <div style="font-size:12px; color:var(--text-light);">未読</div>
       </div>
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
-        <div style="font-size:28px; font-weight:700; font-family:'DM Sans',sans-serif;" id="detail-total-count">0</div>
+        <div style="font-size:28px; font-weight:700;" id="detail-total-count">0</div>
         <div style="font-size:12px; color:var(--text-light);">合計</div>
       </div>
     </div>
-
     <div class="card">
       <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);">✅ 既読（名前・時刻）</div>
       <div id="detail-read-list"></div>
     </div>
-
     <div class="card" style="margin-top:12px;">
       <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);">❌ 未読</div>
       <div id="detail-unread-list"></div>
@@ -434,13 +394,11 @@
       <div style="font-size:18px; font-weight:700;" id="profile-name">---</div>
       <div style="font-size:12px; color:var(--text-light); margin-top:4px;" id="profile-line-name"></div>
     </div>
-
     <div class="group-id-box">
       <div class="group-id-label">あなたのグループID</div>
       <div class="group-id-value" id="profile-group-id">---</div>
       <button class="copy-btn" onclick="copyGroupId()">コピー</button>
     </div>
-
     <div class="card" style="padding:16px; margin-bottom:16px;">
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">表示名を変更</label>
@@ -448,32 +406,32 @@
       </div>
       <button class="btn btn-secondary" onclick="updateDisplayName()">表示名を更新</button>
     </div>
-
     <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;">グループを退出する</button>
   </div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // 設定
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 const SUPABASE_URL = 'https://fibrgvbpnelywnptvgwx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpYnJndmJwbmVseXducHR2Z3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjY1NDksImV4cCI6MjA5MjE0MjU0OX0.y-gzEBwJSFMHOwR29zlJGkzMktDPoM_A324oE4ofwaU';
 const LIFF_ID = '2009827936-jvYNcPNH';
+const POLL_INTERVAL = 5000; // ★ 5秒ごとに自動更新
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // グローバル状態
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 let currentUser = null;
 let currentGroup = null;
 let currentMemberId = null;
 let messages = [];
 let members = [];
-let realtimeChannel = null; // ★ リアルタイム購読チャンネル
+let pollTimer = null; // ★ ポーリング用タイマー
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // 初期化
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function init() {
   try {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -571,9 +529,9 @@ async function restoreSession(memberId, groupId) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // グループ作成
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function createGroup() {
   const displayName = document.getElementById('input-display-name').value.trim();
   if (!displayName) { showToast('表示名を入力してください'); return; }
@@ -622,9 +580,9 @@ async function createGroup() {
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // グループ参加
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function joinGroup() {
   const displayName = document.getElementById('input-display-name').value.trim();
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
@@ -711,9 +669,9 @@ async function joinGroup() {
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // 承認確認
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function checkApproval() {
   try {
     const { data: member } = await supabase
@@ -736,9 +694,9 @@ async function checkApproval() {
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // ホーム読み込み
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function loadHome() {
   document.getElementById('home-group-id-display').textContent = currentGroup.group_id;
   document.getElementById('profile-group-id').textContent = currentGroup.group_id;
@@ -746,73 +704,32 @@ async function loadHome() {
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
 
   await loadMessages();
-  startRealtime(); // ★ リアルタイム購読を開始
+  startPolling(); // ★ ポーリング開始
 }
 
-// ═══════════════════════════════════════════════════════
-// ★ リアルタイム更新
-// ═══════════════════════════════════════════════════════
-function startRealtime() {
-  // 既存のチャンネルがあれば一旦切断
-  if (realtimeChannel) {
-    supabase.removeChannel(realtimeChannel);
+// ═══════════════════════════════════════════════════
+// ★ ポーリング（5秒ごとに自動更新）
+// ═══════════════════════════════════════════════════
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(async () => {
+    const homeActive = document.getElementById('screen-home').classList.contains('active');
+    const approvalActive = document.getElementById('screen-approval').classList.contains('active');
+    if (homeActive) await loadMessages();
+    if (approvalActive) await loadApprovals();
+  }, POLL_INTERVAL);
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
-
-  realtimeChannel = supabase
-    .channel('stafflink-realtime-' + currentGroup.id)
-
-    // メッセージの追加・更新を監視
-    .on('postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: `group_session_id=eq.${currentGroup.id}`
-      },
-      () => {
-        if (document.getElementById('screen-home').classList.contains('active')) {
-          loadMessages();
-        }
-      }
-    )
-
-    // 既読の追加を監視
-    .on('postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'read_receipts'
-      },
-      () => {
-        if (document.getElementById('screen-home').classList.contains('active')) {
-          loadMessages();
-        }
-      }
-    )
-
-    // メンバーの追加・承認を監視
-    .on('postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'group_members',
-        filter: `group_session_id=eq.${currentGroup.id}`
-      },
-      () => {
-        if (document.getElementById('screen-home').classList.contains('active')) {
-          loadMessages();
-        }
-        if (document.getElementById('screen-approval').classList.contains('active')) {
-          loadApprovals();
-        }
-      }
-    )
-
-    .subscribe((status) => {
-      console.log('Realtime status:', status);
-    });
 }
 
+// ═══════════════════════════════════════════════════
+// メッセージ読み込み
+// ═══════════════════════════════════════════════════
 async function loadMessages() {
   try {
     const { data } = await supabase
@@ -839,10 +756,9 @@ async function loadMessages() {
       .eq('group_session_id', currentGroup.id)
       .eq('status', 'pending');
 
-    if (count > 0) {
-      document.querySelector('[onclick="showScreen(\'screen-approval\')"]').textContent = `👥${count}`;
-    } else {
-      document.querySelector('[onclick="showScreen(\'screen-approval\')"]').textContent = `👥`;
+    const approvalBtn = document.getElementById('approval-btn');
+    if (approvalBtn) {
+      approvalBtn.textContent = count > 0 ? `👥${count}` : '👥';
     }
   } catch (e) {
     console.error(e);
@@ -851,20 +767,17 @@ async function loadMessages() {
 
 function renderMessages() {
   const container = document.getElementById('home-messages');
-
   if (messages.length === 0) {
     container.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">まだメッセージがありません<br>右下の✏️ボタンから送信してください</div></div>`;
     return;
   }
 
   const totalMembers = members.length;
-
   container.innerHTML = messages.map(msg => {
     const readPct = totalMembers > 0 ? (msg.read_count || 0) / totalMembers * 100 : 0;
     const unreadCount = totalMembers - (msg.read_count || 0);
     const senderName = getMemberName(msg.sender_line_uid);
     const timeStr = formatTime(msg.created_at);
-
     return `
       <div class="msg-card" onclick="showDetail('${msg.id}')">
         <div class="msg-title">${escHtml(msg.body.substring(0, 50))}${msg.body.length > 50 ? '...' : ''}</div>
@@ -879,16 +792,15 @@ function renderMessages() {
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // メッセージ送信
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function sendMessage() {
   const body = document.getElementById('compose-body').value.trim();
   if (!body) { showToast('メッセージを入力してください'); return; }
 
   try {
     showToast('送信中...');
-
     const { error } = await supabase
       .from('messages')
       .insert({
@@ -901,18 +813,18 @@ async function sendMessage() {
     if (error) throw error;
 
     document.getElementById('compose-body').value = '';
+    await loadMessages();
     showScreen('screen-home');
     showToast('送信しました！');
-    // ★ リアルタイムで自動更新されるので手動loadMessages不要
   } catch (e) {
     console.error(e);
     showToast('送信に失敗しました。');
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // メッセージ詳細・既読記録
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function showDetail(messageId) {
   const msg = messages.find(m => m.id === messageId);
   if (!msg) return;
@@ -996,9 +908,9 @@ async function recordRead(messageId) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // 承認管理
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function loadApprovals() {
   try {
     const { data: pending } = await supabase
@@ -1009,7 +921,6 @@ async function loadApprovals() {
       .order('created_at', { ascending: true });
 
     const container = document.getElementById('approval-list');
-
     if (!pending || pending.length === 0) {
       container.innerHTML = '<div class="empty" style="padding:40px;"><div class="empty-text">承認待ちのメンバーはいません</div></div>';
       return;
@@ -1043,9 +954,9 @@ async function approveMember(memberId, displayName) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // プロフィール
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 async function updateDisplayName() {
   const newName = document.getElementById('profile-new-name').value.trim();
   if (!newName) { showToast('新しい表示名を入力してください'); return; }
@@ -1075,11 +986,7 @@ function showProfile() {
 async function leaveGroup() {
   if (!confirm('グループを退出しますか？')) return;
   try {
-    // リアルタイム購読を切断
-    if (realtimeChannel) {
-      supabase.removeChannel(realtimeChannel);
-      realtimeChannel = null;
-    }
+    stopPolling();
     await supabase.from('group_members')
       .update({ status: 'left' })
       .eq('id', currentMemberId);
@@ -1099,9 +1006,9 @@ function copyGroupId() {
   navigator.clipboard?.writeText(id).then(() => showToast('グループIDをコピーしました'));
 }
 
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 // ユーティリティ
-// ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 function generateGroupId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const part1 = Array.from({length:5}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
@@ -1152,9 +1059,6 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
-// ═══════════════════════════════════════════════════════
-// 起動
-// ═══════════════════════════════════════════════════════
 window.addEventListener('load', init);
 </script>
 </body>
