@@ -409,9 +409,21 @@
       <input class="form-input" id="input-display-name" type="text" placeholder="例：山田 太郎" maxlength="20">
     </div>
     <div style="margin-bottom:16px;">
-      <button class="btn btn-primary" onclick="createGroup()" style="margin-bottom:10px;">
-        ✨ 新しいグループを作る / Create Group
-      </button>
+      <div class="card" style="padding:16px; margin-bottom:10px;">
+        <div style="font-size:13px; font-weight:700; color:var(--text-mid); margin-bottom:10px;">✨ 新しいグループを作る / Create Group</div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label">業種を選択 / Industry</label>
+          <select class="form-input" id="input-industry">
+            <option value="">-- 業種を選んでください --</option>
+            <option value="hotel">🏨 ホテル・旅館</option>
+            <option value="clinic">🏥 病院・クリニック</option>
+            <option value="care">🏠 介護施設</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="createGroup()">
+          ✨ 新しいグループを作る / Create Group
+        </button>
+      </div>
       <div style="text-align:center; color:var(--text-light); font-size:13px; margin-bottom:10px;">または / or</div>
     </div>
     <div class="card" style="padding:16px;">
@@ -594,12 +606,25 @@
       <div class="group-id-value" id="profile-group-id">---</div>
       <button class="copy-btn" onclick="copyGroupId()">コピー</button>
     </div>
-    <div class="card" style="padding:16px; margin-bottom:12px;">
-      <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">グループ名を変更 / Group Name</label>
-        <input class="form-input" id="profile-group-name" type="text" placeholder="例：フロントスタッフ" maxlength="30">
+    <div id="profile-admin-section" style="display:none;">
+      <div class="card" style="padding:16px; margin-bottom:12px;">
+        <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:10px; letter-spacing:0.5px;">👑 グループ管理者メニュー</div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label">グループ名を変更 / Group Name</label>
+          <input class="form-input" id="profile-group-name" type="text" placeholder="例：フロントスタッフ" maxlength="30">
+        </div>
+        <button class="btn btn-secondary" onclick="updateGroupName()" style="margin-bottom:12px;">グループ名を更新 / Update</button>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label">業種を変更 / Change Industry</label>
+          <select class="form-input" id="profile-industry">
+            <option value="">-- 選択してください --</option>
+            <option value="hotel">🏨 ホテル・旅館</option>
+            <option value="clinic">🏥 病院・クリニック</option>
+            <option value="care">🏠 介護施設</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" onclick="updateIndustry()">業種を更新 / Update Industry</button>
       </div>
-      <button class="btn btn-secondary" onclick="updateGroupName()">グループ名を更新 / Update</button>
     </div>
     <div class="card" style="padding:16px; margin-bottom:16px;">
       <div class="form-group" style="margin-bottom:12px;">
@@ -640,6 +665,7 @@ const POLL_INTERVAL = 5000;
 let currentUser = null;
 let currentGroup = null;
 let currentMemberId = null;
+let isCreator = false;
 let messages = [];
 let members = [];
 let pollTimer = null;
@@ -714,7 +740,7 @@ async function restoreSession(memberId, groupId) {
     }
     if (member.status === 'approved') {
       currentMemberId = member.id; currentUser.display_name = member.display_name;
-      currentGroup = member.group_sessions; hideLoading();
+      currentGroup = member.group_sessions; isCreator = member.is_creator || false; hideLoading();
       await loadHome(); showScreen('screen-home'); return;
     }
   } catch (e) { localStorage.clear(); hideLoading(); showScreen('screen-start'); }
@@ -748,20 +774,22 @@ async function recheckFriendship() {
 // ═══════════════════════════════════════════
 async function createGroup() {
   const displayName = document.getElementById('input-display-name').value.trim();
+  const industryVal = document.getElementById('input-industry').value;
   if (!displayName) { showToast('表示名を入力してください'); return; }
+  if (!industryVal) { showToast('業種を選択してください'); return; }
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
     const expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);
     const { data: group, error: groupError } = await supabase
-      .from('group_sessions').insert({ group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50 }).select().single();
+      .from('group_sessions').insert({ group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50, industry: industryVal }).select().single();
     if (groupError) throw groupError;
     const { data: member, error: memberError } = await supabase
-      .from('group_members').insert({ group_session_id: group.id, line_uid: currentUser.line_uid, display_name: displayName, status: 'approved' }).select().single();
+      .from('group_members').insert({ group_session_id: group.id, line_uid: currentUser.line_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
     if (memberError) throw memberError;
     localStorage.setItem('sl_member_id', member.id);
     localStorage.setItem('sl_group_id', groupId);
-    currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id;
+    currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id; isCreator = true;
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
   } catch (e) { console.error(e); showToast('エラーが発生しました。再試行してください。'); }
 }
@@ -785,6 +813,7 @@ async function joinGroup() {
       if (existing.status === 'approved') {
         localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
         currentUser.display_name = existing.display_name; currentGroup = group; currentMemberId = existing.id;
+        isCreator = existing.is_creator || false;
         await loadHome(); showScreen('screen-home'); return;
       }
       if (existing.status === 'pending') {
@@ -809,6 +838,7 @@ async function checkApproval() {
       .eq('id', currentMemberId).single();
     if (member && member.status === 'approved') {
       currentUser.display_name = member.display_name; currentGroup = member.group_sessions;
+      isCreator = member.is_creator || false;
       await loadHome(); showScreen('screen-home'); showToast('参加が承認されました！');
     } else { showToast('まだ承認されていません。しばらくお待ちください。'); }
   } catch (e) { showToast('確認中にエラーが発生しました。'); }
@@ -1087,10 +1117,24 @@ async function updateGroupName() {
       .update({ group_name: newName }).eq('id', currentGroup.id);
     if (error) throw error;
     currentGroup.group_name = newName;
-    // ヘッダーを即時更新
     const groupLabel = newName + '　(' + currentGroup.group_id + ')';
     document.getElementById('home-group-id-display').textContent = groupLabel;
     showToast('グループ名を更新しました');
+  } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
+}
+
+// ── 業種変更（管理者のみ） ──
+async function updateIndustry() {
+  if (!isCreator) { showToast('管理者のみ変更できます'); return; }
+  const newIndustry = document.getElementById('profile-industry').value;
+  if (!newIndustry) { showToast('業種を選択してください'); return; }
+  try {
+    const { error } = await supabase.from('group_sessions')
+      .update({ industry: newIndustry }).eq('id', currentGroup.id);
+    if (error) throw error;
+    currentGroup.industry = newIndustry;
+    const labels = { hotel: 'ホテル・旅館', clinic: '病院・クリニック', care: '介護施設' };
+    showToast(`業種を「${labels[newIndustry]}」に更新しました`);
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
 
@@ -1131,9 +1175,17 @@ function showProfile() {
   document.getElementById('profile-name').textContent = currentUser.display_name || '---';
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
   document.getElementById('profile-group-id').textContent = currentGroup?.group_id || '---';
-  // グループ名を入力欄にセット
+  // 管理者セクションの表示切替
+  const adminSection = document.getElementById('profile-admin-section');
+  if (adminSection) {
+    adminSection.style.display = isCreator ? 'block' : 'none';
+  }
+  // グループ名を入力欄にセット（管理者のみ）
   const gnEl = document.getElementById('profile-group-name');
   if (gnEl) gnEl.value = currentGroup?.group_name || '';
+  // 業種をセレクトにセット（管理者のみ）
+  const indEl = document.getElementById('profile-industry');
+  if (indEl) indEl.value = currentGroup?.industry || '';
   // LINEプロフィール画像を表示
   const avatarEl = document.getElementById('profile-avatar');
   if (avatarEl) {
