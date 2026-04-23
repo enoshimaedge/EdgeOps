@@ -412,6 +412,10 @@
       <div class="card" style="padding:16px; margin-bottom:10px;">
         <div style="font-size:13px; font-weight:700; color:var(--text-mid); margin-bottom:10px;">✨ 新しいグループを作る / Create Group</div>
         <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label">グループ名（任意） / Group Name <span style="font-size:11px; color:var(--text-light); font-weight:400;">※後から変更できます</span></label>
+          <input class="form-input" id="input-group-name" type="text" placeholder="例：フロントスタッフ・1階ナースステーション" maxlength="30">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label">業種を選択 / Industry</label>
           <select class="form-input" id="input-industry">
             <option value="">-- 業種を選んでください --</option>
@@ -775,14 +779,17 @@ async function recheckFriendship() {
 async function createGroup() {
   const displayName = document.getElementById('input-display-name').value.trim();
   const industryVal = document.getElementById('input-industry').value;
+  const groupNameVal = document.getElementById('input-group-name').value.trim();
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!industryVal) { showToast('業種を選択してください'); return; }
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
     const expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    const insertData = { group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50, industry: industryVal };
+    if (groupNameVal) insertData.group_name = groupNameVal;
     const { data: group, error: groupError } = await supabase
-      .from('group_sessions').insert({ group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50, industry: industryVal }).select().single();
+      .from('group_sessions').insert(insertData).select().single();
     if (groupError) throw groupError;
     const { data: member, error: memberError } = await supabase
       .from('group_members').insert({ group_session_id: group.id, line_uid: currentUser.line_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
