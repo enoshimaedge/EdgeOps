@@ -411,20 +411,28 @@ const INDUSTRY_LABELS = {
 async function init() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  try {
-    await liff.init({ liffId: LIFF_ID });
+  // URLパラメータからline_uid取得（LINEアプリ内からの遷移時）
+  const urlParams = new URLSearchParams(window.location.search);
+  const uidFromUrl = urlParams.get('uid');
 
-    if (!liff.isLoggedIn()) {
-      liff.login();
+  if (uidFromUrl) {
+    // URLパラメータでUIDが渡された場合（LINEアプリ経由）
+    currentUser = { line_uid: uidFromUrl, display_name: '管理者' };
+  } else {
+    // 通常のLIFFログイン
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      const profile = await liff.getProfile();
+      currentUser = { line_uid: profile.userId, display_name: profile.displayName };
+    } catch(e) {
+      document.getElementById('screen-loading').style.display = 'none';
+      document.getElementById('screen-denied').style.display = 'flex';
       return;
     }
-
-    const profile = await liff.getProfile();
-    currentUser = { line_uid: profile.userId, display_name: profile.displayName };
-
-  } catch(e) {
-    // ブラウザテスト用
-    currentUser = { line_uid: 'dev_admin_test', display_name: 'テスト管理者' };
   }
 
   // 超管理者チェック（adminsテーブル）
