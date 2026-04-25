@@ -1351,7 +1351,7 @@ async function checkSuperAdmin() {
 }
 
 function openAdminPanel() {
-  liff.openWindow({ url: "https://app.edgeops.jp/admin.html", external: false });
+  liff.openWindow({ url: "https://app.edgeops.jp/admin.html", external: true });
 }
 async function leaveGroup() {
   if (!confirm('グループを退出しますか？')) return;
