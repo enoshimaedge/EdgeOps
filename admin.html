@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EdgeOps 超管理者ダッシュボード</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --green: #06C755;
+    --green-dark: #04a044;
+    --green-light: #e6f9ee;
+    --navy: #0f1e35;
+    --bg: #f2f3f7;
+    --white: #ffffff;
+    --red: #e53935;
+    --orange: #f57c00;
+    --border: #e4e8f0;
+    --text: #1a2f4a;
+    --text-mid: #4a6080;
+    --text-light: #9aa5b8;
+  }
+
+  body {
+    font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 430px;
+    margin: 0 auto;
+  }
+
+  /* ── ヘッダー ── */
+  .header {
+    background: var(--navy);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+  .header-title { color: white; font-size: 16px; font-weight: 700; flex: 1; }
+  .header-sub { color: rgba(255,255,255,0.6); font-size: 11px; }
+  .admin-badge {
+    background: var(--green);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* ── 画面 ── */
+  .screen { display: none; flex-direction: column; min-height: 100vh; }
+  .screen.active { display: flex; }
+
+  /* ── ローディング ── */
+  #screen-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── アクセス拒否 ── */
+  #screen-denied {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    flex-direction: column;
+    gap: 16px;
+    padding: 32px;
+    text-align: center;
+  }
+  .denied-icon { font-size: 64px; }
+  .denied-title { font-size: 20px; font-weight: 700; color: var(--red); }
+  .denied-text { font-size: 14px; color: var(--text-mid); line-height: 1.6; }
+
+  /* ── タブ ── */
+  .tab-bar {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 57px;
+    z-index: 9;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 12px 4px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-light);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    font-weight: 600;
+  }
+  .tab-btn.active {
+    color: var(--navy);
+    border-bottom-color: var(--navy);
+  }
+  .tab-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+  /* ── コンテンツ ── */
+  .content { flex: 1; padding: 16px; overflow-y: auto; }
+
+  /* ── タブパネル ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ── 統計カード ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .stat-card.full { grid-column: 1 / -1; }
+  .stat-label { font-size: 11px; color: var(--text-light); font-weight: 600; margin-bottom: 6px; }
+  .stat-value { font-size: 28px; font-weight: 700; color: var(--text); }
+  .stat-unit { font-size: 13px; font-weight: 400; color: var(--text-mid); margin-left: 2px; }
+  .stat-icon { font-size: 20px; margin-bottom: 8px; }
+
+  /* ── 業種内訳 ── */
+  .industry-bar {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .industry-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .industry-label { font-size: 12px; color: var(--text-mid); width: 80px; flex-shrink: 0; }
+  .bar-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+  .bar-hotel { background: #06C755; }
+  .bar-clinic { background: #2196F3; }
+  .bar-care { background: #FF9800; }
+  .bar-attraction { background: #9C27B0; }
+  .industry-count { font-size: 12px; font-weight: 700; color: var(--text); width: 24px; text-align: right; }
+
+  /* ── カード ── */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 12px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .card-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .card-meta { font-size: 11px; color: var(--text-light); }
+
+  /* ── グループ一覧 ── */
+  .group-item {
+    background: white;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 10px;
+  }
+  .group-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .group-id { font-size: 13px; font-weight: 700; color: var(--text); font-family: monospace; }
+  .industry-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--green-light);
+    color: var(--green-dark);
+  }
+  .industry-tag.clinic { background: #e3f2fd; color: #1565c0; }
+  .industry-tag.care { background: #fff3e0; color: #e65100; }
+  .industry-tag.attraction { background: #f3e5f5; color: #6a1b9a; }
+  .group-item-info {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: var(--text-light);
+  }
+  .group-item-info span { display: flex; align-items: center; gap: 3px; }
+
+  /* ── 検索 ── */
+  .search-box {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 14px;
+    width: 100%;
+    margin-bottom: 12px;
+    outline: none;
+    color: var(--text);
+  }
+  .search-box:focus { border-color: var(--green); }
+
+  /* ── ローディングスピナー（小） ── */
+  .loading-small {
+    text-align: center;
+    padding: 32px;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+
+  /* ── リフレッシュボタン ── */
+  .refresh-btn {
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  .refresh-btn:active { opacity: 0.85; }
+
+  /* ── 空状態 ── */
+  .empty-state {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-light);
+    font-size: 13px;
+  }
+
+  /* ── メンバー一覧 ── */
+  .member-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .member-item:last-child { border-bottom: none; }
+  .member-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .member-uid { font-size: 10px; color: var(--text-light); font-family: monospace; }
+  .status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .status-approved { background: var(--green-light); color: var(--green-dark); }
+  .status-pending { background: #fff3e0; color: #e65100; }
+  .status-left { background: var(--bg); color: var(--text-light); }
+</style>
+</head>
+<body>
+
+<!-- ローディング -->
+<div id="screen-loading">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:#9aa5b8;">認証中...</div>
+</div>
+
+<!-- アクセス拒否 -->
+<div id="screen-denied">
+  <div class="denied-icon">🚫</div>
+  <div class="denied-title">アクセス拒否</div>
+  <div class="denied-text">このページは超管理者専用です。<br>権限のないアカウントではアクセスできません。</div>
+</div>
+
+<!-- メイン画面 -->
+<div id="screen-main" class="screen">
+  <!-- ヘッダー -->
+  <div class="header">
+    <div style="flex:1">
+      <div class="header-title">⚙️ 超管理者ダッシュボード</div>
+      <div class="header-sub">EdgeOps Admin Panel</div>
+    </div>
+    <div class="admin-badge">ADMIN</div>
+  </div>
+
+  <!-- タブバー -->
+  <div class="tab-bar">
+    <div class="tab-btn active" onclick="switchTab('stats')">
+      <span class="tab-icon">📊</span>統計
+    </div>
+    <div class="tab-btn" onclick="switchTab('groups')">
+      <span class="tab-icon">🏢</span>グループ
+    </div>
+    <div class="tab-btn" onclick="switchTab('members')">
+      <span class="tab-icon">👥</span>メンバー
+    </div>
+  </div>
+
+  <!-- コンテンツ -->
+  <div class="content">
+
+    <!-- 統計タブ -->
+    <div id="tab-stats" class="tab-panel active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🏢</div>
+          <div class="stat-label">総グループ数</div>
+          <div class="stat-value" id="stat-groups">-<span class="stat-unit">件</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-label">総メンバー数</div>
+          <div class="stat-value" id="stat-members">-<span class="stat-unit">人</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-label">承認済みメンバー</div>
+          <div class="stat-value" id="stat-approved">-<span class="stat-unit">人</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-label">承認待ち</div>
+          <div class="stat-value" id="stat-pending">-<span class="stat-unit">人</span></div>
+        </div>
+        <div class="stat-card full">
+          <div class="stat-icon">💬</div>
+          <div class="stat-label">総メッセージ数</div>
+          <div class="stat-value" id="stat-messages">-<span class="stat-unit">件</span></div>
+        </div>
+      </div>
+
+      <!-- 業種内訳 -->
+      <div class="industry-bar">
+        <div class="section-title">📊 業種内訳</div>
+        <div id="industry-breakdown">
+          <div class="loading-small">読み込み中...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- グループタブ -->
+    <div id="tab-groups" class="tab-panel">
+      <input class="search-box" type="text" id="group-search" placeholder="🔍 グループIDで検索..." oninput="filterGroups()">
+      <div id="group-list">
+        <div class="loading-small">読み込み中...</div>
+      </div>
+    </div>
+
+    <!-- メンバータブ -->
+    <div id="tab-members" class="tab-panel">
+      <input class="search-box" type="text" id="member-search" placeholder="🔍 名前・UIDで検索..." oninput="filterMembers()">
+      <div id="member-list">
+        <div class="loading-small">読み込み中...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fibrgvbpnelywnptvgwx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpYnJndmJwbmVseXducHR2Z3d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NjY1NDksImV4cCI6MjA5MjE0MjU0OX0.y-gzEBwJSFMHOwR29zlJGkzMktDPoM_A324oE4ofwaU';
+const LIFF_ID = '2009827939-rZo06gWm';
+
+let sb, currentUser;
+let allGroups = [], allMembers = [];
+
+const INDUSTRY_LABELS = {
+  hotel: '🏨 ホテル・旅館',
+  clinic: '🏥 病院・クリニック',
+  care: '🏠 介護施設',
+  attraction: '🎡 集客施設'
+};
+
+// ── 初期化 ──
+async function init() {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  try {
+    await liff.init({ liffId: LIFF_ID });
+
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+
+    const profile = await liff.getProfile();
+    currentUser = { line_uid: profile.userId, display_name: profile.displayName };
+
+  } catch(e) {
+    // ブラウザテスト用
+    currentUser = { line_uid: 'dev_admin_test', display_name: 'テスト管理者' };
+  }
+
+  // 超管理者チェック（adminsテーブル）
+  const { data: adminRecord } = await supabase
+    .from('admins')
+    .select('line_uid')
+    .eq('line_uid', currentUser.line_uid)
+    .single();
+
+  if (!adminRecord) {
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('screen-denied').style.display = 'flex';
+    return;
+  }
+
+  // 認証OK → データ読み込み
+  await loadAllData();
+
+  document.getElementById('screen-loading').style.display = 'none';
+  document.getElementById('screen-main').classList.add('active');
+}
+
+// ── 全データ読み込み ──
+async function loadAllData() {
+  await Promise.all([loadStats(), loadGroups(), loadMembers()]);
+}
+
+// ── 統計 ──
+async function loadStats() {
+  const [
+    { count: groupCount },
+    { count: memberCount },
+    { count: approvedCount },
+    { count: pendingCount },
+    { count: messageCount },
+    { data: industryData }
+  ] = await Promise.all([
+    sb.from('group_sessions').select('*', { count: 'exact', head: true }),
+    sb.from('group_members').select('*', { count: 'exact', head: true }),
+    sb.from('group_members').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+    sb.from('group_members').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    sb.from('messages').select('*', { count: 'exact', head: true }),
+    sb.from('group_sessions').select('industry')
+  ]);
+
+  document.getElementById('stat-groups').innerHTML = `${groupCount || 0}<span class="stat-unit">件</span>`;
+  document.getElementById('stat-members').innerHTML = `${memberCount || 0}<span class="stat-unit">人</span>`;
+  document.getElementById('stat-approved').innerHTML = `${approvedCount || 0}<span class="stat-unit">人</span>`;
+  document.getElementById('stat-pending').innerHTML = `${pendingCount || 0}<span class="stat-unit">人</span>`;
+  document.getElementById('stat-messages').innerHTML = `${messageCount || 0}<span class="stat-unit">件</span>`;
+
+  // 業種内訳
+  const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0 };
+  (industryData || []).forEach(g => { if (counts[g.industry] !== undefined) counts[g.industry]++; });
+  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+
+  const html = Object.entries(counts).map(([id, count]) => `
+    <div class="industry-row">
+      <div class="industry-label">${INDUSTRY_LABELS[id]?.split(' ')[0] || id} ${id === 'hotel' ? 'ホテル' : id === 'clinic' ? '病院' : id === 'care' ? '介護' : '集客'}</div>
+      <div class="bar-wrap"><div class="bar-fill bar-${id}" style="width:${Math.round(count/total*100)}%"></div></div>
+      <div class="industry-count">${count}</div>
+    </div>
+  `).join('');
+  document.getElementById('industry-breakdown').innerHTML = html;
+}
+
+// ── グループ一覧 ──
+async function loadGroups() {
+  const { data } = await supabase
+    .from('group_sessions')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  allGroups = data || [];
+  renderGroups(allGroups);
+}
+
+function renderGroups(groups) {
+  if (!groups.length) {
+    document.getElementById('group-list').innerHTML = '<div class="empty-state">グループがありません</div>';
+    return;
+  }
+
+  const html = groups.map(g => {
+    const industry = g.industry || 'hotel';
+    const tagClass = industry === 'hotel' ? '' : industry;
+    const label = INDUSTRY_LABELS[industry] || industry;
+    const date = new Date(g.created_at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+    return `
+      <div class="group-item">
+        <div class="group-item-header">
+          <div class="group-id">${g.group_id}</div>
+          <div class="industry-tag ${tagClass}">${label}</div>
+        </div>
+        <div class="group-item-info">
+          <span>📅 ${date}作成</span>
+          <span>🔑 ${g.group_id}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('group-list').innerHTML = html;
+}
+
+function filterGroups() {
+  const q = document.getElementById('group-search').value.toLowerCase();
+  const filtered = allGroups.filter(g =>
+    g.group_id?.toLowerCase().includes(q) ||
+    g.industry?.toLowerCase().includes(q)
+  );
+  renderGroups(filtered);
+}
+
+// ── メンバー一覧 ──
+async function loadMembers() {
+  const { data } = await supabase
+    .from('group_members')
+    .select('*, group_sessions(group_id, industry)')
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  allMembers = data || [];
+  renderMembers(allMembers);
+}
+
+function renderMembers(members) {
+  if (!members.length) {
+    document.getElementById('member-list').innerHTML = '<div class="empty-state">メンバーがいません</div>';
+    return;
+  }
+
+  const html = members.map(m => {
+    const statusClass = m.status === 'approved' ? 'approved' : m.status === 'pending' ? 'pending' : 'left';
+    const statusLabel = m.status === 'approved' ? '承認済' : m.status === 'pending' ? '承認待ち' : '退出';
+    const groupId = m.group_sessions?.group_id || '-';
+    return `
+      <div class="group-item">
+        <div class="group-item-header">
+          <div>
+            <div class="group-id" style="font-size:14px;font-family:inherit">${m.display_name || '名無し'}</div>
+            <div style="font-size:10px;color:#9aa5b8;font-family:monospace;margin-top:2px">${m.line_uid?.substring(0, 20)}...</div>
+          </div>
+          <div class="status-badge status-${statusClass}">${statusLabel}</div>
+        </div>
+        <div class="group-item-info">
+          <span>🏢 ${groupId}</span>
+          <span>${m.group_sessions ? INDUSTRY_LABELS[m.group_sessions.industry] || '' : ''}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('member-list').innerHTML = html;
+}
+
+function filterMembers() {
+  const q = document.getElementById('member-search').value.toLowerCase();
+  const filtered = allMembers.filter(m =>
+    m.display_name?.toLowerCase().includes(q) ||
+    m.line_uid?.toLowerCase().includes(q)
+  );
+  renderMembers(filtered);
+}
+
+// ── タブ切り替え ──
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+init();
+</script>
+</body>
+</html>
