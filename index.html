@@ -684,7 +684,33 @@
             <option value="attraction">🎡 集客施設</option>
           </select>
         </div>
-        <button class="btn btn-secondary" onclick="updateIndustry()">業種を更新 / Update Industry</button>
+        <button class="btn btn-secondary" onclick="updateIndustry()" style="margin-bottom:12px;">業種を更新 / Update Industry</button>
+        <!-- 月次レポートボタン -->
+        <button class="btn btn-secondary" onclick="showMonthlyReport()" style="margin-top:4px; background:#f0f8ff; border-color:#4a90d9; color:#1a5fa8;">
+          📊 月次レポートを見る / Monthly Report
+        </button>
+      </div>
+    </div>
+
+    <!-- ══ 月次レポートモーダル ══ -->
+    <div id="modal-report" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; overflow-y:auto;">
+      <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <div style="font-size:16px; font-weight:700;">📊 月次レポート</div>
+          <div onclick="document.getElementById('modal-report').style.display='none'"
+               style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
+        </div>
+        <!-- 月切替タブ -->
+        <div style="display:flex; gap:8px; margin-bottom:16px;">
+          <button id="tab-lastmonth" onclick="switchReportTab('last')"
+            style="flex:1; padding:8px; border-radius:8px; border:2px solid var(--green); background:var(--green); color:white; font-weight:700; font-family:inherit; cursor:pointer; font-size:13px;">先月</button>
+          <button id="tab-thismonth" onclick="switchReportTab('this')"
+            style="flex:1; padding:8px; border-radius:8px; border:2px solid var(--border); background:white; color:var(--text-mid); font-weight:700; font-family:inherit; cursor:pointer; font-size:13px;">今月</button>
+        </div>
+        <div id="report-period" style="font-size:12px; color:var(--text-light); text-align:center; margin-bottom:12px;"></div>
+        <div id="report-content">
+          <div class="spinner" style="margin:40px auto;"></div>
+        </div>
       </div>
     </div>
     <div class="card" style="padding:16px; margin-bottom:16px;">
@@ -1288,6 +1314,170 @@ async function approveMember(memberId, displayName) {
     showToast(`${displayName}さんを承認しました`);
     await loadApprovals(); await loadMessages();
   } catch (e) { showToast('エラーが発生しました。'); }
+}
+
+// ═══════════════════════════════════════════
+// 月次レポート
+// ═══════════════════════════════════════════
+let currentReportTab = 'last'; // 'last' or 'this'
+
+async function showMonthlyReport() {
+  document.getElementById('modal-report').style.display = 'block';
+  currentReportTab = 'last';
+  updateReportTabUI();
+  await loadReportData('last');
+}
+
+function switchReportTab(tab) {
+  currentReportTab = tab;
+  updateReportTabUI();
+  loadReportData(tab);
+}
+
+function updateReportTabUI() {
+  const lastBtn = document.getElementById('tab-lastmonth');
+  const thisBtn = document.getElementById('tab-thismonth');
+  if (currentReportTab === 'last') {
+    lastBtn.style.background = 'var(--green)'; lastBtn.style.borderColor = 'var(--green)'; lastBtn.style.color = 'white';
+    thisBtn.style.background = 'white'; thisBtn.style.borderColor = 'var(--border)'; thisBtn.style.color = 'var(--text-mid)';
+  } else {
+    thisBtn.style.background = 'var(--green)'; thisBtn.style.borderColor = 'var(--green)'; thisBtn.style.color = 'white';
+    lastBtn.style.background = 'white'; lastBtn.style.borderColor = 'var(--border)'; lastBtn.style.color = 'var(--text-mid)';
+  }
+}
+
+async function loadReportData(tab) {
+  const content = document.getElementById('report-content');
+  const periodEl = document.getElementById('report-period');
+  content.innerHTML = '<div class="spinner" style="margin:40px auto;"></div>';
+
+  const now = new Date();
+  let year, month;
+  if (tab === 'last') {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    year = d.getFullYear(); month = d.getMonth(); // 0-indexed
+  } else {
+    year = now.getFullYear(); month = now.getMonth();
+  }
+  const start = new Date(year, month, 1).toISOString();
+  const end   = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  const label = `${year}年${month + 1}月`;
+  periodEl.textContent = label;
+
+  try {
+    // メッセージ取得
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('id, created_at, sender_uid')
+      .eq('group_session_id', currentGroup.id)
+      .gte('created_at', start).lte('created_at', end);
+
+    // 既読レコード取得
+    const msgIds = (msgs || []).map(m => m.id);
+    let receipts = [];
+    if (msgIds.length > 0) {
+      const { data } = await supabase
+        .from('read_receipts')
+        .select('message_id, member_id, read_at')
+        .in('message_id', msgIds);
+      receipts = data || [];
+    }
+
+    // メンバー取得
+    const { data: members } = await supabase
+      .from('group_members')
+      .select('id, display_name')
+      .eq('group_session_id', currentGroup.id)
+      .eq('status', 'approved');
+    const memberCount = (members || []).length;
+    const memberMap = {};
+    (members || []).forEach(m => { memberMap[m.id] = m.display_name; });
+
+    // 統計計算
+    const totalMsgs = (msgs || []).length;
+
+    // 平均既読率
+    let totalRate = 0;
+    (msgs || []).forEach(msg => {
+      const msgReceipts = receipts.filter(r => r.message_id === msg.id);
+      totalRate += memberCount > 1 ? msgReceipts.length / (memberCount - 1) : 0;
+    });
+    const avgRate = totalMsgs > 0 ? Math.round(totalRate / totalMsgs * 100) : 0;
+
+    // 最速既読者（全メッセージで最も平均既読時間が短いメンバー）
+    const memberReadTimes = {};
+    const memberReadCounts = {};
+    receipts.forEach(r => {
+      const msg = (msgs || []).find(m => m.id === r.message_id);
+      if (!msg) return;
+      const diff = (new Date(r.read_at) - new Date(msg.created_at)) / 60000; // 分
+      if (!memberReadTimes[r.member_id]) { memberReadTimes[r.member_id] = 0; memberReadCounts[r.member_id] = 0; }
+      memberReadTimes[r.member_id] += diff;
+      memberReadCounts[r.member_id]++;
+    });
+    let fastestName = '—'; let fastestMin = Infinity;
+    Object.keys(memberReadTimes).forEach(mid => {
+      const avg = memberReadTimes[mid] / memberReadCounts[mid];
+      if (avg < fastestMin) { fastestMin = avg; fastestName = memberMap[mid] || '—'; }
+    });
+    const fastestStr = fastestMin < Infinity
+      ? `${fastestName}（平均${fastestMin < 60 ? Math.round(fastestMin) + '分' : Math.round(fastestMin/60) + '時間'}）`
+      : '—';
+
+    // 要注意スタッフ（既読率50%未満）
+    const memberRateMap = {};
+    (members || []).forEach(m => { memberRateMap[m.id] = { name: m.display_name, read: 0, total: 0 }; });
+    (msgs || []).forEach(msg => {
+      const msgReceipts = receipts.filter(r => r.message_id === msg.id);
+      (members || []).forEach(m => {
+        if (m.id === msg.sender_uid) return; // 送信者は除く
+        memberRateMap[m.id].total++;
+        if (msgReceipts.find(r => r.member_id === m.id)) memberRateMap[m.id].read++;
+      });
+    });
+    const caution = Object.values(memberRateMap)
+      .filter(m => m.total > 0 && m.read / m.total < 0.5)
+      .sort((a, b) => (a.read/a.total) - (b.read/b.total))
+      .slice(0, 3);
+
+    // レポートHTML生成
+    const rateColor = avgRate >= 80 ? 'var(--green)' : avgRate >= 60 ? '#f59e0b' : 'var(--red)';
+    content.innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+        <div style="background:var(--green-light); border-radius:12px; padding:14px; text-align:center;">
+          <div style="font-size:11px; color:var(--text-mid); margin-bottom:4px;">送信メッセージ数</div>
+          <div style="font-size:28px; font-weight:700; color:var(--green);">${totalMsgs}</div>
+          <div style="font-size:11px; color:var(--text-light);">件</div>
+        </div>
+        <div style="background:#f0f8ff; border-radius:12px; padding:14px; text-align:center;">
+          <div style="font-size:11px; color:var(--text-mid); margin-bottom:4px;">平均既読率</div>
+          <div style="font-size:28px; font-weight:700; color:${rateColor};">${avgRate}</div>
+          <div style="font-size:11px; color:var(--text-light);">%</div>
+        </div>
+      </div>
+      <div style="background:#fffde7; border-radius:12px; padding:14px; margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:700; color:#f57f17; margin-bottom:6px;">⚡ 最速既読者</div>
+        <div style="font-size:14px; font-weight:600; color:var(--text);">${fastestStr}</div>
+      </div>
+      <div style="background:#ffeaea; border-radius:12px; padding:14px;">
+        <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:6px;">⚠️ 要注意スタッフ（既読率50%未満）</div>
+        ${caution.length === 0
+          ? '<div style="font-size:13px; color:var(--text-light);">該当者なし 🎉</div>'
+          : caution.map(m => {
+              const r = m.total > 0 ? Math.round(m.read / m.total * 100) : 0;
+              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
+                <span style="font-size:13px; font-weight:500;">${escHtml(m.name)}</span>
+                <span style="font-size:13px; font-weight:700; color:var(--red);">${r}%</span>
+              </div>`;
+            }).join('')
+        }
+      </div>
+      ${totalMsgs === 0 ? '<div style="text-align:center; color:var(--text-light); font-size:13px; margin-top:16px;">この月のメッセージはありません</div>' : ''}
+    `;
+  } catch(e) {
+    console.error(e);
+    content.innerHTML = '<div style="text-align:center; color:var(--red); padding:20px;">データの取得に失敗しました</div>';
+  }
 }
 
 // ═══════════════════════════════════════════
