@@ -1400,11 +1400,12 @@ async function loadReportData(tab) {
     // 統計計算
     const totalMsgs = (msgs || []).length;
 
-    // 平均既読率
+    // 平均既読率（送信者を除いた受信者ベースで計算）
     let totalRate = 0;
     (msgs || []).forEach(msg => {
-      const msgReceipts = receipts.filter(r => r.message_id === msg.id);
-      totalRate += memberCount > 1 ? msgReceipts.length / (memberCount - 1) : 0;
+      const msgReceipts = receipts.filter(r => r.message_id === msg.id && r.line_uid !== msg.sender_line_uid);
+      const receiverCount = memberCount - 1; // 送信者を除く
+      totalRate += receiverCount > 0 ? msgReceipts.length / receiverCount : 0;
     });
     const avgRate = totalMsgs > 0 ? Math.round(totalRate / totalMsgs * 100) : 0;
 
