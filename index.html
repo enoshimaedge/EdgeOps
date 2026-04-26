@@ -1442,8 +1442,7 @@ async function loadReportData(tab) {
     });
     const caution = Object.values(memberRateMap)
       .filter(m => m.total > 0 && m.read / m.total < 0.5)
-      .sort((a, b) => (a.read/a.total) - (b.read/b.total))
-      .slice(0, 3);
+      .sort((a, b) => (a.read/a.total) - (b.read/b.total)); // 既読率が低い順
 
     // レポートHTML生成
     const rateColor = avgRate >= 80 ? 'var(--green)' : avgRate >= 60 ? '#f59e0b' : 'var(--red)';
