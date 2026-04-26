@@ -652,9 +652,9 @@
     </div>
     <!-- フィルター -->
     <div class="home-filter-toggle">
-      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')">💬 連絡</button>
-      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')">📋 引き継ぎ</button>
-      <button class="filter-chip" id="filter-chip-all" onclick="setHomeFilter('all')">すべて</button>
+      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')">💬 連絡 / Messages</button>
+      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')">📋 引き継ぎ / Handover</button>
+      <button class="filter-chip" id="filter-chip-all" onclick="setHomeFilter('all')">すべて / All</button>
     </div>
     <div id="home-messages"></div>
   </div>
@@ -674,8 +674,8 @@
   <div class="content">
     <!-- タイプ切替 -->
     <div class="compose-type-toggle" style="margin-bottom:16px;">
-      <button class="compose-type-btn active" id="ctype-msg" onclick="selectComposeType('msg')">💬 通常メッセージ</button>
-      <button class="compose-type-btn" id="ctype-handover" onclick="selectComposeType('handover')">📋 引き継ぎノート</button>
+      <button class="compose-type-btn active" id="ctype-msg" onclick="selectComposeType('msg')">💬 通常メッセージ / Message</button>
+      <button class="compose-type-btn" id="ctype-handover" onclick="selectComposeType('handover')">📋 引き継ぎノート / Handover</button>
     </div>
     <!-- 通常メッセージ優先度 -->
     <div id="section-msg-priority" class="form-group">
@@ -1661,8 +1661,8 @@ async function showHandoverDetail(handoverId) {
       confirmArea.innerHTML = `<div class="hw-confirmed-banner">✅ ${actionLabel}（${formatTime(myConf.confirmed_at)}）</div>`;
     } else {
       confirmArea.innerHTML = `
-        <button class="hw-confirm-btn hw-btn-takeover" onclick="confirmHandover('takeover')">🔄 引き継ぎました</button>
-        <button class="hw-confirm-btn hw-btn-done" onclick="confirmHandover('done')">✅ 対応しました</button>
+        <button class="hw-confirm-btn hw-btn-takeover" onclick="confirmHandover('takeover')">🔄 引き継ぎました / Took Over</button>
+        <button class="hw-confirm-btn hw-btn-done" onclick="confirmHandover('done')">✅ 対応しました / Completed</button>
       `;
     }
 
