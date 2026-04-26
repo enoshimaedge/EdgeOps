@@ -1619,8 +1619,16 @@ async function showHandoverDetail(handoverId) {
     const unconfirmedList = document.getElementById('hw-unconfirmed-list');
     const confirmArea = document.getElementById('hw-confirm-area');
 
-    // 確認ボタン
-    if (myConf) {
+    // 最新のメンバー一覧をDBから取得（確実に全員を把握するため）
+    const { data: latestMembers } = await supabase.from('group_members').select('*')
+      .eq('group_session_id', currentGroup.id).eq('status', 'approved');
+    const allMembers = latestMembers || [];
+
+    // 確認ボタン：投稿者本人には表示しない
+    const isSender = hw.sender_line_uid === currentUser.line_uid;
+    if (isSender) {
+      confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #66bb6a; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#2e7d32; margin-bottom:10px;">📋 自分が投稿した引き継ぎです</div>`;
+    } else if (myConf) {
       const actionLabel = myConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
       confirmArea.innerHTML = `<div class="hw-confirmed-banner">✅ ${actionLabel}（${formatTime(myConf.confirmed_at)}）</div>`;
     } else {
@@ -1640,8 +1648,10 @@ async function showHandoverDetail(handoverId) {
       confirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も確認していません</div>';
     }
 
-    // 未確認メンバー
-    const unconfirmed = members.filter(m => !confirmedUids.has(m.line_uid));
+    // 未確認メンバー：投稿者本人は除外、残りで未確認の人を表示
+    const unconfirmed = allMembers.filter(m =>
+      m.line_uid !== hw.sender_line_uid && !confirmedUids.has(m.line_uid)
+    );
     if (unconfirmed.length > 0) {
       unconfirmedList.innerHTML = unconfirmed.map(m =>
         `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`
