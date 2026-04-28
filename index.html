@@ -1328,8 +1328,8 @@ function renderMessages() {
 
     // 月内ソート：①未読あり→全員既読 ②緊急→通常→連絡
     msgs.sort((a, b) => {
-      const aReceivers = members.filter(m => m.line_uid !== a.sender_line_uid).length;
-      const bReceivers = members.filter(m => m.line_uid !== b.sender_line_uid).length;
+      const aReceivers = a.receiver_count != null ? a.receiver_count : members.filter(m => m.line_uid !== a.sender_line_uid).length;
+      const bReceivers = b.receiver_count != null ? b.receiver_count : members.filter(m => m.line_uid !== b.sender_line_uid).length;
       const aUnread = aReceivers - (a.read_count || 0);
       const bUnread = bReceivers - (b.read_count || 0);
       const aHasUnread = aUnread > 0 ? 0 : 1;
@@ -1353,7 +1353,11 @@ function renderMessages() {
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
 
     msgs.forEach(msg => {
-      const receiverCount = members.filter(m => m.line_uid !== msg.sender_line_uid).length;
+      // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
+      // NULLの場合（旧メッセージ）は現在のメンバーから計算
+      const receiverCount = msg.receiver_count != null
+        ? msg.receiver_count
+        : members.filter(m => m.line_uid !== msg.sender_line_uid).length;
       const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
       const unreadCount = receiverCount - (msg.read_count || 0);
       const senderName = getMemberName(msg.sender_line_uid);
@@ -1540,9 +1544,12 @@ async function sendMessage() {
 
   try {
     showToast('送信中...');
+    // 送信時点の受信者数を固定保存（後からメンバーが増えても分母が変わらないようにする）
+    const receiverCountAtSend = members.filter(m => m.line_uid !== currentUser.line_uid).length;
     const { error } = await supabase.from('messages').insert({
       group_session_id: currentGroup.id, sender_line_uid: currentUser.line_uid,
-      body: body, read_count: 0, priority: selectedPriority
+      body: body, read_count: 0, priority: selectedPriority,
+      receiver_count: receiverCountAtSend
     });
     if (error) throw error;
     document.getElementById('compose-body').value = '';
@@ -1767,8 +1774,9 @@ async function showDetail(messageId) {
   const validReads = (reads || []).filter(r => memberUids.has(r.line_uid));
   const readUids = new Set(validReads.map(r => r.line_uid));
   // 送信者を除いた受信者リスト
+  // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
   const receivers = members.filter(m => m.line_uid !== msg.sender_line_uid);
-  const totalMembers = receivers.length;
+  const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
   const readCount = [...readUids].filter(uid => uid !== msg.sender_line_uid).length;
   const unreadMembers = receivers.filter(m => !readUids.has(m.line_uid));
   document.getElementById('detail-title').textContent = getMessageTitle(msg.body, 20);
