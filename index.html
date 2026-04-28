@@ -1265,7 +1265,6 @@ function renderMessages() {
     container.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">まだメッセージがありません / No messages yet<br>下の「＋新しい連絡」から送信してください</div></div>`;
     return;
   }
-  const totalMembers = members.length;
   const priorityOrder = { urgent: 0, normal: 1, info: 2 };
 
   // 月別グループ化
@@ -1302,8 +1301,10 @@ function renderMessages() {
 
     // 月内ソート：①未読あり→全員既読 ②緊急→通常→連絡
     msgs.sort((a, b) => {
-      const aUnread = totalMembers - (a.read_count || 0);
-      const bUnread = totalMembers - (b.read_count || 0);
+      const aReceivers = members.filter(m => m.line_uid !== a.sender_line_uid).length;
+      const bReceivers = members.filter(m => m.line_uid !== b.sender_line_uid).length;
+      const aUnread = aReceivers - (a.read_count || 0);
+      const bUnread = bReceivers - (b.read_count || 0);
       const aHasUnread = aUnread > 0 ? 0 : 1;
       const bHasUnread = bUnread > 0 ? 0 : 1;
       if (aHasUnread !== bHasUnread) return aHasUnread - bHasUnread;
@@ -1325,8 +1326,9 @@ function renderMessages() {
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
 
     msgs.forEach(msg => {
-      const readPct = totalMembers > 0 ? (msg.read_count || 0) / totalMembers * 100 : 0;
-      const unreadCount = totalMembers - (msg.read_count || 0);
+      const receiverCount = members.filter(m => m.line_uid !== msg.sender_line_uid).length;
+      const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
+      const unreadCount = receiverCount - (msg.read_count || 0);
       const senderName = getMemberName(msg.sender_line_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
@@ -1338,7 +1340,7 @@ function renderMessages() {
           <div class="msg-meta">${senderName}　${timeStr}</div>
           <div class="msg-read-bar">
             <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
-            <div class="read-count">${msg.read_count || 0}/${totalMembers}人既読</div>
+            <div class="read-count">${msg.read_count || 0}/${receiverCount}人既読</div>
           </div>
           ${unreadCount > 0 ? `<div class="unread-names">❌ 未読：詳細を確認してください</div>` : ''}
         </div>`;
@@ -1726,9 +1728,11 @@ async function showDetail(messageId) {
   // 退出済みメンバーの既読は除外
   const validReads = (reads || []).filter(r => memberUids.has(r.line_uid));
   const readUids = new Set(validReads.map(r => r.line_uid));
-  const totalMembers = members.length;
-  const readCount = readUids.size;
-  const unreadMembers = members.filter(m => !readUids.has(m.line_uid));
+  // 送信者を除いた受信者リスト
+  const receivers = members.filter(m => m.line_uid !== msg.sender_line_uid);
+  const totalMembers = receivers.length;
+  const readCount = [...readUids].filter(uid => uid !== msg.sender_line_uid).length;
+  const unreadMembers = receivers.filter(m => !readUids.has(m.line_uid));
   document.getElementById('detail-title').textContent = msg.body.substring(0, 20) + (msg.body.length > 20 ? '...' : '');
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_line_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').textContent = msg.body;
@@ -1736,8 +1740,9 @@ async function showDetail(messageId) {
   document.getElementById('detail-unread-count').textContent = totalMembers - readCount;
   document.getElementById('detail-total-count').textContent = totalMembers;
   const readListEl = document.getElementById('detail-read-list');
-  if (validReads.length > 0) {
-    readListEl.innerHTML = validReads.map(r => {
+  const receiverReads = validReads.filter(r => r.line_uid !== msg.sender_line_uid);
+  if (receiverReads.length > 0) {
+    readListEl.innerHTML = receiverReads.map(r => {
       const member = members.find(m => m.line_uid === r.line_uid);
       if (!member) return ''; // 退出済みは表示しない
       return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">✅</div></div></div>`;
