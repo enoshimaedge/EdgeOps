@@ -659,7 +659,7 @@
     <div id="home-messages"></div>
   </div>
   <!-- 新しい連絡ボタン -->
-  <button class="new-msg-btn" onclick="showScreen('screen-compose')">
+  <button class="new-msg-btn" onclick="showCompose()">
     <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     新しい連絡 / New Message
   </button>
@@ -1449,6 +1449,16 @@ function renderTemplates() {
 let selectedPriority = 'info'; // デフォルト：連絡
 let selectedComposeType = 'msg'; // 'msg' | 'handover'
 let selectedHandoverPriority = 'action'; // 'action' | 'check' | 'done'
+
+function showCompose() {
+  // ホームのタブ状態に応じて作成画面のタブを自動選択
+  showScreen('screen-compose');
+  if (homeFilter === 'handover') {
+    selectComposeType('handover');
+  } else {
+    selectComposeType('msg');
+  }
+}
 
 function selectComposeType(type) {
   selectedComposeType = type;
