@@ -731,7 +731,7 @@
   <div class="content">
     <div class="card" style="padding:16px; margin-bottom:12px;">
       <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="detail-meta"></div>
-      <div style="font-size:15px; line-height:1.7;" id="detail-body"></div>
+      <div style="font-size:15px; line-height:1.7; word-break:break-all;" id="detail-body"></div>
     </div>
     <div style="display:flex; gap:10px; margin-bottom:16px;">
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
@@ -787,7 +787,7 @@
   <div class="content">
     <div class="card" style="padding:16px; margin-bottom:12px;">
       <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="hw-detail-meta"></div>
-      <div style="font-size:15px; line-height:1.7;" id="hw-detail-body"></div>
+      <div style="font-size:15px; line-height:1.7; word-break:break-all;" id="hw-detail-body"></div>
     </div>
     <!-- 確認ボタンエリア -->
     <div id="hw-confirm-area"></div>
@@ -1350,7 +1350,7 @@ function renderMessages() {
       html += `
         <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
           <span class="priority-badge priority-${p}">${pLabel}</span>
-          <div class="msg-title">${escHtml(msg.body.substring(0, 40))}${msg.body.length > 40 ? '…' : ''}</div>
+          <div class="msg-title">${getMessageTitle(msg.body, 40)}</div>
           <div class="msg-meta">${senderName}　${timeStr}</div>
           <div class="msg-read-bar">
             <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
@@ -1631,7 +1631,7 @@ function renderHandoverCardHtml(hw, confs, myConf) {
   return `
     <div class="handover-card priority-${p}" onclick="showHandoverDetail('${hw.id}')">
       <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>
-      <div class="msg-title">${escHtml((hw.content||'').substring(0,40))}${ (hw.content||'').length > 40 ? '…' : ''}</div>
+      <div class="msg-title">${getMessageTitle(hw.content||'', 40)}</div>
       <div class="msg-meta">${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}</div>
       ${statusHtml}
     </div>`;
@@ -1658,7 +1658,7 @@ async function showHandoverDetail(handoverId) {
     const pLabels = { action: '🔴 重要', check: '🟡 通常', done: '🟢 確認要' };
     document.getElementById('hw-detail-title').textContent = pLabels[hw.priority] || '引き継ぎ詳細';
     document.getElementById('hw-detail-meta').textContent = `${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}`;
-    document.getElementById('hw-detail-body').textContent = hw.content;
+    document.getElementById('hw-detail-body').innerHTML = linkify(hw.content || '');
 
     // 確認情報を取得
     const { data: confs } = await supabase.from('handover_confirmations').select('*').eq('handover_id', handoverId);
@@ -1745,9 +1745,9 @@ async function showDetail(messageId) {
   const totalMembers = members.length;
   const readCount = readUids.size;
   const unreadMembers = members.filter(m => !readUids.has(m.line_uid));
-  document.getElementById('detail-title').textContent = msg.body.substring(0, 20) + (msg.body.length > 20 ? '...' : '');
+  document.getElementById('detail-title').textContent = getMessageTitle(msg.body, 20);
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_line_uid)}　${formatTime(msg.created_at)}`;
-  document.getElementById('detail-body').textContent = msg.body;
+  document.getElementById('detail-body').innerHTML = linkify(msg.body);
   document.getElementById('detail-read-count').textContent = readCount;
   document.getElementById('detail-unread-count').textContent = totalMembers - readCount;
   document.getElementById('detail-total-count').textContent = totalMembers;
@@ -2197,6 +2197,23 @@ function formatTime(isoString) {
 }
 function escHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// URLをタップ可能なリンクに変換（連絡・引き継ぎ共用）
+function linkify(text) {
+  const escaped = escHtml(text);
+  return escaped.replace(
+    /(https?:\/\/[^\s&]+(?:&amp;[^\s]*)*)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" style="color:var(--green);text-decoration:underline;word-break:break-all;">$1</a>'
+  );
+}
+
+// URLかどうか判定してヘッダータイトルを返す
+function getMessageTitle(body, maxLen) {
+  if (!body) return '';
+  if (/^https?:\/\//.test(body.trim())) return '🔗 リンクを含むメッセージ';
+  const s = body.substring(0, maxLen);
+  return s + (body.length > maxLen ? '…' : '');
 }
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
