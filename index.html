@@ -2256,18 +2256,24 @@ async function leaveGroup() {
     stopPolling();
     // 退出時：自分が未読のメッセージのread_countを+1して既読扱いにする
     // （退出後に分母だけ残って既読率が永遠に100%にならない問題を防ぐ）
-    const unreadMsgs = messages.filter(msg => {
-      if (msg.sender_line_uid === currentUser.line_uid) return false; // 自分が送信者は除外
-      const alreadyRead = msg._readByMe; // 既読済みは除外
-      return !alreadyRead;
-    });
-    for (const msg of unreadMsgs) {
-      // read_receiptsに未登録なら登録してread_countを+1
-      const { data: existing } = await supabase.from('read_receipts').select('id')
-        .eq('message_id', msg.id).eq('line_uid', currentUser.line_uid).single().catch(() => ({ data: null }));
-      if (!existing) {
-        await supabase.from('read_receipts').insert({ message_id: msg.id, line_uid: currentUser.line_uid, read_at: new Date().toISOString() });
-        await supabase.from('messages').update({ read_count: (msg.read_count || 0) + 1 }).eq('id', msg.id);
+    // 自分が送信者でないメッセージのIDを取得
+    const receivedMsgIds = messages
+      .filter(msg => msg.sender_line_uid !== currentUser.line_uid)
+      .map(msg => msg.id);
+
+    if (receivedMsgIds.length > 0) {
+      // 既読済みのメッセージIDを取得
+      const { data: myReceipts } = await supabase.from('read_receipts').select('message_id')
+        .in('message_id', receivedMsgIds).eq('line_uid', currentUser.line_uid);
+      const readMsgIds = new Set((myReceipts || []).map(r => r.message_id));
+
+      // 未読のメッセージだけ処理
+      const unreadMsgIds = receivedMsgIds.filter(id => !readMsgIds.has(id));
+      for (const msgId of unreadMsgIds) {
+        const msg = messages.find(m => m.id === msgId);
+        if (!msg) continue;
+        await supabase.from('read_receipts').insert({ message_id: msgId, line_uid: currentUser.line_uid, read_at: new Date().toISOString() });
+        await supabase.from('messages').update({ read_count: (msg.read_count || 0) + 1 }).eq('id', msgId);
       }
     }
     await supabase.from('group_members').update({ status: 'left' }).eq('id', currentMemberId);
