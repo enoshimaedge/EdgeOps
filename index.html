@@ -1250,6 +1250,20 @@ async function loadMessages() {
     members = memberData || [];
     handoverNotes = hwData || [];
 
+    // ホーム画面でも引き継ぎの確認状態を正しく表示するためconfirmationsを取得
+    if (handoverNotes.length > 0) {
+      const hwIds = handoverNotes.map(n => n.id);
+      const { data: hwConfs } = await supabase.from('handover_confirmations').select('*').in('handover_id', hwIds);
+      const confirmMap = {};
+      (hwConfs || []).forEach(c => {
+        if (!confirmMap[c.handover_id]) confirmMap[c.handover_id] = [];
+        confirmMap[c.handover_id].push(c);
+      });
+      window._hwConfirmMap = confirmMap;
+    } else {
+      window._hwConfirmMap = {};
+    }
+
     renderMessages();
     const badge = document.getElementById('approval-badge');
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
@@ -1313,7 +1327,11 @@ function renderMessages() {
     html += `<div class="card" style="margin-bottom:12px;">`;
     html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">📋 引き継ぎノート</div>`;
     handoverNotes.slice(0, 5).forEach(hw => {
-      html += renderHandoverCardHtml(hw);
+      // ホーム画面でもconfirmMapを使って完了済み・確認状態を正しく表示
+      const hwConfirmMap = window._hwConfirmMap || {};
+      const confs = hwConfirmMap[hw.id] || [];
+      const myConf = confs.find(c => c.line_uid === currentUser.line_uid);
+      html += renderHandoverCardHtml(hw, confs, myConf);
     });
     if (handoverNotes.length > 5) {
       html += `<div style="padding:10px 16px; text-align:center; font-size:13px; color:var(--green); cursor:pointer;" onclick="showScreen('screen-handover')">すべて見る（${handoverNotes.length}件）</div>`;
@@ -1617,6 +1635,8 @@ async function loadHandoverNotes() {
         confirmMap[c.handover_id].push(c);
       });
     }
+    // renderHandoverInlineからも参照できるようグローバルに保存
+    window._hwConfirmMap = confirmMap;
 
     const container = document.getElementById('handover-list-container');
     if (handoverNotes.length === 0) {
@@ -1692,7 +1712,11 @@ function renderHandoverInline(container) {
     return;
   }
   let html = '<div class="card">';
-  handoverNotes.forEach(hw => { html += renderHandoverCardHtml(hw); });
+  handoverNotes.forEach(hw => {
+    const confs = (window._hwConfirmMap || {})[hw.id] || [];
+    const myConf = confs.find(c => c.line_uid === currentUser.line_uid);
+    html += renderHandoverCardHtml(hw, confs, myConf);
+  });
   html += '</div>';
   container.innerHTML = html;
 }
