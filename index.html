@@ -1579,10 +1579,15 @@ async function updateHandoverBadge() {
       return;
     }
     const noteIds = othersNotes.map(n => n.id);
-    const { data: myConfirms } = await supabase.from('handover_confirmations').select('handover_id')
-      .in('handover_id', noteIds).eq('line_uid', currentUser.line_uid);
-    const confirmedIds = new Set((myConfirms || []).map(c => c.handover_id));
-    const unconfirmedCount = noteIds.filter(id => !confirmedIds.has(id)).length;
+    // 全confirmationsを取得（自分の確認状況＋完了済み判定の両方に使う）
+    const { data: allConfirms } = await supabase.from('handover_confirmations').select('handover_id, line_uid, action')
+      .in('handover_id', noteIds);
+    // 自分が確認済みのID
+    const confirmedIds = new Set((allConfirms || []).filter(c => c.line_uid === currentUser.line_uid).map(c => c.handover_id));
+    // 誰かがtakeover/doneを押した完了済みのID（バッジカウントから除外）
+    const completedIds = new Set((allConfirms || []).filter(c => c.action === 'takeover' || c.action === 'done').map(c => c.handover_id));
+    // 未確認かつ完了済みでないものだけカウント
+    const unconfirmedCount = noteIds.filter(id => !confirmedIds.has(id) && !completedIds.has(id)).length;
     const bar = document.getElementById('handover-badge-bar');
     const countEl = document.getElementById('handover-badge-count');
     if (unconfirmedCount > 0) {
