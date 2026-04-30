@@ -651,9 +651,18 @@ async function loadMessage() {
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    // 連絡ソート：緊急度順→新しい順
+    // 連絡ソート：未読優先→緊急度順→新しい順
     const priorityOrderM = { urgent: 0, normal: 1, info: 2 };
     messageItems.sort((a, b) => {
+      const aRead = readCountMap[a.id] || 0;
+      const bRead = readCountMap[b.id] || 0;
+      const aFullRead = aRead >= humanCount;
+      const bFullRead = bRead >= humanCount;
+      // 未読（0人）が最上位
+      const aUnread = aRead === 0 ? 0 : (aFullRead ? 2 : 1);
+      const bUnread = bRead === 0 ? 0 : (bFullRead ? 2 : 1);
+      if (aUnread !== bUnread) return aUnread - bUnread;
+      // 同じ既読状況なら緊急度順
       const pa = priorityOrderM[a.priority] ?? 1;
       const pb = priorityOrderM[b.priority] ?? 1;
       if (pa !== pb) return pa - pb;
@@ -662,19 +671,20 @@ async function loadMessage() {
 
     // 引き継ぎラベルを確認状況で決定（3段階）
     const getHandoverLabel = (item) => {
-      if (item._fullyConfirmed) return { label: '🟢 引き継ぎ・確認済', cls: 'priority-info', itemCls: 'info' };
-      if (item._confirmed === 0) {
-        // 誰も確認していない→元のpriorityで色を決定
-        const baseMap = {
-          action: { label: '🔴 引き継ぎ・未確認', cls: 'priority-urgent', itemCls: 'urgent' },
-          check:  { label: '🟡 引き継ぎ・未確認', cls: 'priority-normal', itemCls: 'normal' },
-          done:   { label: '🟢 引き継ぎ・未確認', cls: 'priority-info',   itemCls: 'info' },
-        };
-        return baseMap[item.priority] || baseMap.check;
+      // WEBアプリと同じ：priorityの色をそのまま使い、確認状況をラベルに反映
+      const isConfirmed = item._fullyConfirmed || item._confirmed > 0;
+      if (item.priority === 'action') {
+        return isConfirmed
+          ? { label: '🔴 引き継ぎ・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
+          : { label: '🔴 引き継ぎ・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
       }
-      // 一部確認済→黄色
-      return { label: '🟡 引き継ぎ・一部確認済', cls: 'priority-normal', itemCls: 'normal' };
-      return baseMap[item.priority] || baseMap.check;
+      if (item.priority === 'done') {
+        return { label: '🟢 引き継ぎ・確認済', cls: 'priority-info', itemCls: 'info' };
+      }
+      // check（通常）
+      return isConfirmed
+        ? { label: '🟡 引き継ぎ・確認済', cls: 'priority-normal', itemCls: 'normal' }
+        : { label: '🟡 引き継ぎ・未確認', cls: 'priority-normal', itemCls: 'normal' };
     };
 
     const allItems = [...handoverItems, ...messageItems];
