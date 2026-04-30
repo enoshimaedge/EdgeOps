@@ -393,22 +393,21 @@
   <!-- コンテンツ -->
   <div class="signage-body">
 
-    <!-- 引き継ぎノート＋連絡 -->
+    <!-- 引き継ぎノート＋連絡（全体ひとつのスクロール） -->
     <div class="s-card" id="card-message">
-      <div id="message-list-wrapper" style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+      <div class="message-list" id="message-list-all" style="flex:1; overflow-y:auto;">
         <!-- 引き継ぎノートセクション -->
-        <div id="section-handover" style="display:none; flex-shrink:0; max-height:45%; overflow-y:auto;">
+        <div id="section-handover" style="display:none;">
           <div class="s-card-title" style="margin-bottom:6px;">📋 引き継ぎノート</div>
-          <div class="message-list" id="handover-list" style="max-height:none;"></div>
-          <!-- アコーディオン展開ボタン（5件超のとき表示） -->
-          <div id="handover-accordion-btn" style="display:none; text-align:center; padding:6px 0 4px; font-size:13px; color:var(--green); cursor:pointer; font-weight:700; flex-shrink:0;" onclick="toggleHandoverAccordion()"></div>
+          <div id="handover-list"></div>
+          <div id="handover-accordion-btn" style="display:none; text-align:center; padding:6px 0 4px; font-size:13px; color:var(--green); cursor:pointer; font-weight:700;" onclick="toggleHandoverAccordion()"></div>
         </div>
-        <!-- 引き継ぎ↔連絡の区切り線 -->
-        <div id="section-divider" style="display:none; border-top:1px solid rgba(255,255,255,0.15); margin:8px 0; flex-shrink:0;"></div>
+        <!-- 区切り線 -->
+        <div id="section-divider" style="display:none; border-top:1px solid rgba(255,255,255,0.15); margin:8px 0;"></div>
         <!-- 連絡セクション -->
-        <div id="section-message" style="flex:1; display:flex; flex-direction:column; min-height:0;">
-          <div class="s-card-title" id="message-section-title" style="margin-bottom:6px; flex-shrink:0;">💬 連絡</div>
-          <div class="message-list" id="message-list" style="flex:1;"></div>
+        <div id="section-message">
+          <div class="s-card-title" id="message-section-title" style="margin-bottom:6px; display:none;">💬 連絡</div>
+          <div id="message-list"></div>
         </div>
       </div>
     </div>
@@ -656,12 +655,8 @@ function linkifyBody(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-  // ⑦ メールアドレス → window.location.href='mailto:...' でメーラー起動
-  // （Fully KioskではtargetBlankやwindow.openがブロックされるため）
-  const withMail = escaped.replace(
-    /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g,
-    '<a href="javascript:void(0)" onclick="window.location.href=\'mailto:$1\'" style="color:#64d2ff; text-decoration:underline; word-break:break-all; cursor:pointer;">$1</a>'
-  );
+  // ⑦ メールアドレスはテキストのままで表示（Fully KioskではmailtoでメーラーNG）
+  const withMail = escaped;
 
   // ⑧ URL → window.location.hrefで同ウィンドウ遷移（Fully Kioskで動作する方法）
   // &amp; を & に戻してから遷移
