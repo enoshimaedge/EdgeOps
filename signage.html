@@ -611,10 +611,13 @@ async function loadMessage() {
     // サイネージ端末のline_uidセット
     const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.line_uid));
 
-    // 既読数マップ（サイネージ端末を除外）
+    // 既読数マップ（サイネージ端末・送信者を除外）
+    const senderMap = {};
+    messages.forEach(m => { senderMap[m.id] = m.sender_line_uid; });
     const readCountMap = {};
     receipts.forEach(r => {
       if (signageUids.has(r.line_uid)) return; // サイネージ除外
+      if (senderMap[r.message_id] === r.line_uid) return; // 送信者除外
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
     // 確認済マップ（引き継ぎIDごとの確認者リスト）
@@ -657,10 +660,8 @@ async function loadMessage() {
     messageItems.sort((a, b) => {
       const aRead = readCountMap[a.id] || 0;
       const bRead = readCountMap[b.id] || 0;
-      const aReceivers = humanMembers.filter(m => m.line_uid !== a.sender_line_uid).length;
-      const bReceivers = humanMembers.filter(m => m.line_uid !== b.sender_line_uid).length;
-      const aFullRead = aReceivers > 0 && aRead >= aReceivers;
-      const bFullRead = bReceivers > 0 && bRead >= bReceivers;
+      const aFullRead = aRead >= humanCount;
+      const bFullRead = bRead >= humanCount;
       // 未読（0人）が最上位
       const aUnread = aRead === 0 ? 0 : (aFullRead ? 2 : 1);
       const bUnread = bRead === 0 ? 0 : (bFullRead ? 2 : 1);
@@ -704,17 +705,15 @@ async function loadMessage() {
       const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
       const bodyEscaped = (item.body || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 
-      // 既読/確認バッジ（送信者を分母から除外）
+      // 既読/確認バッジ
       let readBadge = '';
       if (humanCount > 0) {
         if (item._type === 'message') {
           const readCount = readCountMap[item.id] || 0;
-          // 送信者を分母から除外（送信者はサイネージでない前提）
-          const receiverCount = humanMembers.filter(m => m.line_uid !== item.sender_line_uid).length;
-          if (readCount >= receiverCount) {
+          if (readCount >= humanCount) {
             readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
           } else {
-            readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
+            readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${humanCount}人既読</span>`;
           }
         } else {
           const confirmedCount = item._confirmed || 0;
