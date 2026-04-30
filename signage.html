@@ -381,12 +381,12 @@
     </div>
     <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
       <div class="last-updated" id="last-updated-display">最終更新：--:--</div>
-      <a id="vacan-btn"
-         href="https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima"
-         target="_blank" rel="noopener" class="vacan-header-btn" style="display:none;">
+      <button id="vacan-btn"
+         onclick="window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'"
+         class="vacan-header-btn" style="display:none;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
         混雑度
-      </a>
+      </button>
     </div>
   </div>
 
@@ -397,7 +397,7 @@
     <div class="s-card" id="card-message">
       <div id="message-list-wrapper" style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
         <!-- 引き継ぎノートセクション -->
-        <div id="section-handover" style="display:none; flex-shrink:0;">
+        <div id="section-handover" style="display:none; flex-shrink:0; max-height:45%; overflow-y:auto;">
           <div class="s-card-title" style="margin-bottom:6px;">📋 引き継ぎノート</div>
           <div class="message-list" id="handover-list" style="max-height:none;"></div>
           <!-- アコーディオン展開ボタン（5件超のとき表示） -->
@@ -656,16 +656,22 @@ function linkifyBody(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-  // メールアドレス→mailtoリンク（URLより先にマッチ）
+  // ⑦ メールアドレス → window.location.href='mailto:...' でメーラー起動
+  // （Fully KioskではtargetBlankやwindow.openがブロックされるため）
   const withMail = escaped.replace(
     /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g,
-    '<a href="mailto:$1" style="color:#64d2ff; text-decoration:underline; word-break:break-all;">$1</a>'
+    '<a href="javascript:void(0)" onclick="window.location.href=\'mailto:$1\'" style="color:#64d2ff; text-decoration:underline; word-break:break-all; cursor:pointer;">$1</a>'
   );
 
-  // URL→別ウィンドウで開くリンク（Fully Kioskではwindow.openで外部ブラウザ起動）
+  // ⑧ URL → window.location.hrefで同ウィンドウ遷移（Fully Kioskで動作する方法）
+  // &amp; を & に戻してから遷移
   const withLinks = withMail.replace(
     /(https?:\/\/[^\s&<>"]+(?:&amp;[^\s&<>"]*)*)/g,
-    '<a href="$1" onclick="event.preventDefault(); window.open(\'$1\'.replace(/&amp;/g,\'&\'),\'_blank\');" style="color:#64d2ff; text-decoration:underline; word-break:break-all; cursor:pointer;">$1</a>'
+    (match) => {
+      const cleanUrl = match.replace(/&amp;/g, '&');
+      const safeUrl = cleanUrl.replace(/'/g, '%27');
+      return `<a href="javascript:void(0)" onclick="window.location.href='${safeUrl}'" style="color:#64d2ff; text-decoration:underline; word-break:break-all; cursor:pointer;">${match}</a>`;
+    }
   );
 
   return withLinks;
@@ -1197,7 +1203,7 @@ async function init() {
   // ④ 藤沢グループのみ混雑度ボタンを表示
   if (currentGroupData.region === 'fujisawa') {
     const vacanBtn = document.getElementById('vacan-btn');
-    if (vacanBtn) vacanBtn.style.display = 'flex';
+    if (vacanBtn) { vacanBtn.style.display = 'flex'; vacanBtn.style.alignItems = 'center'; }
   }
 
   showMain();
