@@ -890,18 +890,13 @@
         <button class="btn btn-secondary" onclick="showMemberList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
           👥 メンバー一覧 / Member List
         </button>
-        <!-- サイネージURL発行 -->
+        <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージURL管理</div>
-          <div id="signage-url-display" style="font-size:11px; color:var(--text-light); word-break:break-all; margin-bottom:8px; min-height:16px;"></div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-secondary" onclick="generateSignageToken()" style="flex:1; font-size:12px; padding:10px 8px;">
-              🔑 URL発行・再生成
-            </button>
-            <button class="btn btn-secondary" onclick="copySignageUrl()" id="copy-signage-btn" style="flex:1; font-size:12px; padding:10px 8px; display:none;">
-              📋 URLをコピー
-            </button>
-          </div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージ管理</div>
+          <div id="signage-url-display" style="font-size:12px; margin-bottom:8px; min-height:16px;"></div>
+          <button class="btn btn-secondary" onclick="generateSignageToken()" style="font-size:13px; padding:10px 8px;">
+            🔑 トークンを再生成する
+          </button>
           <div style="font-size:11px; color:#e53935; margin-top:6px;">⚠️ 再生成すると旧URLは即無効化されます</div>
         </div>
       </div>
