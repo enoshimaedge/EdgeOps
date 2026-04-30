@@ -622,6 +622,22 @@
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
       <!-- エリア混雑度ボタン（藤沢グループのみ表示） -->
+      <!-- サイネージボタン（is_signage=trueのメンバーのみ表示） -->
+      <div id="signage-btn" style="display:none;">
+        <button onclick="openSignage()" title="サイネージを開く" style="
+          display:flex; align-items:center; gap:4px;
+          background:rgba(255,255,255,0.18); border:1.5px solid rgba(255,255,255,0.6);
+          border-radius:20px; padding:5px 10px;
+          color:white; font-size:11px; font-weight:700;
+          cursor:pointer; font-family:inherit;
+          white-space:nowrap;
+        ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+          サイネージ
+        </button>
+      </div>
       <div id="vacan-btn" style="display:none;">
         <button onclick="openVacanMap()" title="エリア混雑度" style="
           display:flex; align-items:center; gap:4px;
@@ -1220,11 +1236,37 @@ async function loadHome() {
     vacanBtn.style.display = 'none';
   }
 
+  // is_signage=trueのメンバーのみサイネージボタンを表示
+  const signageBtn = document.getElementById('signage-btn');
+  if (signageBtn) {
+    const { data: myMember } = await supabase.from('group_members')
+      .select('is_signage').eq('id', currentMemberId).single();
+    if (myMember && myMember.is_signage) {
+      signageBtn.style.display = 'flex';
+      signageBtn.style.alignItems = 'center';
+    } else {
+      signageBtn.style.display = 'none';
+    }
+  }
+
   await loadMessages();
   startPolling();
 }
 
 // VACAN Maps（江の島周辺混雑度）を開く
+// サイネージを開く（is_signage=trueのメンバー専用）
+function openSignage() {
+  if (!currentGroup) return;
+  const gid = currentGroup.group_id;
+  const token = currentGroup.signage_token || '';
+  const url = `https://app.edgeops.jp/signage.html?gid=${gid}&token=${token}&layout=portrait`;
+  if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+    liff.openWindow({ url: url, external: true });
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
 function openVacanMap() {
   const url = 'https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima';
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
@@ -2323,9 +2365,8 @@ function updateSignageUrlDisplay() {
   const copyBtn = document.getElementById('copy-signage-btn');
   if (!el) return;
   if (currentGroup?.signage_token && currentGroup?.signage_enabled) {
-    const url = `https://app.edgeops.jp/signage.html?gid=${currentGroup.group_id}&token=${currentGroup.signage_token}&layout=portrait`;
-    el.textContent = url;
-    el.style.color = 'var(--text)';
+    el.textContent = '✅ サイネージURLが発行済みです';
+    el.style.color = '#2e7d32';
     if (copyBtn) copyBtn.style.display = 'block';
   } else if (currentGroup?.signage_token && !currentGroup?.signage_enabled) {
     el.textContent = '⚠️ サイネージは無効化されています';
