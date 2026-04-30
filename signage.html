@@ -611,10 +611,13 @@ async function loadMessage() {
     // サイネージ端末のline_uidセット
     const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.line_uid));
 
-    // 既読数マップ（サイネージ端末を除外）
+    // 既読数マップ（サイネージ端末・送信者を除外）
+    const senderMap = {};
+    messages.forEach(m => { senderMap[m.id] = m.sender_line_uid; });
     const readCountMap = {};
     receipts.forEach(r => {
       if (signageUids.has(r.line_uid)) return; // サイネージ除外
+      if (senderMap[r.message_id] === r.line_uid) return; // 送信者除外
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
     // 確認済マップ（引き継ぎIDごとの確認者リスト）
