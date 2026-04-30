@@ -1257,9 +1257,8 @@ async function loadHome() {
 // サイネージを開く（is_signage=trueのメンバー専用）
 function openSignage() {
   if (!currentGroup) return;
-  const gid = currentGroup.group_id;
   const token = currentGroup.signage_token || '';
-  const url = `https://app.edgeops.jp/signage.html?gid=${gid}&token=${token}&layout=portrait`;
+  const url = `https://app.edgeops.jp/signage.html?token=${token}`;
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
     liff.openWindow({ url: url, external: true });
   } else {
@@ -2398,7 +2397,7 @@ async function generateSignageToken() {
 
 function copySignageUrl() {
   if (!currentGroup?.signage_token) return;
-  const url = `https://app.edgeops.jp/signage.html?gid=${currentGroup.group_id}&token=${currentGroup.signage_token}&layout=portrait`;
+  const url = `https://app.edgeops.jp/signage.html?token=${currentGroup.signage_token}`;
   navigator.clipboard?.writeText(url).then(() => showToast('URLをコピーしました'));
 }
 async function leaveGroup() {

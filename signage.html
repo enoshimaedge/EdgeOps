@@ -514,25 +514,23 @@ function toDateStr(date) {
 // 認証チェック（3段階）
 // ═══════════════════════════════════════════
 async function authenticate() {
-  // ① クエリパラメータ確認
+  // ① クエリパラメータ確認（tokenのみ必須・gidは不要）
   const params = new URLSearchParams(window.location.search);
-  const gid = params.get('gid');
   const token = params.get('token');
 
-  if (!gid || !token) {
+  if (!token) {
     showError(
       'サイネージURLが無効です',
-      'URLにグループIDとトークンが含まれていません。\nグループ管理者にお問い合わせください。'
+      'URLにトークンが含まれていません。\nグループ管理者にお問い合わせください。'
     );
     return false;
   }
 
-  // ② DBでトークン照合
+  // ② DBでトークン照合（tokenだけでグループを自動特定）
   try {
     const { data: group, error } = await sbClient
       .from('group_sessions')
       .select('*')
-      .eq('group_id', gid)
       .eq('signage_token', token)
       .eq('signage_enabled', true)
       .single();
@@ -978,13 +976,11 @@ function startPolling() {
   updateTimer = setInterval(async () => {
     // トークン再検証（設計書事故ポイント②：キャッシュしない）
     const params = new URLSearchParams(window.location.search);
-    const gid = params.get('gid');
     const token = params.get('token');
     try {
       const { data: group } = await sbClient
         .from('group_sessions')
         .select('*')
-        .eq('group_id', gid)
         .eq('signage_token', token)
         .eq('signage_enabled', true)
         .single();
