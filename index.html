@@ -1870,6 +1870,9 @@ let currentDetailMessageId = null; // 削除用に現在表示中のメッセー
 
 async function recordRead(messageId) {
   try {
+    // サイネージ端末は既読記録しない
+    const currentMember = members.find(m => m.line_uid === currentUser.line_uid);
+    if (currentMember && currentMember.is_signage) return;
     const { data: existing } = await supabase.from('read_receipts').select('id')
       .eq('message_id', messageId).eq('line_uid', currentUser.line_uid).single();
     if (existing) return;
