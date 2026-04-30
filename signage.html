@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EdgeOps サイネージ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --green: #06C755;
+    --navy: #0f1e35;
+    --bg: #f2f3f7;
+    --white: #ffffff;
+    --text: #1a2f4a;
+    --text-light: #9aa5b8;
+    --border: #e4e8f0;
+    --red: #e53935;
+    --orange: #f57c00;
+  }
+
+  body {
+    font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--navy);
+    color: var(--white);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── エラー画面 ── */
+  #error-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px;
+    text-align: center;
+    background: var(--navy);
+  }
+  #error-screen.active { display: flex; }
+  .error-icon { font-size: 64px; margin-bottom: 24px; }
+  .error-title { font-size: 22px; font-weight: 700; margin-bottom: 12px; color: #ff6b6b; }
+  .error-message { font-size: 15px; color: rgba(255,255,255,0.7); line-height: 1.6; }
+
+  /* ── メイン画面 ── */
+  #main-screen {
+    display: none;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  #main-screen.active { display: flex; }
+
+  /* ── ヘッダー ── */
+  .signage-header {
+    background: var(--green);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .signage-logo {
+    font-size: 20px;
+    font-weight: 900;
+    color: white;
+    letter-spacing: 1px;
+  }
+  .signage-group-name {
+    font-size: 13px;
+    color: rgba(255,255,255,0.85);
+    font-weight: 600;
+  }
+  .last-updated {
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+    text-align: right;
+  }
+
+  /* ── コンテンツエリア ── */
+  .signage-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  /* ── カード共通 ── */
+  .s-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .s-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ── 今日の連絡カード ── */
+  #card-message {
+    grid-column: 1 / 3;
+    grid-row: 1 / 2;
+  }
+  .message-priority {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .priority-urgent { background: #e53935; color: white; }
+  .priority-info { background: #1565C0; color: white; }
+  .priority-normal { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+  .message-body {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: white;
+    flex: 1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+  }
+  .message-time {
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+  .no-message {
+    font-size: 16px;
+    color: rgba(255,255,255,0.4);
+    font-style: italic;
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  /* ── 天気カード ── */
+  #card-weather {
+    grid-column: 1 / 2;
+    grid-row: 2 / 3;
+  }
+  .weather-row {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+  }
+  .weather-day {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 10px 6px;
+  }
+  .weather-day-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .weather-icon { font-size: 28px; margin-bottom: 4px; }
+  .weather-temp {
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+  }
+  .weather-temp-range {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 2px;
+  }
+  .weather-error {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    font-style: italic;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── 祝日カード（天気カード内に統合表示） ── */
+  .holiday-bar {
+    background: rgba(255, 193, 7, 0.2);
+    border: 1px solid rgba(255, 193, 7, 0.4);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #FFD54F;
+    margin-top: 8px;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  /* ── QRカード ── */
+  #card-qr {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+    align-items: center;
+  }
+  .qr-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  #qr-canvas {
+    background: white;
+    border-radius: 8px;
+    padding: 6px;
+  }
+  .qr-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* ── ローディング ── */
+  #loading-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 4px solid rgba(255,255,255,0.2);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── オフラインバナー ── */
+  #offline-banner {
+    display: none;
+    background: var(--orange);
+    color: white;
+    text-align: center;
+    padding: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  #offline-banner.show { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ローディング -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div style="font-size:13px; color:rgba(255,255,255,0.5);">読み込み中...</div>
+</div>
+
+<!-- エラー画面 -->
+<div id="error-screen">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title" id="error-title">サイネージURLが無効です</div>
+  <div class="error-message" id="error-message">管理者にお問い合わせください</div>
+</div>
+
+<!-- メイン画面 -->
+<div id="main-screen">
+  <!-- オフラインバナー -->
+  <div id="offline-banner">⚠️ オフライン中 — 表示中の情報は最新でない場合があります</div>
+
+  <!-- ヘッダー -->
+  <div class="signage-header">
+    <div>
+      <div class="signage-logo">EdgeOps</div>
+      <div class="signage-group-name" id="header-group-name">---</div>
+    </div>
+    <div class="last-updated" id="last-updated-display">
+      最終更新：--:--
+    </div>
+  </div>
+
+  <!-- コンテンツ -->
+  <div class="signage-body">
+
+    <!-- 今日の連絡 -->
+    <div class="s-card" id="card-message">
+      <div class="s-card-title">📋 今日の連絡</div>
+      <div id="message-priority-badge"></div>
+      <div id="message-body-text" class="message-body"></div>
+      <div id="message-time-text" class="message-time"></div>
+    </div>
+
+    <!-- 天気・祝日 -->
+    <div class="s-card" id="card-weather">
+      <div class="s-card-title">🌤 天気・気温</div>
+      <div class="weather-row" id="weather-row">
+        <div class="weather-error">取得中...</div>
+      </div>
+      <div id="holiday-display" style="display:none;" class="holiday-bar"></div>
+    </div>
+
+    <!-- QRコード -->
+    <div class="s-card" id="card-qr">
+      <div class="s-card-title">📱 グループ参加QR</div>
+      <div class="qr-container">
+        <canvas id="qr-canvas"></canvas>
+        <div class="qr-label">
+          このQRでEdgeOpsグループに参加<br>
+          <span style="font-size:10px; color:rgba(255,255,255,0.35);">※このQRは無効になることがあります</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// 定数・設定
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
+
+// 地域→座標マッピング
+const REGION_COORDS = {
+  fujisawa:  { lat: 35.3396, lng: 139.4869, name: '藤沢' },
+  kamakura:  { lat: 35.3197, lng: 139.5467, name: '鎌倉' },
+  hakone:    { lat: 35.2329, lng: 139.1069, name: '箱根' },
+  yokohama:  { lat: 35.4437, lng: 139.6380, name: '横浜' },
+  tokyo:     { lat: 35.6895, lng: 139.6917, name: '東京' },
+  other:     { lat: 35.6895, lng: 139.6917, name: '---' },
+};
+
+// 天気コード→絵文字・説明
+function getWeatherIcon(code) {
+  if (code === 0) return { icon: '☀️', label: '快晴' };
+  if (code <= 2)  return { icon: '⛅', label: '晴れ時々曇り' };
+  if (code === 3) return { icon: '☁️', label: '曇り' };
+  if (code <= 49) return { icon: '🌫️', label: '霧' };
+  if (code <= 59) return { icon: '🌦️', label: '霧雨' };
+  if (code <= 69) return { icon: '🌧️', label: '雨' };
+  if (code <= 79) return { icon: '❄️', label: '雪' };
+  if (code <= 84) return { icon: '🌧️', label: 'にわか雨' };
+  if (code <= 99) return { icon: '⛈️', label: '雷雨' };
+  return { icon: '🌡️', label: '---' };
+}
+
+// 日本の祝日データ（2026年）
+const HOLIDAYS_2026 = {
+  '2026-01-01': '元日',
+  '2026-01-12': '成人の日',
+  '2026-02-11': '建国記念の日',
+  '2026-02-23': '天皇誕生日',
+  '2026-03-20': '春分の日',
+  '2026-04-29': '昭和の日',
+  '2026-05-03': '憲法記念日',
+  '2026-05-04': 'みどりの日',
+  '2026-05-05': 'こどもの日',
+  '2026-07-20': '海の日',
+  '2026-08-11': '山の日',
+  '2026-09-21': '敬老の日',
+  '2026-09-23': '秋分の日',
+  '2026-10-12': 'スポーツの日',
+  '2026-11-03': '文化の日',
+  '2026-11-23': '勤労感謝の日',
+  '2026-12-23': '天皇誕生日（旧）',
+};
+// 2025年の祝日も含める
+const HOLIDAYS_2025 = {
+  '2025-01-01': '元日',
+  '2025-01-13': '成人の日',
+  '2025-02-11': '建国記念の日',
+  '2025-02-23': '天皇誕生日',
+  '2025-03-20': '春分の日',
+  '2025-04-29': '昭和の日',
+  '2025-05-03': '憲法記念日',
+  '2025-05-04': 'みどりの日',
+  '2025-05-05': 'こどもの日',
+  '2025-07-21': '海の日',
+  '2025-08-11': '山の日',
+  '2025-09-15': '敬老の日',
+  '2025-09-23': '秋分の日',
+  '2025-10-13': 'スポーツの日',
+  '2025-11-03': '文化の日',
+  '2025-11-23': '勤労感謝の日',
+};
+const ALL_HOLIDAYS = { ...HOLIDAYS_2025, ...HOLIDAYS_2026 };
+
+// ═══════════════════════════════════════════
+// グローバル変数
+// ═══════════════════════════════════════════
+let supabase = null;
+let currentGroupData = null;
+let updateTimer = null;
+
+// ═══════════════════════════════════════════
+// ユーティリティ
+// ═══════════════════════════════════════════
+function showError(title, message) {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('main-screen').classList.remove('active');
+  const err = document.getElementById('error-screen');
+  err.classList.add('active');
+  document.getElementById('error-title').textContent = title;
+  document.getElementById('error-message').textContent = message;
+}
+
+function showMain() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-screen').classList.remove('active');
+  document.getElementById('main-screen').classList.add('active');
+}
+
+function updateLastUpdated() {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('last-updated-display').textContent = '最終更新：' + hh + ':' + mm;
+}
+
+function toDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + d;
+}
+
+// ═══════════════════════════════════════════
+// 認証チェック（3段階）
+// ═══════════════════════════════════════════
+async function authenticate() {
+  // ① クエリパラメータ確認
+  const params = new URLSearchParams(window.location.search);
+  const gid = params.get('gid');
+  const token = params.get('token');
+
+  if (!gid || !token) {
+    showError(
+      'サイネージURLが無効です',
+      'URLにグループIDとトークンが含まれていません。\nグループ管理者にお問い合わせください。'
+    );
+    return false;
+  }
+
+  // ② DBでトークン照合
+  try {
+    const { data: group, error } = await supabase
+      .from('group_sessions')
+      .select('*')
+      .eq('group_id', gid)
+      .eq('signage_token', token)
+      .eq('signage_enabled', true)
+      .single();
+
+    if (error || !group) {
+      showError(
+        'このサイネージURLは無効です',
+        'トークンが一致しないか、サイネージが無効になっています。\nグループ管理者にお問い合わせください。'
+      );
+      return false;
+    }
+
+    // ③ 認証成功
+    currentGroupData = group;
+    return true;
+  } catch (e) {
+    showError(
+      '認証エラー',
+      'サーバーへの接続に失敗しました。\nネットワークをご確認ください。'
+    );
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// 今日の連絡を取得・表示
+// ═══════════════════════════════════════════
+async function loadMessage() {
+  try {
+    const now = new Date().toISOString();
+    const { data: messages } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('group_session_id', currentGroupData.id)
+      .neq('priority', 'handover')
+      .gt('expires_at', now)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const msgBody = document.getElementById('message-body-text');
+    const msgTime = document.getElementById('message-time-text');
+    const msgPriority = document.getElementById('message-priority-badge');
+
+    if (!messages || messages.length === 0) {
+      msgPriority.innerHTML = '';
+      msgBody.innerHTML = '<span class="no-message">本日の連絡はありません</span>';
+      msgTime.textContent = '';
+      return;
+    }
+
+    const msg = messages[0];
+
+    // 優先度バッジ
+    const priorityMap = {
+      urgent: { label: '🚨 緊急', cls: 'priority-urgent' },
+      info:   { label: 'ℹ️ お知らせ', cls: 'priority-info' },
+      normal: { label: '📌 通常', cls: 'priority-normal' },
+    };
+    const p = priorityMap[msg.priority] || priorityMap.normal;
+    msgPriority.innerHTML = `<span class="message-priority ${p.cls}">${p.label}</span>`;
+
+    // 本文
+    msgBody.textContent = msg.body || '';
+    msgBody.className = 'message-body';
+
+    // 時刻
+    const createdAt = new Date(msg.created_at);
+    const hh = String(createdAt.getHours()).padStart(2, '0');
+    const mm = String(createdAt.getMinutes()).padStart(2, '0');
+    const mo = createdAt.getMonth() + 1;
+    const dd = createdAt.getDate();
+    msgTime.textContent = mo + '月' + dd + '日 ' + hh + ':' + mm + ' 送信';
+
+    updateLastUpdated();
+  } catch (e) {
+    console.error('メッセージ取得エラー:', e);
+    // メッセージ取得失敗でも他の表示は継続
+  }
+}
+
+// ═══════════════════════════════════════════
+// 天気・気温を取得・表示（Open-Meteo・APIキー不要）
+// ═══════════════════════════════════════════
+async function loadWeather() {
+  const weatherRow = document.getElementById('weather-row');
+  try {
+    const region = currentGroupData.region || 'other';
+    const coords = REGION_COORDS[region] || REGION_COORDS.other;
+
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('天気API応答エラー');
+    const data = await res.json();
+
+    const daily = data.daily;
+    const days = ['今日', '明日'];
+
+    let html = '';
+    for (let i = 0; i < 2; i++) {
+      const code = daily.weathercode[i];
+      const tMax = Math.round(daily.temperature_2m_max[i]);
+      const tMin = Math.round(daily.temperature_2m_min[i]);
+      const w = getWeatherIcon(code);
+      html += `
+        <div class="weather-day">
+          <div class="weather-day-label">${days[i]}</div>
+          <div class="weather-icon">${w.icon}</div>
+          <div class="weather-temp">${tMax}°</div>
+          <div class="weather-temp-range">↑${tMax}° ↓${tMin}°</div>
+        </div>
+      `;
+    }
+    weatherRow.innerHTML = html;
+
+    // 祝日チェック（今日・明日）
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    const todayStr = toDateStr(today);
+    const tomorrowStr = toDateStr(tomorrow);
+    const holidayDisplay = document.getElementById('holiday-display');
+
+    if (ALL_HOLIDAYS[todayStr]) {
+      holidayDisplay.textContent = '🎌 今日は ' + ALL_HOLIDAYS[todayStr] + ' です';
+      holidayDisplay.style.display = 'block';
+    } else if (ALL_HOLIDAYS[tomorrowStr]) {
+      holidayDisplay.textContent = '🎌 明日は ' + ALL_HOLIDAYS[tomorrowStr] + ' です';
+      holidayDisplay.style.display = 'block';
+    } else {
+      holidayDisplay.style.display = 'none';
+    }
+
+    updateLastUpdated();
+  } catch (e) {
+    // ⚠️ 天気取得失敗でも全体停止しない（設計書事故ポイント③）
+    console.error('天気取得エラー:', e);
+    weatherRow.innerHTML = '<div class="weather-error">天気情報を取得できませんでした</div>';
+  }
+}
+
+// ═══════════════════════════════════════════
+// QRコード生成
+// ═══════════════════════════════════════════
+function generateQR() {
+  try {
+    const joinUrl = 'https://liff.line.me/2009827939-rZo06gWm';
+    QRCode.toCanvas(document.getElementById('qr-canvas'), joinUrl, {
+      width: 120,
+      margin: 1,
+      color: { dark: '#0f1e35', light: '#ffffff' }
+    }, (err) => {
+      if (err) console.error('QR生成エラー:', err);
+    });
+  } catch (e) {
+    console.error('QR生成エラー:', e);
+  }
+}
+
+// ═══════════════════════════════════════════
+// オフライン検知
+// ═══════════════════════════════════════════
+function setupOfflineDetection() {
+  const banner = document.getElementById('offline-banner');
+  window.addEventListener('offline', () => { banner.classList.add('show'); });
+  window.addEventListener('online',  () => { banner.classList.remove('show'); });
+  if (!navigator.onLine) banner.classList.add('show');
+}
+
+// ═══════════════════════════════════════════
+// 深夜3時 自動リロード（設計書事故ポイント⑦）
+// ═══════════════════════════════════════════
+function scheduleNightlyReload() {
+  const now = new Date();
+  const next3am = new Date();
+  next3am.setHours(3, 0, 0, 0);
+  if (next3am <= now) {
+    next3am.setDate(next3am.getDate() + 1);
+  }
+  const ms = next3am - now;
+  setTimeout(() => { location.reload(); }, ms);
+}
+
+// ═══════════════════════════════════════════
+// 定期更新（5分ごと）
+// ═══════════════════════════════════════════
+function startPolling() {
+  if (updateTimer) clearInterval(updateTimer);
+  updateTimer = setInterval(async () => {
+    // トークン再検証（設計書事故ポイント②：キャッシュしない）
+    const params = new URLSearchParams(window.location.search);
+    const gid = params.get('gid');
+    const token = params.get('token');
+    try {
+      const { data: group } = await supabase
+        .from('group_sessions')
+        .select('*')
+        .eq('group_id', gid)
+        .eq('signage_token', token)
+        .eq('signage_enabled', true)
+        .single();
+      if (!group) {
+        // トークン無効化されたら即エラー画面へ
+        showError('このサイネージURLは無効になりました', '管理者がURLを再生成しました。\n新しいURLで再度アクセスしてください。');
+        clearInterval(updateTimer);
+        return;
+      }
+      currentGroupData = group;
+    } catch (e) {
+      // ネットワークエラーはスキップ（オフラインバナーで通知済み）
+    }
+    await loadMessage();
+    await loadWeather();
+  }, 5 * 60 * 1000); // 5分ごと
+}
+
+// ═══════════════════════════════════════════
+// 初期化
+// ═══════════════════════════════════════════
+async function init() {
+  // Supabase初期化
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 認証（3段階）
+  const ok = await authenticate();
+  if (!ok) return;
+
+  // 画面表示
+  document.getElementById('header-group-name').textContent =
+    currentGroupData.group_name || currentGroupData.group_id;
+
+  showMain();
+  setupOfflineDetection();
+  scheduleNightlyReload();
+
+  // データ取得（並列）
+  await Promise.allSettled([
+    loadMessage(),
+    loadWeather(),
+  ]);
+
+  generateQR();
+  startPolling();
+}
+
+// 起動
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
