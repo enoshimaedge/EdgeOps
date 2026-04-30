@@ -503,13 +503,11 @@ async function authenticate() {
 // ═══════════════════════════════════════════
 async function loadMessage() {
   try {
-    const now = new Date().toISOString();
     const { data: messages } = await supabase
       .from('messages')
       .select('*')
       .eq('group_session_id', currentGroupData.id)
       .neq('priority', 'handover')
-      .gt('expires_at', now)
       .order('created_at', { ascending: false })
       .limit(1);
 
