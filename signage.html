@@ -67,20 +67,39 @@
     flex-shrink: 0;
   }
   .signage-logo {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 900;
     color: white;
     letter-spacing: 1px;
   }
   .signage-group-name {
-    font-size: 13px;
-    color: rgba(255,255,255,0.85);
-    font-weight: 600;
+    font-size: 16px;
+    color: rgba(255,255,255,0.9);
+    font-weight: 700;
   }
   .last-updated {
-    font-size: 11px;
-    color: rgba(255,255,255,0.7);
+    font-size: 14px;
+    color: rgba(255,255,255,0.85);
     text-align: right;
+    font-weight: 600;
+  }
+  /* 混雑度ボタン */
+  .vacan-header-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    border-radius: 20px;
+    padding: 6px 12px;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    text-decoration: none;
+    margin-top: 4px;
   }
 
   /* ── コンテンツエリア ── */
@@ -187,6 +206,16 @@
     line-height: 1.5;
     color: white;
   }
+  /* 2行以上は折りたたみ */
+  .message-body.collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .message-body.expanded {
+    display: block;
+  }
   .message-time {
     font-size: 11px;
     color: rgba(255,255,255,0.4);
@@ -224,22 +253,22 @@
   }
   .weather-day-left { display: none; }
   .weather-day-label {
-    font-size: 11px;
-    color: rgba(255,255,255,0.5);
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
     font-weight: 700;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
-  .weather-icon { font-size: 22px; margin-bottom: 2px; }
+  .weather-icon { font-size: 36px; margin-bottom: 4px; }
   .weather-temp-block { text-align: center; }
   .weather-temp {
-    font-size: 18px;
+    font-size: 28px;
     font-weight: 700;
     color: white;
   }
   .weather-temp-range {
-    font-size: 11px;
-    color: rgba(255,255,255,0.5);
-    margin-top: 2px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+    margin-top: 3px;
   }
   .weather-error {
     font-size: 12px;
@@ -350,18 +379,38 @@
       <div class="signage-logo">EdgeOps</div>
       <div class="signage-group-name" id="header-group-name">---</div>
     </div>
-    <div class="last-updated" id="last-updated-display">
-      最終更新：--:--
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+      <div class="last-updated" id="last-updated-display">最終更新：--:--</div>
+      <a id="vacan-btn"
+         href="https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima"
+         target="_blank" rel="noopener" class="vacan-header-btn" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+        混雑度
+      </a>
     </div>
   </div>
 
   <!-- コンテンツ -->
   <div class="signage-body">
 
-    <!-- 今日の連絡 -->
+    <!-- 引き継ぎノート＋連絡 -->
     <div class="s-card" id="card-message">
-      <div class="s-card-title">📋 今日の連絡</div>
-      <div class="message-list" id="message-list"></div>
+      <div id="message-list-wrapper" style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+        <!-- 引き継ぎノートセクション -->
+        <div id="section-handover" style="display:none; flex-shrink:0;">
+          <div class="s-card-title" style="margin-bottom:6px;">📋 引き継ぎノート</div>
+          <div class="message-list" id="handover-list" style="max-height:none;"></div>
+          <!-- アコーディオン展開ボタン（5件超のとき表示） -->
+          <div id="handover-accordion-btn" style="display:none; text-align:center; padding:6px 0 4px; font-size:13px; color:var(--green); cursor:pointer; font-weight:700; flex-shrink:0;" onclick="toggleHandoverAccordion()"></div>
+        </div>
+        <!-- 引き継ぎ↔連絡の区切り線 -->
+        <div id="section-divider" style="display:none; border-top:1px solid rgba(255,255,255,0.15); margin:8px 0; flex-shrink:0;"></div>
+        <!-- 連絡セクション -->
+        <div id="section-message" style="flex:1; display:flex; flex-direction:column; min-height:0;">
+          <div class="s-card-title" id="message-section-title" style="margin-bottom:6px; flex-shrink:0;">💬 連絡</div>
+          <div class="message-list" id="message-list" style="flex:1;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- 天気・祝日 + QRコード（下部固定） -->
@@ -556,6 +605,158 @@ async function authenticate() {
 }
 
 // ═══════════════════════════════════════════
+// アコーディオン制御（引き継ぎ5件超）
+// ═══════════════════════════════════════════
+const HANDOVER_SHOW_COUNT = 5; // 折りたたみ前の最大表示数
+let _handoverAllItems = []; // 全引き継ぎデータを保持
+
+function toggleHandoverAccordion() {
+  const btn = document.getElementById('handover-accordion-btn');
+  const list = document.getElementById('handover-list');
+  const isExpanded = btn.dataset.expanded === '1';
+  if (isExpanded) {
+    // 折りたたむ
+    renderHandoverList(_handoverAllItems, false);
+    btn.dataset.expanded = '0';
+  } else {
+    // 展開する
+    renderHandoverList(_handoverAllItems, true);
+    btn.dataset.expanded = '1';
+  }
+}
+
+function renderHandoverList(items, showAll) {
+  const list = document.getElementById('handover-list');
+  const btn = document.getElementById('handover-accordion-btn');
+  const displayItems = showAll ? items : items.slice(0, HANDOVER_SHOW_COUNT);
+  list.innerHTML = displayItems.map(item => buildItemHtml(item)).join('');
+  if (items.length > HANDOVER_SHOW_COUNT) {
+    btn.style.display = 'block';
+    if (showAll) {
+      btn.textContent = '▲ 折りたたむ';
+      btn.dataset.expanded = '1';
+    } else {
+      btn.textContent = `▼ すべて見る（${items.length}件）`;
+      btn.dataset.expanded = '0';
+    }
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════
+// テキスト内のメールアドレス・URLを検出してリンク化（モーダル用）
+// ⑦ mailto、⑧ URLリンク
+// ═══════════════════════════════════════════
+function linkifyBody(text) {
+  // XSS対策：まずHTMLエスケープ
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  // メールアドレス→mailtoリンク（URLより先にマッチ）
+  const withMail = escaped.replace(
+    /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g,
+    '<a href="mailto:$1" style="color:#64d2ff; text-decoration:underline; word-break:break-all;">$1</a>'
+  );
+
+  // URL→別ウィンドウで開くリンク（Fully Kioskではwindow.openで外部ブラウザ起動）
+  const withLinks = withMail.replace(
+    /(https?:\/\/[^\s&<>"]+(?:&amp;[^\s&<>"]*)*)/g,
+    '<a href="$1" onclick="event.preventDefault(); window.open(\'$1\'.replace(/&amp;/g,\'&\'),\'_blank\');" style="color:#64d2ff; text-decoration:underline; word-break:break-all; cursor:pointer;">$1</a>'
+  );
+
+  return withLinks;
+}
+
+// ═══════════════════════════════════════════
+// カードHTMLを生成する共通関数
+// ═══════════════════════════════════════════
+let _buildItemContext = {}; // buildItemHtmlが参照するコンテキスト
+
+function buildItemHtml(item) {
+  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap } = _buildItemContext;
+  const p = item._type === 'handover'
+    ? getHandoverLabel(item)
+    : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
+  const createdAt = new Date(item.created_at);
+  const mo = createdAt.getMonth() + 1;
+  const dd = createdAt.getDate();
+  const hh = String(createdAt.getHours()).padStart(2, '0');
+  const mm = String(createdAt.getMinutes()).padStart(2, '0');
+  const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
+  const body = item.body || '';
+  // ⑥ 本文が長い場合は折りたたみ（モーダルで全文表示）
+  const isLong = body.length > 60 || body.split('\n').length > 2;
+
+  // 既読/確認バッジ
+  let readBadge = '';
+  if (humanCount > 0) {
+    if (item._type === 'message') {
+      const readCount = readCountMap[item.id] || 0;
+      const receiverCount = humanMembers.filter(m => m.line_uid !== item.sender_line_uid).length;
+      if (readCount >= receiverCount) {
+        readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
+      } else {
+        readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
+      }
+    } else {
+      const confirmedCount = item._confirmed || 0;
+      if (confirmedCount === 0) {
+        readBadge = `<span style="font-size:10px; color:#e53935; font-weight:700;">❗ 未確認</span>`;
+      } else {
+        const confirmerNames = (confirmedMap[item.id] || []).map(c => c.display_name).join('・');
+        readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ ${confirmerNames}が確認済</span>`;
+      }
+    }
+  }
+  const senderMember = allMembers.find(m => m.line_uid === item.sender_line_uid);
+  const senderName = senderMember ? senderMember.display_name + '　' : '';
+
+  // onclickはdata属性に逃がしてシングルクォート問題を回避（⑧対応）
+  const itemIndex = _buildItemContext.allItemsFlat.indexOf(item);
+
+  return `
+    <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span class="message-priority ${p.cls}">${p.label}</span>
+        ${readBadge}
+      </div>
+      <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(body)}</div>
+      <div class="message-time">${senderName}${timeStr} 送信${isLong ? '　<span style="font-size:10px; color:rgba(255,255,255,0.3);">タップで全文表示</span>' : ''}</div>
+    </div>
+  `;
+}
+
+function escHtmlSignage(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════
+// 引き継ぎラベルを確認状況で決定（共通化）
+// ═══════════════════════════════════════════
+function getHandoverLabel(item) {
+  const isConfirmed = item._fullyConfirmed || item._confirmed > 0;
+  if (item.priority === 'action') {
+    return isConfirmed
+      ? { label: '🔴 引き継ぎ・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
+      : { label: '🔴 引き継ぎ・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
+  }
+  if (item.priority === 'done') {
+    return { label: '🟢 引き継ぎ・確認済', cls: 'priority-info', itemCls: 'info' };
+  }
+  return isConfirmed
+    ? { label: '🟡 引き継ぎ・確認済', cls: 'priority-normal', itemCls: 'normal' }
+    : { label: '🟡 引き継ぎ・未確認', cls: 'priority-normal', itemCls: 'normal' };
+}
+
+// ═══════════════════════════════════════════
 // 今日の連絡を取得・表示
 // ═══════════════════════════════════════════
 async function loadMessage() {
@@ -569,20 +770,13 @@ async function loadMessage() {
       sbClient.from('handover_notes').select('*')
         .eq('group_session_id', currentGroupData.id)
         .order('created_at', { ascending: false })
-        .limit(10)
+        .limit(20)
     ]);
 
     const messages = msgResult.status === 'fulfilled' ? (msgResult.value.data || []) : [];
     const handovers = handoverResult.status === 'fulfilled' ? (handoverResult.value.data || []) : [];
 
-    const msgList = document.getElementById('message-list');
-
-    if (messages.length === 0 && handovers.length === 0) {
-      msgList.innerHTML = '<span class="no-message">本日の連絡はありません</span>';
-      return;
-    }
-
-    // 連絡のpriorityMap（index.htmlと同じ色・ラベル）
+    // 連絡のpriorityMap
     const msgPriorityMap = {
       urgent: { label: '🔴 緊急', cls: 'priority-urgent', itemCls: 'urgent', order: 0 },
       normal: { label: '🟡 通常', cls: 'priority-normal', itemCls: 'normal', order: 1 },
@@ -600,7 +794,8 @@ async function loadMessage() {
       handoverIds.length > 0
         ? sbClient.from('handover_confirmations').select('handover_id,line_uid,display_name').in('handover_id', handoverIds)
         : Promise.resolve({ data: [] }),
-      sbClient.from('group_members').select('line_uid,display_name,is_signage').eq('group_session_id', currentGroupData.id).eq('status', 'approved')
+      sbClient.from('group_members').select('line_uid,display_name,is_signage')
+        .eq('group_session_id', currentGroupData.id).eq('status', 'approved')
     ]);
 
     const receipts = receiptsResult.status === 'fulfilled' ? (receiptsResult.value.data || []) : [];
@@ -608,18 +803,18 @@ async function loadMessage() {
     const allMembers = membersResult.status === 'fulfilled' ? (membersResult.value.data || []) : [];
     const humanMembers = allMembers.filter(m => !m.is_signage);
     const humanCount = humanMembers.length;
-    // サイネージ端末のline_uidセット
     const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.line_uid));
 
-    // 既読数マップ（サイネージ端末・送信者を除外）
+    // 既読数マップ（サイネージ端末・送信者除外）
     const senderMap = {};
     messages.forEach(m => { senderMap[m.id] = m.sender_line_uid; });
     const readCountMap = {};
     receipts.forEach(r => {
-      if (signageUids.has(r.line_uid)) return; // サイネージ除外
-      if (senderMap[r.message_id] === r.line_uid) return; // 送信者除外
+      if (signageUids.has(r.line_uid)) return;
+      if (senderMap[r.message_id] === r.line_uid) return;
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
+
     // 確認済マップ（引き継ぎIDごとの確認者リスト）
     const confirmedMap = {};
     confirmations.forEach(c => {
@@ -638,20 +833,16 @@ async function loadMessage() {
     // 引き継ぎソート：未確認優先→優先度順→新しい順
     const priorityOrderH = { action: 0, check: 1, done: 2 };
     handoverItems.sort((a, b) => {
-      // WEBアプリと同じ：誰か1人でも確認したら下へ、0人が最上位
       const confirmOrder = (item) => {
-        if (item._confirmed === 0) return 0; // 誰も確認していない→最上位
-        if (item._fullyConfirmed) return 2;  // 全員確認済→最下位
-        return 1;                             // 一部確認済→中位
+        if (item._confirmed === 0) return 0;
+        if (item._fullyConfirmed) return 2;
+        return 1;
       };
-      const ca = confirmOrder(a);
-      const cb = confirmOrder(b);
+      const ca = confirmOrder(a); const cb = confirmOrder(b);
       if (ca !== cb) return ca - cb;
-      // 同じ確認状況なら優先度順
       const pa = priorityOrderH[a.priority] ?? 1;
       const pb = priorityOrderH[b.priority] ?? 1;
       if (pa !== pb) return pa - pb;
-      // 同じなら新しい順
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
@@ -662,84 +853,52 @@ async function loadMessage() {
       const bRead = readCountMap[b.id] || 0;
       const aFullRead = aRead >= humanCount;
       const bFullRead = bRead >= humanCount;
-      // 未読（0人）が最上位
       const aUnread = aRead === 0 ? 0 : (aFullRead ? 2 : 1);
       const bUnread = bRead === 0 ? 0 : (bFullRead ? 2 : 1);
       if (aUnread !== bUnread) return aUnread - bUnread;
-      // 同じ既読状況なら緊急度順
       const pa = priorityOrderM[a.priority] ?? 1;
       const pb = priorityOrderM[b.priority] ?? 1;
       if (pa !== pb) return pa - pb;
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    // 引き継ぎラベルを確認状況で決定（3段階）
-    const getHandoverLabel = (item) => {
-      // WEBアプリと同じ：priorityの色をそのまま使い、確認状況をラベルに反映
-      const isConfirmed = item._fullyConfirmed || item._confirmed > 0;
-      if (item.priority === 'action') {
-        return isConfirmed
-          ? { label: '🔴 引き継ぎ・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
-          : { label: '🔴 引き継ぎ・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
-      }
-      if (item.priority === 'done') {
-        return { label: '🟢 引き継ぎ・確認済', cls: 'priority-info', itemCls: 'info' };
-      }
-      // check（通常）
-      return isConfirmed
-        ? { label: '🟡 引き継ぎ・確認済', cls: 'priority-normal', itemCls: 'normal' }
-        : { label: '🟡 引き継ぎ・未確認', cls: 'priority-normal', itemCls: 'normal' };
+    // buildItemHtmlが参照するコンテキストを設定
+    _buildItemContext = {
+      allMembers, humanMembers, humanCount,
+      readCountMap, confirmedMap, msgPriorityMap,
+      allItemsFlat: [...handoverItems, ...messageItems]
     };
 
-    const allItems = [...handoverItems, ...messageItems];
+    // ① 引き継ぎセクション表示（②セクションタイトルも分離）
+    const sectionHandover = document.getElementById('section-handover');
+    const sectionDivider = document.getElementById('section-divider');
+    const sectionMessage = document.getElementById('section-message');
+    const msgSectionTitle = document.getElementById('message-section-title');
+    const msgList = document.getElementById('message-list');
 
-    msgList.innerHTML = allItems.map(item => {
-      const p = item._type === 'handover'
-        ? getHandoverLabel(item)
-        : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
-      const createdAt = new Date(item.created_at);
-      const mo = createdAt.getMonth() + 1;
-      const dd = createdAt.getDate();
-      const hh = String(createdAt.getHours()).padStart(2, '0');
-      const mm = String(createdAt.getMinutes()).padStart(2, '0');
-      const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-      const bodyEscaped = (item.body || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    if (handoverItems.length > 0) {
+      sectionHandover.style.display = 'block';
+      sectionDivider.style.display = 'block';
+      _handoverAllItems = handoverItems;
+      renderHandoverList(handoverItems, false);
+    } else {
+      sectionHandover.style.display = 'none';
+      sectionDivider.style.display = 'none';
+    }
 
-      // 既読/確認バッジ
-      let readBadge = '';
-      if (humanCount > 0) {
-        if (item._type === 'message') {
-          const readCount = readCountMap[item.id] || 0;
-          // 送信者を分母から除外
-          const receiverCount = humanMembers.filter(m => m.line_uid !== item.sender_line_uid).length;
-          if (readCount >= receiverCount) {
-            readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
-          } else {
-            readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
-          }
-        } else {
-          const confirmedCount = item._confirmed || 0;
-          if (confirmedCount === 0) {
-            readBadge = `<span style="font-size:10px; color:#e53935; font-weight:700;">❗ 未確認</span>`;
-          } else {
-            // 誰か1人でも確認したら「対応済」→確認者名を表示
-            const confirmerNames = (confirmedMap[item.id] || []).map(c => c.display_name).join('・');
-            readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ ${confirmerNames}が確認済</span>`;
-          }
-        }
-      }
-
-      return `
-        <div class="message-item ${p.itemCls}" onclick="openModal('${bodyEscaped}','${p.label}','${p.cls}','${timeStr}','${item.id}','${item._type}','${item.sender_line_uid || ''}')" style="cursor:pointer;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span class="message-priority ${p.cls}">${p.label}</span>
-            ${readBadge}
-          </div>
-          <div class="message-body">${item.body || ''}</div>
-          <div class="message-time">${(() => { const s = allMembers.find(m => m.line_uid === item.sender_line_uid); return s ? s.display_name + '　' : ''; })()}${timeStr} 送信 　<span style="font-size:10px; color:rgba(255,255,255,0.3);">タップで全文表示</span></div>
-        </div>
-      `;
-    }).join('');
+    if (messageItems.length > 0) {
+      // 連絡がある場合、セクションタイトルを「💬 連絡」にする
+      msgSectionTitle.style.display = 'block';
+      msgList.innerHTML = messageItems.map(item => buildItemHtml(item)).join('');
+    } else if (handoverItems.length === 0) {
+      // 両方ない場合
+      msgSectionTitle.style.display = 'none';
+      msgList.innerHTML = '<span class="no-message">本日の連絡はありません</span>';
+    } else {
+      // 引き継ぎのみある場合、連絡セクションは非表示
+      msgSectionTitle.style.display = 'none';
+      msgList.innerHTML = '';
+    }
 
     updateLastUpdated();
   } catch (e) {
@@ -747,33 +906,50 @@ async function loadMessage() {
   }
 }
 
-// メッセージ詳細モーダル（既読/確認情報付き）
+// ═══════════════════════════════════════════
+// メッセージ詳細モーダル（インデックスで指定・⑦⑧対応）
+// ═══════════════════════════════════════════
+function openModalByIndex(index) {
+  const item = _buildItemContext.allItemsFlat[index];
+  if (!item) return;
+  const { allMembers, msgPriorityMap } = _buildItemContext;
+  const p = item._type === 'handover'
+    ? getHandoverLabel(item)
+    : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
+  const createdAt = new Date(item.created_at);
+  const mo = createdAt.getMonth() + 1;
+  const dd = createdAt.getDate();
+  const hh = String(createdAt.getHours()).padStart(2, '0');
+  const mm = String(createdAt.getMinutes()).padStart(2, '0');
+  const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
+  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_line_uid || '');
+}
+
 async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid) {
   const modal = document.getElementById('modal-msg-detail');
-  document.getElementById('modal-priority-badge').innerHTML = `<span class="message-priority ${priorityCls}">${priorityLabel}</span>`;
-  document.getElementById('modal-body').textContent = body;
+  document.getElementById('modal-priority-badge').innerHTML =
+    `<span class="message-priority ${priorityCls}">${priorityLabel}</span>`;
+  // ⑦⑧ モーダル本文：メールアドレスはmailto、URLは外部ブラウザで開くリンクに変換
+  document.getElementById('modal-body').innerHTML = linkifyBody(body);
   document.getElementById('modal-time').textContent = timeStr + ' 送信';
-  document.getElementById('modal-members-info').innerHTML = '<div style="color:rgba(255,255,255,0.4); font-size:12px;">読み込み中...</div>';
+  document.getElementById('modal-members-info').innerHTML =
+    '<div style="color:rgba(255,255,255,0.4); font-size:12px;">読み込み中...</div>';
   modal.style.display = 'flex';
 
   try {
-    // グループメンバー取得
     const { data: members } = await sbClient.from('group_members')
       .select('line_uid, display_name, is_signage')
       .eq('group_session_id', currentGroupData.id)
       .eq('status', 'approved');
 
-    // is_signage=trueのサイネージ端末・送信者を除外
     const humanMembers = (members || []).filter(m => !m.is_signage && m.line_uid !== senderUid);
 
     let readUids = [];
     if (itemType === 'message') {
-      // 連絡：既読UIDs取得
       const { data: receipts } = await sbClient.from('read_receipts')
         .select('line_uid').eq('message_id', itemId);
       readUids = (receipts || []).map(r => r.line_uid);
     } else {
-      // 引き継ぎ：確認UIDs取得
       const { data: confirmations } = await sbClient.from('handover_confirmations')
         .select('line_uid, display_name, action').eq('handover_id', itemId);
       readUids = (confirmations || []).map(c => c.line_uid);
@@ -784,7 +960,6 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
 
     let html = '';
     if (itemType === 'message') {
-      // 連絡：既読・未読の両方表示
       html = `
         <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:12px;">
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
@@ -804,7 +979,6 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
         </div>
       `;
     } else {
-      // 引き継ぎ：確認済メンバーのみ表示
       html = `
         <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:12px;">
           <div style="font-size:11px; color:#66bb6a; margin-bottom:8px; font-weight:700;">✅ 確認済（${readMembers.length}/${humanMembers.length}名）</div>
@@ -820,6 +994,7 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
     document.getElementById('modal-members-info').innerHTML = '';
   }
 }
+
 function closeModal() {
   document.getElementById('modal-msg-detail').style.display = 'none';
 }
@@ -1018,6 +1193,12 @@ async function init() {
   // 画面表示
   document.getElementById('header-group-name').textContent =
     currentGroupData.group_name || currentGroupData.group_id;
+
+  // ④ 藤沢グループのみ混雑度ボタンを表示
+  if (currentGroupData.region === 'fujisawa') {
+    const vacanBtn = document.getElementById('vacan-btn');
+    if (vacanBtn) vacanBtn.style.display = 'flex';
+  }
 
   showMain();
   setupOfflineDetection();
