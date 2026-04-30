@@ -1727,10 +1727,26 @@ function renderHandoverInline(container) {
     container.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">引き継ぎノートはまだありません</div></div>';
     return;
   }
+  // 引き継ぎノート画面と同じソート順
+  const hwConfirmMap = window._hwConfirmMap || {};
+  const priorityOrder = { action: 0, check: 1, done: 2 };
+  const myUid = currentUser.line_uid;
+  const sorted = [...handoverNotes].sort((a, b) => {
+    const aCompleted = (hwConfirmMap[a.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
+    const bCompleted = (hwConfirmMap[b.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
+    if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+    const aConf = (hwConfirmMap[a.id] || []).some(c => c.line_uid === myUid);
+    const bConf = (hwConfirmMap[b.id] || []).some(c => c.line_uid === myUid);
+    if (aConf !== bConf) return aConf ? 1 : -1;
+    const ap = priorityOrder[a.priority] ?? 1;
+    const bp = priorityOrder[b.priority] ?? 1;
+    if (ap !== bp) return ap - bp;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
   let html = '<div class="card">';
-  handoverNotes.forEach(hw => {
-    const confs = (window._hwConfirmMap || {})[hw.id] || [];
-    const myConf = confs.find(c => c.line_uid === currentUser.line_uid);
+  sorted.forEach(hw => {
+    const confs = hwConfirmMap[hw.id] || [];
+    const myConf = confs.find(c => c.line_uid === myUid);
     html += renderHandoverCardHtml(hw, confs, myConf);
   });
   html += '</div>';
