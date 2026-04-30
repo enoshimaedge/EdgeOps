@@ -719,7 +719,12 @@ async function init() {
 }
 
 // 起動
-document.addEventListener('DOMContentLoaded', init);
+// DOMContentLoadedが既に発火済みの場合も考慮
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 </script>
 </body>
 </html>
