@@ -1308,6 +1308,27 @@ async function loadMessages() {
     members = memberData || [];
     handoverNotes = hwData || [];
 
+    // read_receiptsを取得してread_countを実態に合わせて補正
+    // （サイネージ端末が参加前にread_countが加算されたズレを防ぐ）
+    if (messages.length > 0) {
+      const msgIds = messages.map(m => m.id);
+      const { data: receipts } = await supabase.from('read_receipts')
+        .select('message_id, line_uid').in('message_id', msgIds);
+      const signageUids = new Set(members.filter(m => m.is_signage).map(m => m.line_uid));
+      const realReadMap = {};
+      (receipts || []).forEach(r => {
+        if (signageUids.has(r.line_uid)) return;
+        const msg = messages.find(m => m.id === r.message_id);
+        if (msg && r.line_uid === msg.sender_line_uid) return; // 送信者除外
+        realReadMap[r.message_id] = (realReadMap[r.message_id] || 0) + 1;
+      });
+      // read_countをrealReadMapで上書き
+      messages = messages.map(m => ({
+        ...m,
+        read_count: realReadMap[m.id] !== undefined ? realReadMap[m.id] : m.read_count
+      }));
+    }
+
     // ホーム画面でも引き継ぎの確認状態を正しく表示するためconfirmationsを取得
     if (handoverNotes.length > 0) {
       const hwIds = handoverNotes.map(n => n.id);

@@ -657,8 +657,10 @@ async function loadMessage() {
     messageItems.sort((a, b) => {
       const aRead = readCountMap[a.id] || 0;
       const bRead = readCountMap[b.id] || 0;
-      const aFullRead = aRead >= humanCount;
-      const bFullRead = bRead >= humanCount;
+      const aReceivers = humanMembers.filter(m => m.line_uid !== a.sender_line_uid).length;
+      const bReceivers = humanMembers.filter(m => m.line_uid !== b.sender_line_uid).length;
+      const aFullRead = aReceivers > 0 && aRead >= aReceivers;
+      const bFullRead = bReceivers > 0 && bRead >= bReceivers;
       // 未読（0人）が最上位
       const aUnread = aRead === 0 ? 0 : (aFullRead ? 2 : 1);
       const bUnread = bRead === 0 ? 0 : (bFullRead ? 2 : 1);
@@ -702,15 +704,17 @@ async function loadMessage() {
       const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
       const bodyEscaped = (item.body || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 
-      // 既読/確認バッジ
+      // 既読/確認バッジ（送信者を分母から除外）
       let readBadge = '';
       if (humanCount > 0) {
         if (item._type === 'message') {
           const readCount = readCountMap[item.id] || 0;
-          if (readCount >= humanCount) {
+          // 送信者を分母から除外（送信者はサイネージでない前提）
+          const receiverCount = humanMembers.filter(m => m.line_uid !== item.sender_line_uid).length;
+          if (readCount >= receiverCount) {
             readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
           } else {
-            readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${humanCount}人既読</span>`;
+            readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
           }
         } else {
           const confirmedCount = item._confirmed || 0;
