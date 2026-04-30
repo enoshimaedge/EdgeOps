@@ -558,40 +558,63 @@ async function authenticate() {
 // ═══════════════════════════════════════════
 async function loadMessage() {
   try {
-    const { data: messages } = await sbClient
-      .from('messages')
-      .select('*')
-      .eq('group_session_id', currentGroupData.id)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    // 連絡とhandover_notesを並列取得
+    const [msgResult, handoverResult] = await Promise.allSettled([
+      sbClient.from('messages').select('*')
+        .eq('group_session_id', currentGroupData.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      sbClient.from('handover_notes').select('*')
+        .eq('group_session_id', currentGroupData.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+    ]);
+
+    const messages = msgResult.status === 'fulfilled' ? (msgResult.value.data || []) : [];
+    const handovers = handoverResult.status === 'fulfilled' ? (handoverResult.value.data || []) : [];
 
     const msgList = document.getElementById('message-list');
 
-    if (!messages || messages.length === 0) {
+    if (messages.length === 0 && handovers.length === 0) {
       msgList.innerHTML = '<span class="no-message">本日の連絡はありません</span>';
       return;
     }
 
-    const priorityMap = {
+    // 連絡のpriorityMap
+    const msgPriorityMap = {
       urgent:   { label: '🚨 緊急', cls: 'priority-urgent', itemCls: 'urgent' },
       info:     { label: 'ℹ️ お知らせ', cls: 'priority-info', itemCls: 'info' },
       normal:   { label: '📌 通常', cls: 'priority-normal', itemCls: '' },
-      handover: { label: '📋 引き継ぎ', cls: 'priority-normal', itemCls: '' },
     };
 
-    msgList.innerHTML = messages.map(msg => {
-      const p = priorityMap[msg.priority] || priorityMap.normal;
-      const createdAt = new Date(msg.created_at);
+    // 引き継ぎのpriorityMap
+    const handoverPriorityMap = {
+      action: { label: '📋 引き継ぎ・要対応', cls: 'priority-urgent', itemCls: 'urgent' },
+      check:  { label: '📋 引き継ぎ・確認', cls: 'priority-info', itemCls: 'info' },
+      done:   { label: '📋 引き継ぎ・完了', cls: 'priority-normal', itemCls: '' },
+    };
+
+    // 連絡と引き継ぎを時刻で統合してソート
+    const allItems = [
+      ...messages.map(m => ({ ...m, _type: 'message' })),
+      ...handovers.map(h => ({ ...h, body: h.content, _type: 'handover' }))
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    msgList.innerHTML = allItems.map(item => {
+      const p = item._type === 'handover'
+        ? (handoverPriorityMap[item.priority] || handoverPriorityMap.check)
+        : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
+      const createdAt = new Date(item.created_at);
       const mo = createdAt.getMonth() + 1;
       const dd = createdAt.getDate();
       const hh = String(createdAt.getHours()).padStart(2, '0');
       const mm = String(createdAt.getMinutes()).padStart(2, '0');
       const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-      const bodyEscaped = (msg.body || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+      const bodyEscaped = (item.body || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
       return `
         <div class="message-item ${p.itemCls}" onclick="openModal('${bodyEscaped}','${p.label}','${p.cls}','${timeStr}')" style="cursor:pointer;">
           <span class="message-priority ${p.cls}">${p.label}</span>
-          <div class="message-body">${msg.body || ''}</div>
+          <div class="message-body">${item.body || ''}</div>
           <div class="message-time">${timeStr} 送信 　<span style="font-size:10px; color:rgba(255,255,255,0.3);">タップで全文表示</span></div>
         </div>
       `;
@@ -600,7 +623,6 @@ async function loadMessage() {
     updateLastUpdated();
   } catch (e) {
     console.error('メッセージ取得エラー:', e);
-    // メッセージ取得失敗でも他の表示は継続
   }
 }
 
