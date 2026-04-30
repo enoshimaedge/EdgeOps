@@ -537,8 +537,8 @@ async function authenticate() {
 
     if (error || !group) {
       showError(
-        'このサイネージURLは無効です',
-        'トークンが一致しないか、サイネージが無効になっています。\nグループ管理者にお問い合わせください。'
+        'サイネージが無効です',
+        'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。'
       );
       return false;
     }
@@ -986,7 +986,7 @@ function startPolling() {
         .single();
       if (!group) {
         // トークン無効化されたら即エラー画面へ
-        showError('このサイネージURLは無効になりました', '管理者がURLを再生成しました。\n新しいURLで再度アクセスしてください。');
+        showError('サイネージが無効になりました', 'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。');
         clearInterval(updateTimer);
         return;
       }
