@@ -993,13 +993,14 @@ async function loadWeather() {
       regionNameEl.textContent = '📍 ' + coords.name;
     }
 
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error('天気API応答エラー');
     const data = await res.json();
 
     const daily = data.daily;
+    const currentTemp = data.current ? Math.round(data.current.temperature_2m) : null;
     const days = ['今日', '明日'];
 
     let html = '';
@@ -1008,11 +1009,13 @@ async function loadWeather() {
       const tMax = Math.round(daily.temperature_2m_max[i]);
       const tMin = Math.round(daily.temperature_2m_min[i]);
       const w = getWeatherIcon(code);
+      // 今日は現在気温を大きく表示、明日は最高気温を表示
+      const mainTemp = (i === 0 && currentTemp !== null) ? currentTemp : tMax;
       html += `
         <div class="weather-day">
           <div class="weather-day-label">${days[i]}</div>
           <div class="weather-icon">${w.icon}</div>
-          <div class="weather-temp">${tMax}°</div>
+          <div class="weather-temp">${mainTemp}°</div>
           <div class="weather-temp-range">↑${tMax}° ↓${tMin}°</div>
         </div>
       `;
