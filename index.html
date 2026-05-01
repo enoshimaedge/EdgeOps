@@ -1288,6 +1288,7 @@ async function loadMessages() {
   try {
     // messages・members・handover_notesを並列取得（起動速度改善）
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
     const [
       { data },
       { data: memberData },
@@ -1295,7 +1296,9 @@ async function loadMessages() {
       { count }
     ] = await Promise.all([
       supabase.from('messages').select('*')
-        .eq('group_session_id', currentGroup.id).order('created_at', { ascending: false }),
+        .eq('group_session_id', currentGroup.id)
+        .gte('created_at', cutoff60d)
+        .order('created_at', { ascending: false }),
       supabase.from('group_members').select('*')
         .eq('group_session_id', currentGroup.id).eq('status', 'approved'),
       supabase.from('handover_notes').select('*')
@@ -1410,16 +1413,8 @@ function renderMessages() {
     const hwConfirmMap = window._hwConfirmMap || {};
     const priorityOrder = { action: 0, check: 1, done: 2 };
     const myUid = currentUser.line_uid;
+    // 引き継ぎソート：新しい順のみ（重要度の色分けは表示側で維持）
     const sortedHandovers = [...handoverNotes].sort((a, b) => {
-      const aCompleted = (hwConfirmMap[a.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
-      const bCompleted = (hwConfirmMap[b.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
-      if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
-      const aConf = (hwConfirmMap[a.id] || []).some(c => c.line_uid === myUid);
-      const bConf = (hwConfirmMap[b.id] || []).some(c => c.line_uid === myUid);
-      if (aConf !== bConf) return aConf ? 1 : -1;
-      const ap = priorityOrder[a.priority] ?? 1;
-      const bp = priorityOrder[b.priority] ?? 1;
-      if (ap !== bp) return ap - bp;
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
@@ -1436,21 +1431,12 @@ function renderMessages() {
 
   sortedMonths.forEach((monthKey, idx) => {
     const [year, month] = monthKey.split('-');
-    const label = `${parseInt(month)}月 ${year !== new Date().getFullYear().toString() ? year+'年' : ''}`;
+    const label = `${year}年${parseInt(month)}月`;
     const msgs = monthMap[monthKey];
 
-    // 月内ソート：①未読あり→全員既読 ②緊急→通常→連絡
+    // 月内ソート：新しい順のみ（重要度の色分けは表示側で維持）
     msgs.sort((a, b) => {
-      const aReceivers = a.receiver_count != null ? a.receiver_count : members.filter(m => m.line_uid !== a.sender_line_uid && !m.is_signage).length;
-      const bReceivers = b.receiver_count != null ? b.receiver_count : members.filter(m => m.line_uid !== b.sender_line_uid && !m.is_signage).length;
-      const aUnread = aReceivers - (a.read_count || 0);
-      const bUnread = bReceivers - (b.read_count || 0);
-      const aHasUnread = aUnread > 0 ? 0 : 1;
-      const bHasUnread = bUnread > 0 ? 0 : 1;
-      if (aHasUnread !== bHasUnread) return aHasUnread - bHasUnread;
-      const ap = priorityOrder[a.priority || 'info'];
-      const bp = priorityOrder[b.priority || 'info'];
-      return ap - bp;
+      return new Date(b.created_at) - new Date(a.created_at);
     });
 
     const isLatest = idx === 0;
@@ -1486,7 +1472,7 @@ function renderMessages() {
             <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
             <div class="read-count">${msg.read_count || 0}/${receiverCount}人既読</div>
           </div>
-          ${unreadCount > 0 ? `<div class="unread-names">❌ 未読：詳細を確認してください</div>` : ''}
+          ${unreadCount > 0 ? `<div class="unread-names">❌ 未読 ${unreadCount}名</div>` : ''}
         </div>`;
     });
 
@@ -1739,20 +1725,11 @@ async function loadHandoverNotes() {
       return;
     }
 
-    // 並び順：①完了済み（誰かがtakeover/done）は下へ ②未確認優先 ③優先度順 ④新しい順
+    // 並び順：新しい順のみ（重要度の色分けは表示側で維持）
     const priorityOrder = { action: 0, check: 1, done: 2 };
     const myUid = currentUser.line_uid;
     handoverNotes.sort((a, b) => {
-      const aCompleted = (confirmMap[a.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
-      const bCompleted = (confirmMap[b.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
-      if (aCompleted !== bCompleted) return aCompleted ? 1 : -1; // 完了済みは下へ
-      const aConf = (confirmMap[a.id] || []).some(c => c.line_uid === myUid);
-      const bConf = (confirmMap[b.id] || []).some(c => c.line_uid === myUid);
-      if (aConf !== bConf) return aConf ? 1 : -1; // 自分が未確認は上へ
-      const ap = priorityOrder[a.priority] ?? 1;
-      const bp = priorityOrder[b.priority] ?? 1;
-      if (ap !== bp) return ap - bp;
-      return new Date(b.created_at) - new Date(a.created_at); // 新しい順
+      return new Date(b.created_at) - new Date(a.created_at);
     });
 
     let html = '<div class="card">';
@@ -1806,20 +1783,11 @@ function renderHandoverInline(container) {
     container.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">引き継ぎノートはまだありません</div></div>';
     return;
   }
-  // 引き継ぎノート画面と同じソート順
+  // 引き継ぎノート画面と同じソート順：新しい順のみ
   const hwConfirmMap = window._hwConfirmMap || {};
   const priorityOrder = { action: 0, check: 1, done: 2 };
   const myUid = currentUser.line_uid;
   const sorted = [...handoverNotes].sort((a, b) => {
-    const aCompleted = (hwConfirmMap[a.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
-    const bCompleted = (hwConfirmMap[b.id] || []).some(c => c.action === 'takeover' || c.action === 'done');
-    if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
-    const aConf = (hwConfirmMap[a.id] || []).some(c => c.line_uid === myUid);
-    const bConf = (hwConfirmMap[b.id] || []).some(c => c.line_uid === myUid);
-    if (aConf !== bConf) return aConf ? 1 : -1;
-    const ap = priorityOrder[a.priority] ?? 1;
-    const bp = priorityOrder[b.priority] ?? 1;
-    if (ap !== bp) return ap - bp;
     return new Date(b.created_at) - new Date(a.created_at);
   });
   let html = '<div class="card">';

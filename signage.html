@@ -762,16 +762,17 @@ function getHandoverLabel(item) {
 // ═══════════════════════════════════════════
 async function loadMessage() {
   try {
+    // 連絡は過去60日分のみ取得（DBには残るが表示しない）
+    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
     // 連絡とhandover_notesを並列取得
     const [msgResult, handoverResult] = await Promise.allSettled([
       sbClient.from('messages').select('*')
         .eq('group_session_id', currentGroupData.id)
-        .order('created_at', { ascending: false })
-        .limit(20),
+        .gte('created_at', cutoff60d)
+        .order('created_at', { ascending: false }),
       sbClient.from('handover_notes').select('*')
         .eq('group_session_id', currentGroupData.id)
         .order('created_at', { ascending: false })
-        .limit(20)
     ]);
 
     const messages = msgResult.status === 'fulfilled' ? (msgResult.value.data || []) : [];
@@ -831,35 +832,13 @@ async function loadMessage() {
     });
     const messageItems = messages.map(m => ({ ...m, _type: 'message' }));
 
-    // 引き継ぎソート：未確認優先→優先度順→新しい順
-    const priorityOrderH = { action: 0, check: 1, done: 2 };
+    // 引き継ぎソート：新しい順のみ（重要度の色分けは表示側で維持）
     handoverItems.sort((a, b) => {
-      const confirmOrder = (item) => {
-        if (item._confirmed === 0) return 0;
-        if (item._fullyConfirmed) return 2;
-        return 1;
-      };
-      const ca = confirmOrder(a); const cb = confirmOrder(b);
-      if (ca !== cb) return ca - cb;
-      const pa = priorityOrderH[a.priority] ?? 1;
-      const pb = priorityOrderH[b.priority] ?? 1;
-      if (pa !== pb) return pa - pb;
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    // 連絡ソート：未読優先→緊急度順→新しい順
-    const priorityOrderM = { urgent: 0, normal: 1, info: 2 };
+    // 連絡ソート：新しい順のみ（重要度の色分けは表示側で維持）
     messageItems.sort((a, b) => {
-      const aRead = readCountMap[a.id] || 0;
-      const bRead = readCountMap[b.id] || 0;
-      const aFullRead = aRead >= humanCount;
-      const bFullRead = bRead >= humanCount;
-      const aUnread = aRead === 0 ? 0 : (aFullRead ? 2 : 1);
-      const bUnread = bRead === 0 ? 0 : (bFullRead ? 2 : 1);
-      if (aUnread !== bUnread) return aUnread - bUnread;
-      const pa = priorityOrderM[a.priority] ?? 1;
-      const pb = priorityOrderM[b.priority] ?? 1;
-      if (pa !== pb) return pa - pb;
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
@@ -971,7 +950,7 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
                 : readMembers.map(m => `<div style="font-size:13px; color:#66bb6a; margin-bottom:4px;">✅ ${m.display_name}</div>`).join('')}
             </div>
             <div>
-              <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:6px; font-weight:700;">⬜ 未読（${unreadMembers.length}名）</div>
+              <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:6px; font-weight:700;">❌ 未読 ${unreadMembers.length}名</div>
               ${unreadMembers.length === 0
                 ? `<div style="font-size:12px; color:rgba(255,255,255,0.3);">全員既読</div>`
                 : unreadMembers.map(m => `<div style="font-size:13px; color:rgba(255,255,255,0.5); margin-bottom:4px;">⬜ ${m.display_name}</div>`).join('')}
