@@ -456,11 +456,64 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // 地域→座標マッピング
 const REGION_COORDS = {
-  fujisawa:  { lat: 35.3396, lng: 139.4869, name: '藤沢' },
-  kamakura:  { lat: 35.3197, lng: 139.5467, name: '鎌倉' },
-  hakone:    { lat: 35.2329, lng: 139.1069, name: '箱根' },
-  yokohama:  { lat: 35.4437, lng: 139.6380, name: '横浜' },
-  tokyo:     { lat: 35.6895, lng: 139.6917, name: '東京' },
+  // 北海道・東北
+  hokkaido:  { lat: 43.0642, lng: 141.3469, name: '北海道' },
+  aomori:    { lat: 40.8244, lng: 140.7400, name: '青森県' },
+  iwate:     { lat: 39.7036, lng: 141.1527, name: '岩手県' },
+  miyagi:    { lat: 38.2688, lng: 140.8721, name: '宮城県' },
+  akita:     { lat: 39.7186, lng: 140.1024, name: '秋田県' },
+  yamagata:  { lat: 38.2404, lng: 140.3634, name: '山形県' },
+  fukushima: { lat: 37.7608, lng: 140.4748, name: '福島県' },
+  // 関東
+  ibaraki:   { lat: 36.3418, lng: 140.4468, name: '茨城県' },
+  tochigi:   { lat: 36.5657, lng: 139.8836, name: '栃木県' },
+  gunma:     { lat: 36.3911, lng: 139.0608, name: '群馬県' },
+  saitama:   { lat: 35.8569, lng: 139.6489, name: '埼玉県' },
+  chiba:     { lat: 35.6047, lng: 140.1233, name: '千葉県' },
+  tokyo:     { lat: 35.6895, lng: 139.6917, name: '東京都' },
+  yokohama:  { lat: 35.4437, lng: 139.6380, name: '神奈川県（横浜）' },
+  fujisawa:  { lat: 35.3396, lng: 139.4869, name: '神奈川県（藤沢）' },
+  kamakura:  { lat: 35.3197, lng: 139.5467, name: '神奈川県（鎌倉）' },
+  hakone:    { lat: 35.2329, lng: 139.1069, name: '神奈川県（箱根）' },
+  // 中部
+  niigata:   { lat: 37.9161, lng: 139.0364, name: '新潟県' },
+  toyama:    { lat: 36.6953, lng: 137.2113, name: '富山県' },
+  ishikawa:  { lat: 36.5944, lng: 136.6256, name: '石川県' },
+  fukui:     { lat: 36.0652, lng: 136.2216, name: '福井県' },
+  yamanashi: { lat: 35.6635, lng: 138.5684, name: '山梨県' },
+  nagano:    { lat: 36.6513, lng: 138.1810, name: '長野県' },
+  gifu:      { lat: 35.4232, lng: 136.7608, name: '岐阜県' },
+  shizuoka:  { lat: 34.9756, lng: 138.3828, name: '静岡県' },
+  aichi:     { lat: 35.1802, lng: 136.9066, name: '愛知県' },
+  // 近畿
+  mie:       { lat: 34.7303, lng: 136.5086, name: '三重県' },
+  shiga:     { lat: 35.0045, lng: 135.8686, name: '滋賀県' },
+  kyoto:     { lat: 35.0211, lng: 135.7556, name: '京都府' },
+  osaka:     { lat: 34.6937, lng: 135.5023, name: '大阪府' },
+  hyogo:     { lat: 34.6913, lng: 135.1830, name: '兵庫県' },
+  nara:      { lat: 34.6851, lng: 135.8050, name: '奈良県' },
+  wakayama:  { lat: 34.2260, lng: 135.1675, name: '和歌山県' },
+  // 中国
+  tottori:   { lat: 35.5011, lng: 134.2351, name: '鳥取県' },
+  shimane:   { lat: 35.4723, lng: 133.0505, name: '島根県' },
+  okayama:   { lat: 34.6618, lng: 133.9344, name: '岡山県' },
+  hiroshima: { lat: 34.3966, lng: 132.4596, name: '広島県' },
+  yamaguchi: { lat: 34.1860, lng: 131.4706, name: '山口県' },
+  // 四国
+  tokushima: { lat: 34.0658, lng: 134.5593, name: '徳島県' },
+  kagawa:    { lat: 34.3401, lng: 134.0434, name: '香川県' },
+  ehime:     { lat: 33.8416, lng: 132.7657, name: '愛媛県' },
+  kochi:     { lat: 33.5597, lng: 133.5311, name: '高知県' },
+  // 九州・沖縄
+  fukuoka:   { lat: 33.6064, lng: 130.4183, name: '福岡県' },
+  saga:      { lat: 33.2494, lng: 130.2988, name: '佐賀県' },
+  nagasaki:  { lat: 32.7503, lng: 129.8779, name: '長崎県' },
+  kumamoto:  { lat: 32.7898, lng: 130.7417, name: '熊本県' },
+  oita:      { lat: 33.2382, lng: 131.6126, name: '大分県' },
+  miyazaki:  { lat: 31.9111, lng: 131.4239, name: '宮崎県' },
+  kagoshima: { lat: 31.5602, lng: 130.5581, name: '鹿児島県' },
+  okinawa:   { lat: 26.2124, lng: 127.6809, name: '沖縄県' },
+  // 未設定
   other:     { lat: 35.6895, lng: 139.6917, name: '---' },
 };
 
