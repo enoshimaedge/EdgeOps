@@ -1087,25 +1087,10 @@ function generateQR() {
         display: flex; align-items: center; justify-content: center;
         box-shadow: 0 0 0 3px white;
       `;
-      // LINEロゴ（シンプルな吹き出し形）
+      // LINEロゴ（吹き出し形のみ・シンプル版）
       logo.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-          <!-- 吹き出し外形（白） -->
+        <svg width="22" height="22" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
           <path d="M24 5C13.5 5 5 12.3 5 21.3c0 6.4 3.9 12 9.8 15.3l-1.4 5.1c-.2.6.4.7.7.5l6.2-3.8c1.2.2 2.4.3 3.7.3 10.5 0 19-7.3 19-16.3S34.5 5 24 5z" fill="white"/>
-          <!-- L -->
-          <rect x="13" y="17" width="3" height="9" rx="1" fill="#06C755"/>
-          <rect x="13" y="23.5" width="5.5" height="2.5" rx="1" fill="#06C755"/>
-          <!-- I -->
-          <rect x="20.5" y="17" width="3" height="9" rx="1" fill="#06C755"/>
-          <!-- N -->
-          <rect x="25.5" y="17" width="2.5" height="9" rx="1" fill="#06C755"/>
-          <rect x="32" y="17" width="2.5" height="9" rx="1" fill="#06C755"/>
-          <path d="M28 17 L34.5 26" stroke="#06C755" stroke-width="2.5" stroke-linecap="round"/>
-          <!-- E -->
-          <rect x="37" y="17" width="2.5" height="9" rx="1" fill="#06C755"/>
-          <rect x="37" y="17" width="5" height="2.5" rx="1" fill="#06C755"/>
-          <rect x="37" y="20.5" width="4" height="2" rx="1" fill="#06C755"/>
-          <rect x="37" y="23.5" width="5" height="2.5" rx="1" fill="#06C755"/>
         </svg>
       `;
       container.appendChild(logo);
