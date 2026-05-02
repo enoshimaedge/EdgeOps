@@ -851,6 +851,7 @@
     <div><div class="header-title">引き継ぎノート</div><div class="header-sub">Handover Notes</div></div>
   </div>
   <div class="content" style="padding-bottom:80px;">
+    <div style="padding:8px 16px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:12px; color:#e65100; font-weight:600;">⏰ メッセージ送信後72時間で非表示になります</div>
     <div id="handover-list-container">
       <div class="empty"><div class="empty-icon">📋</div><div class="empty-text">引き継ぎノートはまだありません</div></div>
     </div>
@@ -1469,7 +1470,7 @@ function renderMessages() {
   // all表示の場合は引き継ぎを最上部に表示
   if (showHandover && handoverNotes.length > 0) {
     html += `<div class="card" style="margin-bottom:12px;">`;
-    html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">📋 引き継ぎノート</div>`;
+    html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">📋 引き継ぎノート（72時間で非表示）</div>`;
 
     // 引き継ぎノート画面と同じソート順で表示
     const hwConfirmMap = window._hwConfirmMap || {};
