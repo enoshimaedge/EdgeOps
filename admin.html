@@ -290,6 +290,48 @@
   .status-approved { background: var(--green-light); color: var(--green-dark); }
   .status-pending { background: #fff3e0; color: #e65100; }
   .status-left { background: var(--bg); color: var(--text-light); }
+
+  /* ── 退出済み折りたたみセクション ── */
+  .left-section-header {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+  .left-section-header:active { opacity: 0.7; }
+  .left-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-mid);
+  }
+  .left-section-arrow {
+    font-size: 12px;
+    color: var(--text-light);
+    transition: transform 0.2s;
+  }
+  .left-section-arrow.open { transform: rotate(90deg); }
+  .left-section-body {
+    display: none;
+  }
+  .left-section-body.open { display: block; }
+  .creator-mark {
+    display: inline-block;
+    background: #fff3e0;
+    color: #e65100;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
 </style>
 </head>
 <body>
@@ -586,7 +628,17 @@ async function loadMembers() {
     .order('created_at', { ascending: false })
     .limit(200);
 
-  allMembers = data || [];
+  // line_uid + group_session_id で集約（同じ人が同じグループに複数レコードある場合、最新のcreated_atを代表とする）
+  // ※ created_at の DESC で取得済みなので、各キーの最初に出てくるレコードが最新＝代表
+  const memberMap = new Map();
+  (data || []).forEach(m => {
+    const key = `${m.line_uid}__${m.group_session_id}`;
+    if (!memberMap.has(key)) {
+      memberMap.set(key, m);  // 最新のレコードのみ保持
+    }
+  });
+
+  allMembers = Array.from(memberMap.values());
   renderMembers(allMembers);
 }
 
@@ -596,15 +648,36 @@ function renderMembers(members) {
     return;
   }
 
-  const html = members.map(m => {
+  // 上段：approved / pending（現役）／下段：left（退出済み）に振り分け
+  const activeMembers = members.filter(m => m.status === 'approved' || m.status === 'pending');
+  const leftMembers = members.filter(m => m.status === 'left');
+
+  // 上段の並び順：is_creator が true → 最上部、それ以外は approved_at の古い順
+  activeMembers.sort((a, b) => {
+    if (a.is_creator && !b.is_creator) return -1;
+    if (!a.is_creator && b.is_creator) return 1;
+    const aTime = a.approved_at ? new Date(a.approved_at).getTime() : 0;
+    const bTime = b.approved_at ? new Date(b.approved_at).getTime() : 0;
+    return aTime - bTime;
+  });
+
+  // 下段の並び順：created_at の新しい順（最近退出した人が上）
+  leftMembers.sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const renderCard = (m) => {
     const statusClass = m.status === 'approved' ? 'approved' : m.status === 'pending' ? 'pending' : 'left';
     const statusLabel = m.status === 'approved' ? '承認済' : m.status === 'pending' ? '承認待ち' : '退出';
     const groupId = m.group_sessions?.group_id || '-';
+    const creatorBadge = m.is_creator ? '<span class="creator-mark">作成者</span>' : '';
     return `
       <div class="group-item">
         <div class="group-item-header">
           <div>
-            <div class="group-id" style="font-size:14px;font-family:inherit">${m.display_name || '名無し'}</div>
+            <div class="group-id" style="font-size:14px;font-family:inherit">${m.display_name || '名無し'}${creatorBadge}</div>
             <div style="font-size:10px;color:#9aa5b8;font-family:monospace;margin-top:2px">${m.line_uid?.substring(0, 20)}...</div>
           </div>
           <div class="status-badge status-${statusClass}">${statusLabel}</div>
@@ -615,8 +688,40 @@ function renderMembers(members) {
         </div>
       </div>
     `;
-  }).join('');
+  };
+
+  let html = '';
+
+  // 上段：現役メンバー
+  if (activeMembers.length) {
+    html += activeMembers.map(renderCard).join('');
+  } else {
+    html += '<div class="empty-state">現役メンバーはいません</div>';
+  }
+
+  // 下段：退出済み（折りたたみ）
+  if (leftMembers.length) {
+    html += `
+      <div class="left-section-header" onclick="toggleLeftSection()">
+        <span class="left-section-title">🚪 退出済み (${leftMembers.length})</span>
+        <span class="left-section-arrow" id="left-arrow">▶</span>
+      </div>
+      <div class="left-section-body" id="left-section-body">
+        ${leftMembers.map(renderCard).join('')}
+      </div>
+    `;
+  }
+
   document.getElementById('member-list').innerHTML = html;
+}
+
+function toggleLeftSection() {
+  const body = document.getElementById('left-section-body');
+  const arrow = document.getElementById('left-arrow');
+  if (body && arrow) {
+    body.classList.toggle('open');
+    arrow.classList.toggle('open');
+  }
 }
 
 function filterMembers() {
