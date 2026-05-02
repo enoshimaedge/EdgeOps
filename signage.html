@@ -423,10 +423,11 @@
       </div>
 
       <div class="s-card" id="card-qr">
-        <div class="s-card-title" style="line-height:1.4;">📱 EEE｜EdgeOps<br><span style="font-size:11px; font-weight:600; color:rgba(255,255,255,0.7);">LINE公式アカウント登録QR</span></div>
+        <div class="s-card-title">📱 グループ参加QR</div>
         <div class="qr-container">
           <div id="qr-canvas" style="background:white; border-radius:8px; padding:6px; display:inline-block;"></div>
           <div class="qr-label">グループ参加はこちら</div>
+          <div style="font-size:9px; color:rgba(255,255,255,0.4); text-align:center; margin-top:3px; line-height:1.4;">※グループIDはグループメンバーに<br>教えてもらってください</div>
         </div>
       </div>
     </div>
@@ -546,14 +547,9 @@ function showMain() {
 
 function updateLastUpdated() {
   const now = new Date();
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  const mo = now.getMonth() + 1;
-  const dd = now.getDate();
-  const wd = weekdays[now.getDay()];
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
-  document.getElementById('last-updated-display').textContent =
-    `最終更新：${now.getFullYear()}年${mo}月${dd}日（${wd}）${hh}:${mm}`;
+  document.getElementById('last-updated-display').textContent = '最終更新：' + hh + ':' + mm;
 }
 
 function toDateStr(date) {
@@ -751,15 +747,15 @@ function getHandoverLabel(item) {
   const isConfirmed = item._fullyConfirmed || item._confirmed > 0;
   if (item.priority === 'action') {
     return isConfirmed
-      ? { label: '🔴 重要・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
-      : { label: '🔴 重要・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
+      ? { label: '🔴 引き継ぎ・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
+      : { label: '🔴 引き継ぎ・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
   }
   if (item.priority === 'done') {
-    return { label: '🟢 確認要・確認済', cls: 'priority-info', itemCls: 'info' };
+    return { label: '🟢 引き継ぎ・確認済', cls: 'priority-info', itemCls: 'info' };
   }
   return isConfirmed
-    ? { label: '🟡 通常・確認済', cls: 'priority-normal', itemCls: 'normal' }
-    : { label: '🟡 通常・未確認', cls: 'priority-normal', itemCls: 'normal' };
+    ? { label: '🟡 引き継ぎ・確認済', cls: 'priority-normal', itemCls: 'normal' }
+    : { label: '🟡 引き継ぎ・未確認', cls: 'priority-normal', itemCls: 'normal' };
 }
 
 // ═══════════════════════════════════════════
