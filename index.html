@@ -539,6 +539,8 @@
             <option value="clinic">🏥 病院・クリニック</option>
             <option value="care">🏠 介護施設</option>
             <option value="attraction">🎡 集客施設</option>
+            <option value="freelance">👥 フリーランス集団</option>
+            <option value="club">🏆 部活・クラブ</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
@@ -937,6 +939,8 @@
             <option value="clinic">🏥 病院・クリニック</option>
             <option value="care">🏠 介護施設</option>
             <option value="attraction">🎡 集客施設</option>
+            <option value="freelance">👥 フリーランス集団</option>
+            <option value="club">🏆 部活・クラブ</option>
           </select>
         </div>
         <button class="btn btn-secondary" onclick="updateIndustry()" style="margin-bottom:12px;">業種を更新 / Update Industry</button>
@@ -1594,6 +1598,22 @@ const TEMPLATES = {
     '本日のイベント・特別展示のスケジュールをお知らせします。〇〇時から〇〇にて〇〇を実施します。担当者は事前に準備を完了してください。',
     '緊急時の避難誘導ルートを確認してください。本日は〇〇出口が使用できません。スタッフ全員で共有をお願いします。',
     '落とし物・忘れ物の情報を共有します。〇〇エリアで〇〇が届いています。心当たりのあるお客様がいた場合はインフォメーションへご案内ください。',
+  ],
+  freelance: [
+    '本日のスケジュールをお知らせします。〇〇時から〇〇さんがシェアスペースA、〇〇時から〇〇さんがBで施術予定です。',
+    '〇〇様のご予約変更がありました。担当者は引き継ぎ内容をご確認ください。',
+    '共有設備(〇〇)の不具合があります。次の利用者は〇〇までご注意ください。',
+    '本日のシフト変更をお知らせします。〇〇の担当が〇〇さんに変わりました。',
+    '月次定例ミーティングを行います。〇〇時より〇〇(またはオンライン)で実施します。',
+    '共用備品の補充をお願いします。〇〇が残り少なくなっています。',
+  ],
+  club: [
+    '保護者の皆様へ。本日の練習は〇〇時から〇〇にて行います。お迎えは〇〇時頃を予定しています。',
+    '明日の試合・大会の集合時間をお知らせします。〇〇時に〇〇集合です。送迎・観戦のご予定を調整ください。',
+    '練習中止のお知らせ。本日の練習は〇〇のため中止します。お子様にお伝えください。',
+    '保護者会・保護者面談のお知らせ。〇〇日〇〇時より〇〇にて実施します。出欠のご返信をお願いします。',
+    '部費・遠征費のお知らせ。〇〇日までに〇〇円を集金します。期日までにご準備ください。',
+    '持ち物・準備のお願い。〇〇日は〇〇が必要です。お子様の準備をご確認ください。',
   ],
 };
 
@@ -2302,7 +2322,7 @@ async function updateIndustry() {
       .update({ industry: newIndustry }).eq('id', currentGroup.id);
     if (error) throw error;
     currentGroup.industry = newIndustry;
-    const labels = { hotel: 'ホテル・旅館', clinic: '病院・クリニック', care: '介護施設', attraction: '集客施設' };
+    const labels = { hotel: 'ホテル・旅館', clinic: '病院・クリニック', care: '介護施設', attraction: '集客施設', freelance: 'フリーランス集団', club: '部活・クラブ' };
     showToast(`業種を「${labels[newIndustry]}」に更新しました`);
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
