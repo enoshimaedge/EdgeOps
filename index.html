@@ -727,7 +727,7 @@
     <div id="handover-badge-bar" style="display:none;" class="handover-badge-bar" onclick="showScreen('screen-handover')">
       <div style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:16px;">📋</span>
-        <span style="font-size:13px; font-weight:700; color:#e65100;">未確認の引き継ぎがあります</span>
+        <span style="font-size:13px; font-weight:700; color:#e65100;">自分が投稿した未確認の引き継ぎがあります</span>
       </div>
       <span class="handover-badge-count" id="handover-badge-count">0</span>
     </div>
@@ -1729,27 +1729,45 @@ async function updateHandoverBadge() {
       document.getElementById('handover-badge-bar').style.display = 'none';
       return;
     }
-    // 自分が送った引き継ぎは除外（自分は確認不要）
-    const othersNotes = notes.filter(n => n.sender_line_uid !== currentUser.line_uid);
-    if (othersNotes.length === 0) {
+
+    // 自分がサイネージ端末かどうか確認
+    const myMemberInfo = members.find(m => m.line_uid === currentUser.line_uid);
+    const amISignage = myMemberInfo && myMemberInfo.is_signage;
+
+    let targetNotes;
+    if (amISignage) {
+      // サイネージ端末：全員の未確認件数を表示
+      targetNotes = notes;
+    } else {
+      // スタッフ：自分が投稿した未確認のみ表示
+      targetNotes = notes.filter(n => n.sender_line_uid === currentUser.line_uid);
+    }
+
+    if (targetNotes.length === 0) {
       document.getElementById('handover-badge-bar').style.display = 'none';
       return;
     }
-    const noteIds = othersNotes.map(n => n.id);
-    // 全confirmationsを取得（自分の確認状況＋完了済み判定の両方に使う）
+    const noteIds = targetNotes.map(n => n.id);
+    // 全confirmationsを取得（確認済み＋完了済み判定に使う）
     const { data: allConfirms } = await supabase.from('handover_confirmations').select('handover_id, line_uid, action')
       .in('handover_id', noteIds);
-    // 自分が確認済みのID
-    const confirmedIds = new Set((allConfirms || []).filter(c => c.line_uid === currentUser.line_uid).map(c => c.handover_id));
+    // 誰かが確認済みのID
+    const confirmedIds = new Set((allConfirms || []).map(c => c.handover_id));
     // 誰かがtakeover/doneを押した完了済みのID（バッジカウントから除外）
     const completedIds = new Set((allConfirms || []).filter(c => c.action === 'takeover' || c.action === 'done').map(c => c.handover_id));
-    // 未確認かつ完了済みでないものだけカウント
+    // 誰も確認しておらず完了済みでないものだけカウント
     const unconfirmedCount = noteIds.filter(id => !confirmedIds.has(id) && !completedIds.has(id)).length;
     const bar = document.getElementById('handover-badge-bar');
     const countEl = document.getElementById('handover-badge-count');
     if (unconfirmedCount > 0) {
       bar.style.display = 'flex';
       countEl.textContent = unconfirmedCount;
+      const msgEl = bar.querySelector('span');
+      if (msgEl) {
+        msgEl.textContent = amISignage
+          ? '未確認の引き継ぎがあります'
+          : '自分が投稿した未確認の引き継ぎがあります';
+      }
     } else {
       bar.style.display = 'none';
     }
@@ -1816,10 +1834,8 @@ function renderHandoverCardHtml(hw, confs, myConf) {
     if (isCompleted) {
       const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
       statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿（🔒 ${escHtml(completedConf.display_name)}が${cl}）</div>`;
-    } else if (confirmNames) {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-confirm-names">✅ 確認済み：${escHtml(confirmNames)}</div>`;
     } else {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-unconfirmed">⚠️ 未確認</div>`;
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿${confirmNames ? '（確認済：' + escHtml(confirmNames) + '）' : ''}</div>`;
     }
   } else if (isCompleted) {
     const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
