@@ -727,7 +727,7 @@
     <div id="handover-badge-bar" style="display:none;" class="handover-badge-bar" onclick="showScreen('screen-handover')">
       <div style="display:flex; align-items:center; gap:8px;">
         <span style="font-size:16px;">📋</span>
-        <span style="font-size:13px; font-weight:700; color:#e65100;">自分が投稿した未確認の引き継ぎがあります</span>
+        <span id="handover-badge-msg" style="font-size:13px; font-weight:700; color:#e65100;"></span>
       </div>
       <span class="handover-badge-count" id="handover-badge-count">0</span>
     </div>
@@ -1762,10 +1762,10 @@ async function updateHandoverBadge() {
     if (unconfirmedCount > 0) {
       bar.style.display = 'flex';
       countEl.textContent = unconfirmedCount;
-      const msgEl = bar.querySelector('span');
+      const msgEl = document.getElementById('handover-badge-msg');
       if (msgEl) {
         msgEl.textContent = amISignage
-          ? '未確認の引き継ぎがあります'
+          ? '全員分の未確認引き継ぎ事項があります'
           : '自分が投稿した未確認の引き継ぎがあります';
       }
     } else {
@@ -1834,8 +1834,10 @@ function renderHandoverCardHtml(hw, confs, myConf) {
     if (isCompleted) {
       const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
       statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿（🔒 ${escHtml(completedConf.display_name)}が${cl}）</div>`;
+    } else if (confirmNames) {
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-confirm-names">✅ 確認済み：${escHtml(confirmNames)}</div>`;
     } else {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿${confirmNames ? '（確認済：' + escHtml(confirmNames) + '）' : ''}</div>`;
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-unconfirmed">⚠️ 未確認</div>`;
     }
   } else if (isCompleted) {
     const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
