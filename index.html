@@ -1768,9 +1768,9 @@ function applyComposeType(type) {
 function applySurveyVisibility(isMsgActive) {
   const wrap = document.getElementById('survey-section');
   if (!wrap) return;
-  const myMember = members.find(m => m.line_uid === currentUser?.line_uid);
-  const isCreator = myMember && myMember.is_creator === true;
-  if (isMsgActive && isCreator) {
+  // グローバル変数 isCreator を使用（members 配列のロードタイミングに依存しない）
+  // members 配列が空でも、グループ参加時に設定済みの isCreator で判定できる
+  if (isMsgActive && isCreator === true) {
     wrap.style.display = '';
   } else {
     wrap.style.display = 'none';
@@ -1847,10 +1847,9 @@ async function sendMessage() {
     const receiverCountAtSend = members.filter(m => m.line_uid !== currentUser.line_uid && !m.is_signage).length;
 
     // ── アンケート対応(管理者かつチェック時のみ true) ──
+    // グローバル変数 isCreator を使用（members 依存を排除しタイミング問題を回避）
     const surveyCb = document.getElementById('survey-checkbox');
-    const myMember = members.find(m => m.line_uid === currentUser.line_uid);
-    const isCreator = myMember && myMember.is_creator === true;
-    const isSurvey = !!(surveyCb && surveyCb.checked && isCreator);
+    const isSurvey = !!(surveyCb && surveyCb.checked && isCreator === true);
 
     // 締切日時の組み立て (date input → その日の23:59:59)
     let surveyDeadline = null;
