@@ -777,10 +777,15 @@ function buildItemHtml(item) {
   // onclickはdata属性に逃がしてシングルクォート問題を回避（⑧対応）
   const itemIndex = _buildItemContext.allItemsFlat.indexOf(item);
 
+  // ── アンケートラベル（メッセージで is_survey=true のときのみ表示・サイネージは見せる専用） ──
+  const surveyLabel = (item._type === 'message' && item.is_survey === true)
+    ? `<span class="message-priority" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート</span>`
+    : '';
+
   return `
     <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <span class="message-priority ${p.cls}">${p.label}</span>
+        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}</div>
         ${readBadge}
       </div>
       <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(body)}</div>

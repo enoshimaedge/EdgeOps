@@ -801,6 +801,18 @@
       <label class="form-label" id="compose-body-label">メッセージ内容 / Message</label>
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
+    <!-- ══ アンケート機能(管理者のみ表示・通常メッセージ時のみ表示) ══ -->
+    <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#f0fff4; border:1px solid #06C755; border-radius:8px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600;">
+        <input type="checkbox" id="survey-checkbox" onclick="toggleSurveyMode()" style="width:18px; height:18px; cursor:pointer;">
+        <span>📊 このメッセージをアンケートとして送信</span>
+      </label>
+      <div id="survey-deadline-wrap" style="display:none; margin-top:10px;">
+        <label class="form-label" style="font-size:12px;">締切日(任意・空欄で締切なし)</label>
+        <input type="date" id="survey-deadline-input" class="form-input" style="font-size:14px;">
+        <div style="font-size:11px; color:var(--text-light); margin-top:4px;">※締切は当日の23:59まで有効</div>
+      </div>
+    </div>
     <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()">📢 送信する / Send</button>
   </div>
 </div>
@@ -815,6 +827,23 @@
     <div class="card" style="padding:16px; margin-bottom:12px;">
       <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="detail-meta"></div>
       <div style="font-size:15px; line-height:1.7; word-break:break-all;" id="detail-body"></div>
+    </div>
+    <!-- ══ アンケート回答UI(アンケートメッセージのみ表示) ══ -->
+    <div id="detail-survey-wrap" class="card" style="display:none; padding:16px; margin-bottom:12px; background:#f0fff4; border:1px solid #06C755;">
+      <div style="font-size:13px; font-weight:700; color:#047a37; margin-bottom:8px;">📊 アンケートに回答</div>
+      <div id="detail-survey-deadline" style="font-size:12px; color:var(--text-mid); margin-bottom:10px;"></div>
+      <div id="detail-survey-answer-area">
+        <div class="form-group" style="margin-bottom:10px;">
+          <input type="text" class="form-input" id="detail-survey-input" maxlength="20" placeholder="20文字以内で回答" oninput="updateSurveyButtonState()">
+          <div style="font-size:11px; color:var(--text-light); margin-top:4px;"><span id="detail-survey-char-count">0</span>/20文字</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-primary" id="detail-survey-submit" onclick="submitSurveyResponse()" style="flex:1;">アンケート回答</button>
+          <button class="btn btn-secondary" id="detail-survey-na" onclick="submitSurveyNotApplicable()" style="flex:1;">該当なし</button>
+        </div>
+      </div>
+      <div id="detail-survey-status" style="display:none; margin-top:8px; padding:10px; background:white; border-radius:8px; font-size:13px;"></div>
+      <div id="detail-survey-closed" style="display:none; margin-top:8px; padding:10px; background:#ffeaea; color:#c62828; border-radius:8px; font-size:13px; font-weight:600; text-align:center;">締切済み</div>
     </div>
     <div style="display:flex; gap:10px; margin-bottom:16px;">
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
@@ -953,6 +982,10 @@
         <button class="btn btn-secondary" onclick="showMemberList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
           👥 メンバー一覧 / Member List
         </button>
+        <!-- アンケート集計ボタン -->
+        <button class="btn btn-secondary" onclick="showSurveyList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
+          📊 アンケート集計結果 / Survey Results
+        </button>
         <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
           <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージ管理</div>
@@ -994,6 +1027,30 @@
           <div onclick="document.getElementById('modal-members').style.display='none'" style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
         </div>
         <div id="member-list-content">
+          <div class="spinner" style="margin:40px auto;"></div>
+        </div>
+      </div>
+    </div>
+    <!-- ══ アンケート一覧モーダル(1階層目) ══ -->
+    <div id="modal-survey-list" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; overflow-y:auto;">
+      <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <div style="font-size:16px; font-weight:700;">📊 アンケート集計結果</div>
+          <div onclick="document.getElementById('modal-survey-list').style.display='none'" style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
+        </div>
+        <div id="survey-list-content">
+          <div class="spinner" style="margin:40px auto;"></div>
+        </div>
+      </div>
+    </div>
+    <!-- ══ アンケート個別集計モーダル(2階層目) ══ -->
+    <div id="modal-survey-detail" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:201; overflow-y:auto;">
+      <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <div style="font-size:16px; font-weight:700;" id="survey-detail-title">📊 アンケート詳細</div>
+          <div onclick="document.getElementById('modal-survey-detail').style.display='none'" style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
+        </div>
+        <div id="survey-detail-content">
           <div class="spinner" style="margin:40px auto;"></div>
         </div>
       </div>
@@ -1409,6 +1466,26 @@ async function loadMessages() {
       window._hwConfirmMap = {};
     }
 
+    // ── アンケート回答カウントマップを取得（is_survey=true のメッセージのみ対象）──
+    try {
+      const surveyMsgIds = messages.filter(m => m.is_survey === true).map(m => m.id);
+      const respMap = {};
+      if (surveyMsgIds.length > 0) {
+        const { data: resps } = await supabase.from('message_responses')
+          .select('message_id, status')
+          .in('message_id', surveyMsgIds);
+        (resps || []).forEach(r => {
+          if (r.status === 'answered') {
+            respMap[r.message_id] = (respMap[r.message_id] || 0) + 1;
+          }
+        });
+      }
+      window._surveyResponseCountMap = respMap;
+    } catch (e) {
+      console.error('アンケート回答数取得失敗:', e);
+      window._surveyResponseCountMap = {};
+    }
+
     renderMessages();
     const badge = document.getElementById('approval-badge');
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
@@ -1526,9 +1603,19 @@ function renderMessages() {
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
       const pLabel = p === 'urgent' ? '🔴 緊急' : p === 'normal' ? '🟡 通常' : '🟢 連絡';
+      // ── アンケートメッセージ判定（is_survey が true のときのみ） ──
+      const isSurvey = msg.is_survey === true;
+      // 分母：送信者を含む現メンバー（サイネージ除外）
+      const surveyDenominator = members.filter(m => !m.is_signage).length;
+      // 分子：このメッセージに対する「回答済み（answered）」の数
+      const respMap = window._surveyResponseCountMap || {};
+      const surveyAnsweredCount = respMap[msg.id] || 0;
+      const surveyLabel = isSurvey
+        ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>`
+        : '';
       html += `
         <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
-          <span class="priority-badge priority-${p}">${pLabel}</span>
+          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}
           <div class="msg-title">${getMessageTitle(msg.body, 40)}</div>
           <div class="msg-meta">${senderName}　${timeStr}</div>
           <div class="msg-read-bar">
@@ -1673,6 +1760,40 @@ function applyComposeType(type) {
   if (placeholder) placeholder.placeholder = isMsgActive ? '連絡内容を入力してください...' : '引き継ぎ事項を入力してください（例：〇〇様のご対応をお願いします）...';
   const sendBtn = document.getElementById('compose-send-btn');
   if (sendBtn) sendBtn.textContent = isMsgActive ? '📢 送信する / Send' : '📋 引き継ぎを投稿する';
+  // アンケートセクションは「通常メッセージ」かつ「グループ管理者」のときのみ表示
+  applySurveyVisibility(isMsgActive);
+}
+
+// アンケートセクションの表示制御（グループ管理者かつ通常メッセージ作成時のみ表示）
+function applySurveyVisibility(isMsgActive) {
+  const wrap = document.getElementById('survey-section');
+  if (!wrap) return;
+  const myMember = members.find(m => m.line_uid === currentUser?.line_uid);
+  const isCreator = myMember && myMember.is_creator === true;
+  if (isMsgActive && isCreator) {
+    wrap.style.display = '';
+  } else {
+    wrap.style.display = 'none';
+    // 引き継ぎ切替時はチェック・締切をリセット（状態のリーク防止）
+    const cb = document.getElementById('survey-checkbox');
+    if (cb) cb.checked = false;
+    const dl = document.getElementById('survey-deadline-wrap');
+    if (dl) dl.style.display = 'none';
+    const di = document.getElementById('survey-deadline-input');
+    if (di) di.value = '';
+  }
+}
+
+// チェックボックスON/OFFで締切入力欄を出し入れ
+function toggleSurveyMode() {
+  const cb = document.getElementById('survey-checkbox');
+  const dl = document.getElementById('survey-deadline-wrap');
+  if (!cb || !dl) return;
+  dl.style.display = cb.checked ? '' : 'none';
+  if (!cb.checked) {
+    const di = document.getElementById('survey-deadline-input');
+    if (di) di.value = '';
+  }
 }
 
 function selectHandoverPriority(p) {
@@ -1724,16 +1845,45 @@ async function sendMessage() {
     showToast('送信中...');
     // 送信時点の受信者数を固定保存（後からメンバーが増えても分母が変わらないようにする）
     const receiverCountAtSend = members.filter(m => m.line_uid !== currentUser.line_uid && !m.is_signage).length;
-    const { error } = await supabase.from('messages').insert({
+
+    // ── アンケート対応(管理者かつチェック時のみ true) ──
+    const surveyCb = document.getElementById('survey-checkbox');
+    const myMember = members.find(m => m.line_uid === currentUser.line_uid);
+    const isCreator = myMember && myMember.is_creator === true;
+    const isSurvey = !!(surveyCb && surveyCb.checked && isCreator);
+
+    // 締切日時の組み立て (date input → その日の23:59:59)
+    let surveyDeadline = null;
+    if (isSurvey) {
+      const di = document.getElementById('survey-deadline-input');
+      if (di && di.value) {
+        // 'YYYY-MM-DD' を 'YYYY-MM-DDT23:59:59' (ローカルタイム) として解釈
+        const d = new Date(di.value + 'T23:59:59');
+        if (!isNaN(d.getTime())) surveyDeadline = d.toISOString();
+      }
+    }
+
+    const insertPayload = {
       group_session_id: currentGroup.id, sender_line_uid: currentUser.line_uid,
       body: body, read_count: 0, priority: selectedPriority,
       receiver_count: receiverCountAtSend
-    });
+    };
+    if (isSurvey) {
+      insertPayload.is_survey = true;
+      insertPayload.survey_deadline = surveyDeadline;
+    }
+    const { error } = await supabase.from('messages').insert(insertPayload);
     if (error) throw error;
     document.getElementById('compose-body').value = '';
     selectedPriority = 'info';
     selectPriority('info');
-    await loadMessages(); showScreen('screen-home'); showToast('送信しました！');
+    // アンケートUIをリセット
+    if (surveyCb) surveyCb.checked = false;
+    const dlWrap = document.getElementById('survey-deadline-wrap');
+    if (dlWrap) dlWrap.style.display = 'none';
+    const dlInput = document.getElementById('survey-deadline-input');
+    if (dlInput) dlInput.value = '';
+    await loadMessages(); showScreen('screen-home'); showToast(isSurvey ? 'アンケートを送信しました！' : '送信しました！');
   } catch (e) { console.error(e); showToast('送信に失敗しました。'); }
 }
 
@@ -2041,7 +2191,188 @@ async function showDetail(messageId) {
   if (deleteWrap) {
     deleteWrap.style.display = msg.sender_line_uid === currentUser.line_uid ? 'block' : 'none';
   }
+  // ── アンケート回答UI制御 ──
+  await applySurveyDetailUI(msg);
   showScreen('screen-detail');
+}
+
+// メッセージ詳細画面を開いたときのアンケート回答UI制御
+async function applySurveyDetailUI(msg) {
+  const wrap = document.getElementById('detail-survey-wrap');
+  if (!wrap) return;
+  // 通常メッセージなら非表示
+  if (!msg || msg.is_survey !== true) {
+    wrap.style.display = 'none';
+    return;
+  }
+  // サイネージ端末は回答UI非表示（見せる専用）
+  const myMember = members.find(m => m.line_uid === currentUser.line_uid);
+  if (myMember && myMember.is_signage) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+
+  // 締切表示の組み立て
+  const dlEl = document.getElementById('detail-survey-deadline');
+  let isExpired = false;
+  if (msg.survey_deadline) {
+    const d = new Date(msg.survey_deadline);
+    isExpired = Date.now() > d.getTime();
+    const yyyy = d.getFullYear();
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const youbi = ['日','月','火','水','木','金','土'][d.getDay()];
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    if (dlEl) dlEl.textContent = `締切: ${m}/${day}(${youbi}) ${hh}:${mm}`;
+  } else {
+    if (dlEl) dlEl.textContent = '締切なし';
+  }
+
+  // 既存回答取得
+  let myResponse = null;
+  try {
+    const { data } = await supabase.from('message_responses')
+      .select('*')
+      .eq('message_id', msg.id)
+      .eq('line_uid', currentUser.line_uid)
+      .maybeSingle();
+    myResponse = data;
+  } catch (e) { console.error(e); }
+
+  const answerArea = document.getElementById('detail-survey-answer-area');
+  const statusEl = document.getElementById('detail-survey-status');
+  const closedEl = document.getElementById('detail-survey-closed');
+
+  if (isExpired) {
+    // 締切後：回答UI非表示・締切済み表示
+    if (answerArea) answerArea.style.display = 'none';
+    if (closedEl) closedEl.style.display = '';
+    if (statusEl) {
+      if (myResponse) {
+        statusEl.style.display = '';
+        if (myResponse.status === 'answered') {
+          statusEl.innerHTML = `<div style="color:#047a37; font-weight:600;">あなたの回答：</div><div style="margin-top:4px;">${escHtml(myResponse.response_text || '')}</div>`;
+        } else {
+          statusEl.innerHTML = `<div style="color:#666; font-weight:600;">あなたは「該当なし」を選択しました</div>`;
+        }
+      } else {
+        statusEl.style.display = '';
+        statusEl.innerHTML = `<div style="color:#999;">回答していません</div>`;
+      }
+    }
+    return;
+  }
+
+  // 締切前：回答UI表示
+  if (answerArea) answerArea.style.display = '';
+  if (closedEl) closedEl.style.display = 'none';
+
+  // 既存回答があれば表示しつつ、再回答も可能にする
+  const input = document.getElementById('detail-survey-input');
+  const charCount = document.getElementById('detail-survey-char-count');
+  if (input) {
+    input.value = myResponse && myResponse.status === 'answered' ? (myResponse.response_text || '') : '';
+    if (charCount) charCount.textContent = String(input.value.length);
+  }
+  if (statusEl) {
+    if (myResponse) {
+      statusEl.style.display = '';
+      if (myResponse.status === 'answered') {
+        statusEl.innerHTML = `<div style="color:#047a37; font-weight:600;">✅ 回答済み（再回答可）</div>`;
+      } else {
+        statusEl.innerHTML = `<div style="color:#666; font-weight:600;">「該当なし」選択中（変更可）</div>`;
+      }
+    } else {
+      statusEl.style.display = 'none';
+      statusEl.innerHTML = '';
+    }
+  }
+  updateSurveyButtonState();
+}
+
+// 文字入力中はSubmitを有効化、文字があれば「該当なし」を無効化（誤操作防止）
+function updateSurveyButtonState() {
+  const input = document.getElementById('detail-survey-input');
+  const submitBtn = document.getElementById('detail-survey-submit');
+  const naBtn = document.getElementById('detail-survey-na');
+  const charCount = document.getElementById('detail-survey-char-count');
+  if (!input || !submitBtn || !naBtn) return;
+  const hasText = input.value.trim().length > 0;
+  if (charCount) charCount.textContent = String(input.value.length);
+  // 「アンケート回答」は文字があるときだけ押せる
+  submitBtn.disabled = !hasText;
+  submitBtn.style.opacity = hasText ? '1' : '0.5';
+  submitBtn.style.cursor = hasText ? 'pointer' : 'not-allowed';
+  // 「該当なし」は文字入力中は押せない
+  naBtn.disabled = hasText;
+  naBtn.style.opacity = hasText ? '0.5' : '1';
+  naBtn.style.cursor = hasText ? 'not-allowed' : 'pointer';
+}
+
+// アンケート回答送信（文字あり）
+async function submitSurveyResponse() {
+  if (!currentDetailMessageId) return;
+  const input = document.getElementById('detail-survey-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) { showToast('回答を入力してください'); return; }
+  if (text.length > 20) { showToast('20文字以内で入力してください'); return; }
+  // 締切チェック
+  const msg = messages.find(m => m.id === currentDetailMessageId);
+  if (msg && msg.survey_deadline && Date.now() > new Date(msg.survey_deadline).getTime()) {
+    showToast('締切を過ぎています');
+    return;
+  }
+  try {
+    showToast('送信中...');
+    const { error } = await supabase.from('message_responses').upsert({
+      message_id: currentDetailMessageId,
+      line_uid: currentUser.line_uid,
+      response_text: text,
+      status: 'answered',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'message_id,line_uid' });
+    if (error) throw error;
+    showToast('回答しました！');
+    // 状態反映：詳細画面・一覧両方を更新
+    if (msg) await applySurveyDetailUI(msg);
+    await loadMessages();
+  } catch (e) {
+    console.error(e);
+    showToast('回答送信に失敗しました');
+  }
+}
+
+// 「該当なし」送信
+async function submitSurveyNotApplicable() {
+  if (!currentDetailMessageId) return;
+  const input = document.getElementById('detail-survey-input');
+  if (input && input.value.trim().length > 0) return; // 念のためガード
+  // 締切チェック
+  const msg = messages.find(m => m.id === currentDetailMessageId);
+  if (msg && msg.survey_deadline && Date.now() > new Date(msg.survey_deadline).getTime()) {
+    showToast('締切を過ぎています');
+    return;
+  }
+  try {
+    showToast('送信中...');
+    const { error } = await supabase.from('message_responses').upsert({
+      message_id: currentDetailMessageId,
+      line_uid: currentUser.line_uid,
+      response_text: null,
+      status: 'not_applicable',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'message_id,line_uid' });
+    if (error) throw error;
+    showToast('「該当なし」で記録しました');
+    if (msg) await applySurveyDetailUI(msg);
+    await loadMessages();
+  } catch (e) {
+    console.error(e);
+    showToast('送信に失敗しました');
+  }
 }
 
 let currentDetailMessageId = null; // 削除用に現在表示中のメッセージIDを保持
@@ -2127,6 +2458,201 @@ async function showMemberList() {
   }
 }
 
+// ═══════════════════════════════════════════
+// アンケート集計機能（管理者のみ）
+// ═══════════════════════════════════════════
+
+// 1階層目：アンケート一覧モーダルを表示
+async function showSurveyList() {
+  const modal = document.getElementById('modal-survey-list');
+  const content = document.getElementById('survey-list-content');
+  modal.style.display = 'block';
+  content.innerHTML = '<div class="spinner" style="margin:40px auto;"></div>';
+  try {
+    // 60日以内のアンケートメッセージを取得
+    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: surveys } = await supabase.from('messages')
+      .select('*')
+      .eq('group_session_id', currentGroup.id)
+      .eq('is_survey', true)
+      .gte('created_at', cutoff60d)
+      .order('created_at', { ascending: false });
+    if (!surveys || surveys.length === 0) {
+      content.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:24px;">📭 アンケートはまだありません<br><span style="font-size:12px;">※過去60日以内のアンケートを表示します</span></div>';
+      return;
+    }
+    // 各アンケートの回答数を取得
+    const surveyIds = surveys.map(s => s.id);
+    const { data: resps } = await supabase.from('message_responses')
+      .select('message_id, status')
+      .in('message_id', surveyIds);
+    const respCountMap = {};
+    (resps || []).forEach(r => {
+      if (!respCountMap[r.message_id]) respCountMap[r.message_id] = { answered: 0, na: 0 };
+      if (r.status === 'answered') respCountMap[r.message_id].answered++;
+      else if (r.status === 'not_applicable') respCountMap[r.message_id].na++;
+    });
+    // 分母：現メンバー（サイネージ除外）
+    const denominator = members.filter(m => !m.is_signage).length;
+    const html = surveys.map(s => {
+      const counts = respCountMap[s.id] || { answered: 0, na: 0 };
+      const senderName = getMemberName(s.sender_line_uid);
+      const timeStr = formatTime(s.created_at);
+      const title = getMessageTitle(s.body, 30);
+      // 締切表示
+      let deadlineHtml = '';
+      if (s.survey_deadline) {
+        const d = new Date(s.survey_deadline);
+        const isExpired = Date.now() > d.getTime();
+        const youbi = ['日','月','火','水','木','金','土'][d.getDay()];
+        const m = d.getMonth() + 1;
+        const day = d.getDate();
+        deadlineHtml = isExpired
+          ? `<div style="font-size:11px; color:#c62828; font-weight:600;">⛔ 締切済み (${m}/${day}(${youbi}))</div>`
+          : `<div style="font-size:11px; color:var(--text-mid);">締切: ${m}/${day}(${youbi}) 23:59</div>`;
+      } else {
+        deadlineHtml = `<div style="font-size:11px; color:var(--text-light);">締切なし</div>`;
+      }
+      return `
+        <div onclick="showSurveyDetail('${s.id}')" style="cursor:pointer; padding:12px; margin-bottom:8px; border:1px solid var(--border); border-radius:8px; background:white;">
+          <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${escHtml(title)}</div>
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:6px;">${escHtml(senderName)} ・ ${timeStr}</div>
+          ${deadlineHtml}
+          <div style="display:flex; gap:6px; margin-top:8px; font-size:11px;">
+            <span style="background:#e8f5e9; color:#047a37; padding:2px 8px; border-radius:4px;">✅ 回答 ${counts.answered}</span>
+            <span style="background:#ede7f6; color:#5e35b1; padding:2px 8px; border-radius:4px;">— 該当なし ${counts.na}</span>
+            <span style="background:#f5f5f5; color:#666; padding:2px 8px; border-radius:4px;">未回答 ${Math.max(denominator - counts.answered - counts.na, 0)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+    content.innerHTML = `<div style="font-size:12px; color:var(--text-light); margin-bottom:8px;">${surveys.length}件のアンケート（過去60日）</div>` + html;
+  } catch(e) {
+    console.error(e);
+    content.innerHTML = '<div style="text-align:center;color:var(--red);padding:24px;">取得に失敗しました</div>';
+  }
+}
+
+// 2階層目：個別アンケート詳細集計モーダル
+async function showSurveyDetail(messageId) {
+  const modal = document.getElementById('modal-survey-detail');
+  const content = document.getElementById('survey-detail-content');
+  const titleEl = document.getElementById('survey-detail-title');
+  modal.style.display = 'block';
+  content.innerHTML = '<div class="spinner" style="margin:40px auto;"></div>';
+  try {
+    // メッセージ取得
+    const { data: msg } = await supabase.from('messages')
+      .select('*').eq('id', messageId).single();
+    if (!msg) throw new Error('メッセージが見つかりません');
+    if (titleEl) titleEl.textContent = '📊 ' + getMessageTitle(msg.body, 25);
+
+    // 現メンバー（サイネージ除外）取得
+    const { data: memberList } = await supabase
+      .from('group_members')
+      .select('line_uid, display_name, is_creator, is_signage')
+      .eq('group_session_id', currentGroup.id)
+      .eq('status', 'approved');
+    const targetMembers = (memberList || []).filter(m => !m.is_signage);
+
+    // 回答取得
+    const { data: resps } = await supabase.from('message_responses')
+      .select('*').eq('message_id', messageId);
+    const respMap = {};
+    (resps || []).forEach(r => { respMap[r.line_uid] = r; });
+
+    // 既読取得
+    const { data: reads } = await supabase.from('read_receipts')
+      .select('line_uid, read_at').eq('message_id', messageId);
+    const readMap = {};
+    (reads || []).forEach(r => { readMap[r.line_uid] = r; });
+
+    // 3セクションに分類：未回答 → 該当なし → 回答済み
+    const notAnswered = [];
+    const notApplicable = [];
+    const answered = [];
+    targetMembers.forEach(m => {
+      const r = respMap[m.line_uid];
+      if (!r) {
+        notAnswered.push({ ...m, read: !!readMap[m.line_uid] });
+      } else if (r.status === 'not_applicable') {
+        notApplicable.push({ ...m, response: r, read: !!readMap[m.line_uid] });
+      } else {
+        answered.push({ ...m, response: r, read: !!readMap[m.line_uid] });
+      }
+    });
+
+    // 締切表示
+    let deadlineHtml = '';
+    if (msg.survey_deadline) {
+      const d = new Date(msg.survey_deadline);
+      const isExpired = Date.now() > d.getTime();
+      const youbi = ['日','月','火','水','木','金','土'][d.getDay()];
+      const m2 = d.getMonth() + 1;
+      const day = d.getDate();
+      deadlineHtml = isExpired
+        ? `<div style="font-size:12px; color:#c62828; font-weight:600; margin-bottom:8px;">⛔ 締切済み (${m2}/${day}(${youbi}) 23:59)</div>`
+        : `<div style="font-size:12px; color:var(--text-mid); margin-bottom:8px;">締切: ${m2}/${day}(${youbi}) 23:59</div>`;
+    }
+
+    // セクションごとのHTML生成
+    const renderRow = (m, type) => {
+      const readMark = m.read
+        ? '<span style="font-size:11px; color:#047a37;">✅ 既読</span>'
+        : '<span style="font-size:11px; color:#c62828;">❌ 未読</span>';
+      let bottomLine = '';
+      if (type === 'answered' && m.response) {
+        const updated = m.response.updated_at ? formatTime(m.response.updated_at) : '';
+        bottomLine = `<div style="font-size:13px; margin-top:4px; padding:6px 8px; background:#f0fff4; border-left:3px solid #06C755; border-radius:4px;">${escHtml(m.response.response_text || '')}</div>`
+                   + `<div style="font-size:10px; color:var(--text-light); margin-top:2px;">回答日時: ${updated}</div>`;
+      } else if (type === 'na' && m.response) {
+        const updated = m.response.updated_at ? formatTime(m.response.updated_at) : '';
+        bottomLine = `<div style="font-size:11px; color:var(--text-light); margin-top:4px;">該当なし選択 (${updated})</div>`;
+      }
+      return `
+        <div style="padding:10px 4px; border-bottom:1px solid var(--border);">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-size:14px; font-weight:500;">${escHtml(m.display_name)}${m.is_creator ? ' <span style="font-size:10px;background:var(--green);color:white;border-radius:3px;padding:1px 5px;">管理者</span>' : ''}</div>
+            ${readMark}
+          </div>
+          ${bottomLine}
+        </div>
+      `;
+    };
+
+    const sectionUnanswered = `
+      <div style="margin-bottom:16px;">
+        <div style="font-size:13px; font-weight:700; color:#666; margin-bottom:6px; padding:6px 10px; background:#f5f5f5; border-radius:6px;">📭 未回答 (${notAnswered.length}人)</div>
+        ${notAnswered.length === 0 ? '<div style="font-size:12px; color:var(--text-light); padding:8px;">該当なし</div>' : notAnswered.map(m => renderRow(m, 'unanswered')).join('')}
+      </div>
+    `;
+    const sectionNA = `
+      <div style="margin-bottom:16px;">
+        <div style="font-size:13px; font-weight:700; color:#5e35b1; margin-bottom:6px; padding:6px 10px; background:#ede7f6; border-radius:6px;">— 該当なし (${notApplicable.length}人)</div>
+        ${notApplicable.length === 0 ? '<div style="font-size:12px; color:var(--text-light); padding:8px;">該当なし</div>' : notApplicable.map(m => renderRow(m, 'na')).join('')}
+      </div>
+    `;
+    const sectionAnswered = `
+      <div style="margin-bottom:16px;">
+        <div style="font-size:13px; font-weight:700; color:#047a37; margin-bottom:6px; padding:6px 10px; background:#e8f5e9; border-radius:6px;">✅ 回答済み (${answered.length}人)</div>
+        ${answered.length === 0 ? '<div style="font-size:12px; color:var(--text-light); padding:8px;">該当なし</div>' : answered.map(m => renderRow(m, 'answered')).join('')}
+      </div>
+    `;
+
+    content.innerHTML = `
+      <div style="padding:10px 12px; background:#f9f9f9; border-radius:6px; margin-bottom:12px; font-size:13px; line-height:1.6; max-height:120px; overflow-y:auto;">${escHtml(msg.body)}</div>
+      ${deadlineHtml}
+      <div style="font-size:12px; color:var(--text-light); margin-bottom:12px;">合計 ${targetMembers.length}人 (サイネージ除く全現メンバー・送信者含む)</div>
+      ${sectionUnanswered}
+      ${sectionNA}
+      ${sectionAnswered}
+    `;
+  } catch(e) {
+    console.error(e);
+    content.innerHTML = '<div style="text-align:center;color:var(--red);padding:24px;">取得に失敗しました: ' + escHtml(e.message || '') + '</div>';
+  }
+}
+
 async function showMonthlyReport() {
   document.getElementById('modal-report').style.display = 'block';
   currentReportTab = 'last';
@@ -2180,7 +2706,8 @@ async function loadReportData(tab) {
       .from('messages')
       .select('id, created_at, sender_line_uid, read_count')
       .eq('group_session_id', currentGroup.id)
-      .gte('created_at', start).lte('created_at', end);
+      .gte('created_at', start).lte('created_at', end)
+      .neq('is_survey', true);
 
     // 既読レコード取得
     const msgIds = (msgs || []).map(m => m.id);
@@ -2527,6 +3054,13 @@ async function leaveGroup() {
       }
     }
     await supabase.from('group_members').update({ status: 'left', is_creator: false }).eq('id', currentMemberId);
+    // ── 設計書 16-A-6 に準拠：メンバー脱退時に当該UIDのアンケート回答を削除（集計から完全に消す） ──
+    // 注意: group_session_id 非限定削除。複数グループ在籍時は他グループの回答も消える点に留意
+    try {
+      await supabase.from('message_responses').delete().eq('line_uid', currentUser.line_uid);
+    } catch (e) {
+      console.warn('アンケート回答のクリーンアップに失敗:', e);
+    }
     localStorage.clear(); currentGroup = null; currentMemberId = null;
     showScreen('screen-start'); showToast('グループを退出しました');
   } catch (e) { showToast('エラーが発生しました。'); }
