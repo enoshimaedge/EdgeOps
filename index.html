@@ -1816,8 +1816,10 @@ function renderHandoverCardHtml(hw, confs, myConf) {
     if (isCompleted) {
       const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
       statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿（🔒 ${escHtml(completedConf.display_name)}が${cl}）</div>`;
+    } else if (confirmNames) {
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-confirm-names">✅ 確認済み：${escHtml(confirmNames)}</div>`;
     } else {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿${confirmNames ? '（確認済：' + escHtml(confirmNames) + '）' : ''}</div>`;
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-unconfirmed">⚠️ 未確認</div>`;
     }
   } else if (isCompleted) {
     const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
