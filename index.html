@@ -373,6 +373,27 @@
     cursor: pointer;
   }
   .handover-badge-bar:active { opacity: 0.8; }
+
+  /* ── グループ期限警告バー ── */
+  .expiry-warning-bar {
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .expiry-warning-bar.warning {
+    background: #fff8e1;
+    border: 1.5px solid #ffc107;
+    color: #e65100;
+  }
+  .expiry-warning-bar.danger {
+    background: #ffebee;
+    border: 1.5px solid #e53935;
+    color: #c62828;
+  }
   .handover-badge-count {
     background: #ff6f00;
     color: white;
@@ -725,6 +746,8 @@
     </div>
   </div>
   <div class="content" style="padding-bottom: 120px;">
+    <!-- グループ期限警告バー(ST版・残り30日以下のみ表示) -->
+    <div id="expiry-warning-bar" class="expiry-warning-bar" style="display:none;"></div>
     <!-- 引き継ぎ未確認バッジ -->
     <div id="handover-badge-bar" style="display:none;" class="handover-badge-bar" onclick="showScreen('screen-handover')">
       <div style="display:flex; align-items:center; gap:8px;">
@@ -1332,6 +1355,40 @@ async function cancelRequest() {
 // ═══════════════════════════════════════════
 // ホーム・ポーリング
 // ═══════════════════════════════════════════
+
+// グループ期限警告バーの表示制御
+// ST版(SL-で始まるグループID)のみ対象
+// 残り30日以下→黄色、残り7日以下→赤、それ以上は非表示
+function updateExpiryWarningBar() {
+  const bar = document.getElementById('expiry-warning-bar');
+  if (!bar) return;
+  // ST版以外(EO-など)は対象外
+  const groupId = currentGroup?.group_id || '';
+  if (!groupId.startsWith('SL-')) {
+    bar.style.display = 'none';
+    return;
+  }
+  if (!currentGroup?.expires_at) {
+    bar.style.display = 'none';
+    return;
+  }
+  const exp = new Date(currentGroup.expires_at);
+  const now = new Date();
+  const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+  if (daysLeft > 30) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.classList.remove('warning', 'danger');
+  bar.classList.add(daysLeft <= 7 ? 'danger' : 'warning');
+  if (daysLeft <= 0) {
+    bar.textContent = '⚠️ このグループは有効期限を過ぎています';
+  } else {
+    bar.textContent = `⚠️ あと${daysLeft}日でこのグループは使用できなくなります`;
+  }
+  bar.style.display = 'block';
+}
+
 async function loadHome() {
   // グループ名があればヘッダーに表示、なければグループIDを表示
   const groupLabel = currentGroup.group_name
@@ -1341,6 +1398,9 @@ async function loadHome() {
   document.getElementById('profile-group-id').textContent = currentGroup.group_id;
   document.getElementById('profile-name').textContent = currentUser.display_name;
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
+
+  // グループ期限警告バー表示(ST版=SL-で始まるグループのみ、残り30日以下で表示)
+  updateExpiryWarningBar();
 
   // 地域が「藤沢」の場合、エリア混雑度ボタンを表示
   const vacanBtn = document.getElementById('vacan-btn');
@@ -1610,8 +1670,20 @@ function renderMessages() {
       // 分子：このメッセージに対する「回答済み（answered）」の数
       const respMap = window._surveyResponseCountMap || {};
       const surveyAnsweredCount = respMap[msg.id] || 0;
+      // ── アンケート締切日表示（survey_deadline が設定されている場合のみ） ──
+      let surveyDeadlineLabel = '';
+      if (isSurvey && msg.survey_deadline) {
+        const deadline = new Date(msg.survey_deadline);
+        const nowTime = Date.now();
+        if (deadline.getTime() < nowTime) {
+          surveyDeadlineLabel = `<span class="priority-badge" style="background:#ffeaea; color:#c62828; border:1px solid #ef9a9a; margin-left:6px;">📅 回答締切済</span>`;
+        } else {
+          const dateStr = `${deadline.getMonth() + 1}月${deadline.getDate()}日`;
+          surveyDeadlineLabel = `<span class="priority-badge" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-left:6px;">📅 ${dateStr}</span>`;
+        }
+      }
       const surveyLabel = isSurvey
-        ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>`
+        ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>${surveyDeadlineLabel}`
         : '';
       html += `
         <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
