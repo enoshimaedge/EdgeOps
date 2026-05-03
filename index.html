@@ -825,14 +825,14 @@
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
     <!-- ══ アンケート機能(管理者のみ表示・通常メッセージ時のみ表示) ══ -->
-    <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#f0fff4; border:1px solid #06C755; border-radius:8px;">
+    <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#f0fff4; border:1px solid #06C755; border-radius:8px; box-sizing:border-box;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600;">
         <input type="checkbox" id="survey-checkbox" onclick="toggleSurveyMode()" style="width:18px; height:18px; cursor:pointer;">
         <span>📊 このメッセージをアンケートとして送信</span>
       </label>
-      <div id="survey-deadline-wrap" style="display:none; margin-top:10px;">
+      <div id="survey-deadline-wrap" style="display:none; margin-top:10px; width:100%; box-sizing:border-box; overflow:hidden;">
         <label class="form-label" style="font-size:12px;">締切日(任意・空欄で締切なし)</label>
-        <input type="date" id="survey-deadline-input" class="form-input" style="font-size:14px; display:block; width:100%; min-width:0; max-width:100%;">
+        <input type="date" id="survey-deadline-input" class="form-input" style="font-size:14px !important; display:block !important; width:100% !important; min-width:0 !important; max-width:100% !important; box-sizing:border-box !important; -webkit-appearance:none !important; appearance:none !important;">
         <div style="font-size:11px; color:var(--text-light); margin-top:4px;">※締切は当日の23:59まで有効</div>
       </div>
     </div>
