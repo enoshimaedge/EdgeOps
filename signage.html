@@ -675,6 +675,17 @@ async function authenticate() {
       return false;
     }
 
+    // ST版(SL-)の期限切れチェック
+    if (group.group_id?.startsWith('SL-') && group.expires_at) {
+      if (new Date(group.expires_at) <= new Date()) {
+        showError(
+          'グループの有効期限切れ',
+          'このグループは有効期限を過ぎています。\n管理者にお問い合わせください。'
+        );
+        return false;
+      }
+    }
+
     // ③ 認証成功
     currentGroupData = group;
     return true;

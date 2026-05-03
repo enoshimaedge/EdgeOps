@@ -535,6 +535,9 @@
     </div>
   </div>
   <div class="content">
+    <div id="start-expiry-notice" style="display:none; background:#fff3e0; border-left:4px solid #f57c00; color:#7c4a00; padding:14px 16px; margin-bottom:16px; border-radius:6px; font-size:14px; line-height:1.6;">
+      ⚠️ グループの有効期限が切れました。<br>新しいグループに参加するか、新規作成してください。
+    </div>
     <div style="text-align:center; padding: 32px 0 24px;">
       <div style="font-size:48px; margin-bottom:12px;">📋</div>
       <div style="font-size:18px; font-weight:700; margin-bottom:8px;">はじめましょう / Get Started</div>
@@ -1197,6 +1200,17 @@ async function restoreSession(memberId, groupId) {
     if (member.status === 'approved') {
       currentMemberId = member.id; currentUser.display_name = member.display_name;
       currentGroup = member.group_sessions;
+      // ST版(SL-)の期限切れチェック
+      if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
+        if (new Date(currentGroup.expires_at) <= new Date()) {
+          localStorage.clear();
+          hideLoading();
+          const notice = document.getElementById('start-expiry-notice');
+          if (notice) notice.style.display = 'block';
+          showScreen('screen-start');
+          return;
+        }
+      }
       // resolveIsCreatorとloadHomeを並列実行（起動速度改善）
       const [creatorResult] = await Promise.all([
         resolveIsCreator(member.group_session_id, member.id),
