@@ -24,7 +24,7 @@
   }
 
   body {
-    font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    font-family: 'Yu Gothic', 'YuGothic', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -3049,8 +3049,8 @@ async function checkSuperAdmin() {
 }
 
 function openAdminPanel() {
-  const uid = currentUser?.line_uid || "";
-  liff.openWindow({ url: "https://app.edgeops.jp/admin.html?uid=" + uid, external: true });
+  // ?uid=パラメータは廃止(admin.html側でliff.getProfile()のみで認証・adminsテーブルで権限確認)
+  liff.openWindow({ url: "https://app.edgeops.jp/admin.html", external: true });
 }
 
 // ── サイネージURL管理 ──
