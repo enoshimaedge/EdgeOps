@@ -25,7 +25,7 @@
   }
 
   body {
-    font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    font-family: 'Yu Gothic', 'YuGothic', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -172,6 +172,8 @@
   .bar-clinic { background: #2196F3; }
   .bar-care { background: #FF9800; }
   .bar-attraction { background: #9C27B0; }
+  .bar-freelance { background: #00BCD4; }
+  .bar-club { background: #E91E63; }
   .industry-count { font-size: 12px; font-weight: 700; color: var(--text); width: 24px; text-align: right; }
 
   /* ── カード ── */
@@ -446,7 +448,9 @@ const INDUSTRY_LABELS = {
   hotel: '🏨 ホテル・旅館',
   clinic: '🏥 病院・クリニック',
   care: '🏠 介護施設',
-  attraction: '🎡 集客施設'
+  attraction: '🎡 集客施設',
+  freelance: '👥 フリーランス集団',
+  club: '🏆 部活・クラブ'
 };
 
 // ── 初期化 ──
@@ -542,14 +546,20 @@ async function loadStats() {
     `${messageCount || 0}<span class="stat-unit">件</span>` +
     note(`全グループの送信メッセージ合計`);
 
-  // 業種内訳
-  const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0 };
+  // 業種内訳（6業種対応）
+  const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0, freelance: 0, club: 0 };
   (industryData || []).forEach(g => { if (counts[g.industry] !== undefined) counts[g.industry]++; });
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
 
+  // 業種ラベル（絵文字とテキストを分離して取得）
+  const INDUSTRY_SHORT = {
+    hotel: 'ホテル', clinic: '病院', care: '介護',
+    attraction: '集客', freelance: 'フリーランス', club: '部活'
+  };
+
   const html = Object.entries(counts).map(([id, count]) => `
     <div class="industry-row">
-      <div class="industry-label">${INDUSTRY_LABELS[id]?.split(' ')[0] || id} ${id === 'hotel' ? 'ホテル' : id === 'clinic' ? '病院' : id === 'care' ? '介護' : '集客'}</div>
+      <div class="industry-label">${INDUSTRY_LABELS[id]?.split(' ')[0] || id} ${INDUSTRY_SHORT[id] || id}</div>
       <div class="bar-wrap"><div class="bar-fill bar-${id}" style="width:${Math.round(count/total*100)}%"></div></div>
       <div class="industry-count">${count}</div>
     </div>
