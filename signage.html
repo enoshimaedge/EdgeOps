@@ -83,6 +83,29 @@
     text-align: right;
     font-weight: 600;
   }
+
+  /* ── グループ期限警告バー ── */
+  .expiry-warning-bar {
+    padding: 12px 20px;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.5;
+    flex-shrink: 0;
+    display: none;
+  }
+  .expiry-warning-bar.warning {
+    background: #fff8e1;
+    border-bottom: 2px solid #ffc107;
+    color: #e65100;
+    display: block;
+  }
+  .expiry-warning-bar.danger {
+    background: #ffebee;
+    border-bottom: 2px solid #e53935;
+    color: #c62828;
+    display: block;
+  }
   /* 混雑度ボタン */
   .vacan-header-btn {
     display: flex;
@@ -389,6 +412,9 @@
       </button>
     </div>
   </div>
+
+  <!-- グループ期限警告バー(ST版・残り30日以下のみ表示) -->
+  <div id="expiry-warning-bar" class="expiry-warning-bar"></div>
 
   <!-- コンテンツ -->
   <div class="signage-body">
@@ -736,7 +762,7 @@ function linkifyBody(text) {
 let _buildItemContext = {}; // buildItemHtmlが参照するコンテキスト
 
 function buildItemHtml(item) {
-  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap } = _buildItemContext;
+  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap } = _buildItemContext;
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
     : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
@@ -777,15 +803,33 @@ function buildItemHtml(item) {
   // onclickはdata属性に逃がしてシングルクォート問題を回避（⑧対応）
   const itemIndex = _buildItemContext.allItemsFlat.indexOf(item);
 
-  // ── アンケートラベル（メッセージで is_survey=true のときのみ表示・サイネージは見せる専用） ──
-  const surveyLabel = (item._type === 'message' && item.is_survey === true)
-    ? `<span class="message-priority" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート</span>`
-    : '';
+  // ── アンケートラベル（メッセージで is_survey=true のときのみ表示） ──
+  // スマホ画面と統一：回答数(分子/分母)を表示
+  let surveyLabel = '';
+  let surveyDeadlineLabel = '';
+  if (item._type === 'message' && item.is_survey === true) {
+    const respMap = surveyResponseCountMap || {};
+    const surveyAnsweredCount = respMap[item.id] || 0;
+    // 分母：人間メンバー（サイネージ除外）の人数
+    const surveyDenominator = humanCount;
+    surveyLabel = `<span class="message-priority" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>`;
+    // 締切日表示
+    if (item.survey_deadline) {
+      const deadline = new Date(item.survey_deadline);
+      const nowTime = Date.now();
+      if (deadline.getTime() < nowTime) {
+        surveyDeadlineLabel = `<span class="message-priority" style="background:#ffeaea; color:#c62828; border:1px solid #ef9a9a; margin-left:6px;">📅 回答締切済</span>`;
+      } else {
+        const dateStr = `${deadline.getMonth() + 1}月${deadline.getDate()}日`;
+        surveyDeadlineLabel = `<span class="message-priority" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-left:6px;">📅 ${dateStr}</span>`;
+      }
+    }
+  }
 
   return `
     <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}</div>
+        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}</div>
         ${readBadge}
       </div>
       <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(body)}</div>
@@ -880,6 +924,24 @@ async function loadMessage() {
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
 
+    // ── アンケート回答カウントマップを取得（is_survey=true のメッセージのみ対象）──
+    const surveyResponseCountMap = {};
+    try {
+      const surveyMsgIds = messages.filter(m => m.is_survey === true).map(m => m.id);
+      if (surveyMsgIds.length > 0) {
+        const { data: resps } = await sbClient.from('message_responses')
+          .select('message_id, status')
+          .in('message_id', surveyMsgIds);
+        (resps || []).forEach(r => {
+          if (r.status === 'answered') {
+            surveyResponseCountMap[r.message_id] = (surveyResponseCountMap[r.message_id] || 0) + 1;
+          }
+        });
+      }
+    } catch (e) {
+      console.error('アンケート回答数取得失敗:', e);
+    }
+
     // 確認済マップ（引き継ぎIDごとの確認者リスト）
     const confirmedMap = {};
     confirmations.forEach(c => {
@@ -909,6 +971,7 @@ async function loadMessage() {
     _buildItemContext = {
       allMembers, humanMembers, humanCount,
       readCountMap, confirmedMap, msgPriorityMap,
+      surveyResponseCountMap,
       allItemsFlat: [...handoverItems, ...messageItems]
     };
 
@@ -1262,6 +1325,37 @@ function startPolling() {
 // ═══════════════════════════════════════════
 // 初期化
 // ═══════════════════════════════════════════
+// グループ期限警告バーの表示制御
+// ST版(SL-で始まるグループID)のみ対象
+// 残り30日以下→黄色、残り7日以下→赤、それ以上は非表示
+// ═══════════════════════════════════════════
+function updateExpiryWarningBar() {
+  const bar = document.getElementById('expiry-warning-bar');
+  if (!bar) return;
+  // ST版以外(EO-など)は対象外
+  const groupId = currentGroupData?.group_id || '';
+  if (!groupId.startsWith('SL-')) {
+    bar.classList.remove('warning', 'danger');
+    return;
+  }
+  if (!currentGroupData?.expires_at) {
+    bar.classList.remove('warning', 'danger');
+    return;
+  }
+  const exp = new Date(currentGroupData.expires_at);
+  const now = new Date();
+  const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+  bar.classList.remove('warning', 'danger');
+  if (daysLeft > 30) return;
+  bar.classList.add(daysLeft <= 7 ? 'danger' : 'warning');
+  if (daysLeft <= 0) {
+    bar.textContent = '⚠️ このグループは有効期限を過ぎています';
+  } else {
+    bar.textContent = `⚠️ あと${daysLeft}日でこのグループは使用できなくなります`;
+  }
+}
+
+// ═══════════════════════════════════════════
 async function init() {
   // Supabase初期化
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -1273,6 +1367,9 @@ async function init() {
   // 画面表示
   document.getElementById('header-group-name').textContent =
     currentGroupData.group_name || currentGroupData.group_id;
+
+  // グループ期限警告バー表示(ST版=SL-で始まるグループのみ、残り30日以下で表示)
+  updateExpiryWarningBar();
 
   // ④ 藤沢グループのみ混雑度ボタンを表示
   if (currentGroupData.region === 'fujisawa') {
