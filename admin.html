@@ -383,17 +383,17 @@
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">🏢</div>
-          <div class="stat-label">総グループ数</div>
+          <div class="stat-label">アクティブグループ数</div>
           <div class="stat-value" id="stat-groups">-<span class="stat-unit">件</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">👥</div>
-          <div class="stat-label">総メンバー数</div>
+          <div class="stat-label">全期間ユニークメンバー数</div>
           <div class="stat-value" id="stat-members">-<span class="stat-unit">人</span></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">✅</div>
-          <div class="stat-label">承認済みメンバー</div>
+          <div class="stat-label">アクティブメンバー数</div>
           <div class="stat-value" id="stat-approved">-<span class="stat-unit">人</span></div>
         </div>
         <div class="stat-card">
@@ -410,7 +410,7 @@
 
       <!-- 業種内訳 -->
       <div class="industry-bar">
-        <div class="section-title">📊 業種内訳</div>
+        <div class="section-title">📊 業種内訳（アクティブグループ）</div>
         <div id="industry-breakdown">
           <div class="loading-small">読み込み中...</div>
         </div>
@@ -510,7 +510,7 @@ async function loadStats() {
     sb.from('group_members').select('line_uid, status, group_session_id'),
     sb.from('group_members').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     sb.from('messages').select('*', { count: 'exact', head: true }),
-    sb.from('group_sessions').select('industry')
+    sb.from('group_sessions').select('id, industry')
   ]);
 
   // アクティブグループ（承認済みメンバーが1人以上）
@@ -528,15 +528,15 @@ async function loadStats() {
 
   document.getElementById('stat-groups').innerHTML =
     `${activeGroups}<span class="stat-unit">件</span>` +
-    note(`アクティブ数 ／ 作成数: ${totalGroups}件`);
+    note(`全期間作成数：${totalGroups}件`);
 
   document.getElementById('stat-members').innerHTML =
     `${uniqueUids.size}<span class="stat-unit">人</span>` +
-    note(`ユニーク人数（グループ重複なし）`);
+    note(`承認待ち・現役・退出済を含む累計（重複なし）`);
 
   document.getElementById('stat-approved').innerHTML =
     `${uniqueApprovedUids.size}<span class="stat-unit">人</span>` +
-    note(`現在いずれかのグループに承認中`);
+    note(`現在承認中のメンバー（グループ重複なし）`);
 
   document.getElementById('stat-pending').innerHTML =
     `${pendingCount || 0}<span class="stat-unit">人</span>` +
@@ -546,9 +546,12 @@ async function loadStats() {
     `${messageCount || 0}<span class="stat-unit">件</span>` +
     note(`全グループの送信メッセージ合計`);
 
-  // 業種内訳（6業種対応）
+  // 業種内訳（6業種対応・アクティブグループのみ集計）
   const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0, freelance: 0, club: 0 };
-  (industryData || []).forEach(g => { if (counts[g.industry] !== undefined) counts[g.industry]++; });
+  (industryData || []).forEach(g => {
+    // アクティブグループ（承認済みメンバーが1人以上）のみカウント
+    if (activeGroupIds.has(g.id) && counts[g.industry] !== undefined) counts[g.industry]++;
+  });
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
 
   // 業種ラベル（絵文字とテキストを分離して取得）
