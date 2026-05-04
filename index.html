@@ -1202,6 +1202,13 @@ async function restoreSession(memberId, groupId) {
     const { data: member } = await supabase
       .from('group_members').select('*, group_sessions(*)').eq('id', memberId).single();
     if (!member) { localStorage.clear(); hideLoading(); showScreen('screen-start'); return; }
+    // [Phase 0 後 追加] 退出済みメンバー(left)は localStorage クリアして起動画面へ(チャッピー承認済み)
+    if (member.status === 'left') {
+      localStorage.clear();
+      hideLoading();
+      showScreen('screen-start');
+      return;
+    }
     if (member.status === 'pending') {
       currentMemberId = member.id; hideLoading();
       document.getElementById('pending-group-id').textContent = groupId;
