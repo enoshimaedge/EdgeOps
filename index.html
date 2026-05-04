@@ -3111,7 +3111,7 @@ function updateSignageUrlDisplay() {
 
 async function generateSignageToken() {
   if (!currentGroup?.id) return;
-  if (!confirm('サイネージURLを発行（再生成）しますか？\n再生成すると旧URLは即無効化されます。')) return;
+  if (!confirm('サイネージURLを発行(再生成)しますか?\n再生成すると旧URLは即無効化され、すべてのサイネージ端末は退出扱いになります。\n信頼できる端末は再参加申請が必要です。')) return;
   try {
     const token = Array.from(crypto.getRandomValues(new Uint8Array(24)))
       .map(b => b.toString(16).padStart(2, '0')).join('');
@@ -3119,10 +3119,17 @@ async function generateSignageToken() {
       .update({ signage_token: token, signage_enabled: true })
       .eq('id', currentGroup.id);
     if (error) throw error;
+    // [Phase 0 後 追加] セキュリティ目的: 全サイネージ端末を強制退出(チャッピー承認済み)
+    const { error: leaveError } = await supabase.from('group_members')
+      .update({ status: 'left' })
+      .eq('group_session_id', currentGroup.id)
+      .eq('is_signage', true)
+      .neq('status', 'left');
+    if (leaveError) throw leaveError;
     currentGroup.signage_token = token;
     currentGroup.signage_enabled = true;
     updateSignageUrlDisplay();
-    showToast('サイネージURLを発行しました');
+    showToast('サイネージURLを発行しました(全サイネージ端末は退出扱い)');
   } catch (e) { console.error(e); showToast('発行に失敗しました'); }
 }
 
