@@ -6,6 +6,10 @@
 <title>EdgeOps</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- crypto-js (eo_uid生成用・MD5計算) [Phase 0 5-1] -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<!-- auth.js (認証フロー独立化) [Phase 0 5-2] -->
+<script src="auth.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -969,6 +973,7 @@
       <div id="profile-avatar" style="width:72px;height:72px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;overflow:hidden;border:3px solid var(--green);">👤</div>
       <div style="font-size:18px; font-weight:700;" id="profile-name">---</div>
       <div style="font-size:12px; color:var(--text-light); margin-top:4px;" id="profile-line-name"></div>
+      <div style="font-size:11px; color:var(--text-light); margin-top:6px; font-family:monospace; padding:4px 8px; background:var(--bg); border-radius:4px; display:inline-block;" id="profile-eo-uid" title="EdgeOps Universal ID">🔑 ---</div>
     </div>
     <div class="group-id-box">
       <div class="group-id-label">あなたのグループID</div>
@@ -1144,20 +1149,25 @@ async function init() {
     try {
       await Promise.race([liffInitPromise, timeoutPromise]);
     } catch (liffError) {
-      currentUser = { line_uid: 'dev_' + Math.random().toString(36).substr(2, 9), line_name: 'テストユーザー', picture_url: '' };
+      // [Phase 0 5-3] LIFFタイムアウト時はdev eo_uid生成
+      const dev = generateDevEoUid();
+      currentUser = { eo_uid: dev.eoUid, provider: 'dev', provider_uid: dev.providerUid, line_name: 'テストユーザー', picture_url: '', display_name: 'テストユーザー' };
       hideLoading(); showScreen('screen-start'); return;
     }
 
     if (!liff.isLoggedIn()) {
       if (!liff.isInClient()) {
-        currentUser = { line_uid: 'dev_' + Math.random().toString(36).substr(2, 9), line_name: 'ブラウザテスト', picture_url: '' };
+        // [Phase 0 5-3] ブラウザテスト時はdev eo_uid生成
+        const dev = generateDevEoUid();
+        currentUser = { eo_uid: dev.eoUid, provider: 'dev', provider_uid: dev.providerUid, line_name: 'ブラウザテスト', picture_url: '', display_name: 'ブラウザテスト' };
         hideLoading(); showScreen('screen-start'); return;
       }
       liff.login(); return;
     }
 
-    const profile = await liff.getProfile();
-    currentUser = { line_uid: profile.userId, line_name: profile.displayName, picture_url: profile.pictureUrl || '' };
+    // [Phase 0 5-3] auth.js の resolveEoUid を使用してeo_uidを解決
+    const _auth = await resolveEoUid(supabase);
+    currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, line_name: _auth.displayName, picture_url: _auth.pictureUrl || '', display_name: _auth.displayName };
 
     // ── 友達登録チェック（LINEアプリ内のみ） ──
     if (liff.isInClient()) {
@@ -1294,7 +1304,7 @@ async function createGroup() {
       .from('group_sessions').insert(insertData).select().single();
     if (groupError) throw groupError;
     const { data: member, error: memberError } = await supabase
-      .from('group_members').insert({ group_session_id: group.id, line_uid: currentUser.line_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
+      .from('group_members').insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
     if (memberError) throw memberError;
     localStorage.setItem('sl_member_id', member.id);
     localStorage.setItem('sl_group_id', groupId);
@@ -1317,7 +1327,7 @@ async function joinGroup() {
       .eq('group_session_id', group.id).eq('status', 'approved');
     if (count >= group.max_members) { showToast('このグループは満員です（最大50名）'); return; }
     const { data: existing } = await supabase.from('group_members').select('*')
-      .eq('group_session_id', group.id).eq('line_uid', currentUser.line_uid).single();
+      .eq('group_session_id', group.id).eq('eo_uid', currentUser.eo_uid).single();
     if (existing) {
       if (existing.status === 'approved') {
         localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
@@ -1333,7 +1343,7 @@ async function joinGroup() {
     }
     const isSignage = document.getElementById('join-is-signage')?.checked || false;
     const { data: member, error: memberError } = await supabase.from('group_members')
-      .insert({ group_session_id: group.id, line_uid: currentUser.line_uid, display_name: displayName, status: 'pending', is_signage: isSignage }).select().single();
+      .insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'pending', is_signage: isSignage }).select().single();
     if (memberError) throw memberError;
     localStorage.setItem('sl_member_id', member.id); localStorage.setItem('sl_group_id', groupIdInput);
     currentMemberId = member.id;
@@ -1412,6 +1422,9 @@ async function loadHome() {
   document.getElementById('profile-group-id').textContent = currentGroup.group_id;
   document.getElementById('profile-name').textContent = currentUser.display_name;
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
+  // [Phase 0 追加機能] eo_uid 表示
+  const eoUidEl = document.getElementById('profile-eo-uid');
+  if (eoUidEl) eoUidEl.textContent = '🔑 ' + (currentUser.eo_uid || '---');
 
   // グループ期限警告バー表示(ST版=SL-で始まるグループのみ、残り30日以下で表示)
   updateExpiryWarningBar();
@@ -1510,13 +1523,13 @@ async function loadMessages() {
     if (messages.length > 0) {
       const msgIds = messages.map(m => m.id);
       const { data: receipts } = await supabase.from('read_receipts')
-        .select('message_id, line_uid').in('message_id', msgIds);
-      const signageUids = new Set(members.filter(m => m.is_signage).map(m => m.line_uid));
+        .select('message_id, eo_uid').in('message_id', msgIds);
+      const signageUids = new Set(members.filter(m => m.is_signage).map(m => m.eo_uid));
       const realReadMap = {};
       (receipts || []).forEach(r => {
-        if (signageUids.has(r.line_uid)) return;
+        if (signageUids.has(r.eo_uid)) return;
         const msg = messages.find(m => m.id === r.message_id);
-        if (msg && r.line_uid === msg.sender_line_uid) return; // 送信者除外
+        if (msg && r.eo_uid === msg.sender_eo_uid) return; // 送信者除外
         realReadMap[r.message_id] = (realReadMap[r.message_id] || 0) + 1;
       });
       // read_countをrealReadMapで上書き
@@ -1626,7 +1639,7 @@ function renderMessages() {
     // 引き継ぎノート画面と同じソート順で表示
     const hwConfirmMap = window._hwConfirmMap || {};
     const priorityOrder = { action: 0, check: 1, done: 2 };
-    const myUid = currentUser.line_uid;
+    const myUid = currentUser.eo_uid;
     // 引き継ぎソート：新しい順のみ（重要度の色分けは表示側で維持）
     const sortedHandovers = [...handoverNotes].sort((a, b) => {
       return new Date(b.created_at) - new Date(a.created_at);
@@ -1634,7 +1647,7 @@ function renderMessages() {
 
     sortedHandovers.slice(0, 5).forEach(hw => {
       const confs = hwConfirmMap[hw.id] || [];
-      const myConf = confs.find(c => c.line_uid === myUid);
+      const myConf = confs.find(c => c.eo_uid === myUid);
       html += renderHandoverCardHtml(hw, confs, myConf);
     });
     if (handoverNotes.length > 5) {
@@ -1670,10 +1683,10 @@ function renderMessages() {
       // NULLの場合（旧メッセージ）は現在のメンバーからサイネージを除いて計算
       const receiverCount = msg.receiver_count != null
         ? msg.receiver_count
-        : members.filter(m => m.line_uid !== msg.sender_line_uid && !m.is_signage).length;
+        : members.filter(m => m.eo_uid !== msg.sender_eo_uid && !m.is_signage).length;
       const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
       const unreadCount = receiverCount - (msg.read_count || 0);
-      const senderName = getMemberName(msg.sender_line_uid);
+      const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
       const pLabel = p === 'urgent' ? '🔴 緊急' : p === 'normal' ? '🟡 通常' : '🟢 連絡';
@@ -1912,7 +1925,7 @@ async function sendMessage() {
       showToast('投稿中...');
       const { error } = await supabase.from('handover_notes').insert({
         group_session_id: currentGroup.id,
-        sender_line_uid: currentUser.line_uid,
+        sender_eo_uid: currentUser.eo_uid,
         sender_name: currentUser.display_name,
         content: body,
         priority: selectedHandoverPriority
@@ -1930,7 +1943,7 @@ async function sendMessage() {
   try {
     showToast('送信中...');
     // 送信時点の受信者数を固定保存（後からメンバーが増えても分母が変わらないようにする）
-    const receiverCountAtSend = members.filter(m => m.line_uid !== currentUser.line_uid && !m.is_signage).length;
+    const receiverCountAtSend = members.filter(m => m.eo_uid !== currentUser.eo_uid && !m.is_signage).length;
 
     // ── アンケート対応(管理者かつチェック時のみ true) ──
     // グローバル変数 isCreator を使用（members 依存を排除しタイミング問題を回避）
@@ -1949,7 +1962,7 @@ async function sendMessage() {
     }
 
     const insertPayload = {
-      group_session_id: currentGroup.id, sender_line_uid: currentUser.line_uid,
+      group_session_id: currentGroup.id, sender_eo_uid: currentUser.eo_uid,
       body: body, read_count: 0, priority: selectedPriority,
       receiver_count: receiverCountAtSend
     };
@@ -1977,9 +1990,9 @@ async function sendMessage() {
 // ═══════════════════════════════════════════
 async function updateHandoverBadge() {
   try {
-    // 72時間以内の引き継ぎを取得（sender_line_uidも含めて取得）
+    // 72時間以内の引き継ぎを取得（sender_eo_uidも含めて取得）
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    const { data: notes } = await supabase.from('handover_notes').select('id, sender_line_uid')
+    const { data: notes } = await supabase.from('handover_notes').select('id, sender_eo_uid')
       .eq('group_session_id', currentGroup.id).gte('created_at', cutoff);
     if (!notes || notes.length === 0) {
       document.getElementById('handover-badge-bar').style.display = 'none';
@@ -1987,7 +2000,7 @@ async function updateHandoverBadge() {
     }
 
     // 自分がサイネージ端末かどうか確認
-    const myMemberInfo = members.find(m => m.line_uid === currentUser.line_uid);
+    const myMemberInfo = members.find(m => m.eo_uid === currentUser.eo_uid);
     const amISignage = myMemberInfo && myMemberInfo.is_signage;
 
     let targetNotes;
@@ -1996,7 +2009,7 @@ async function updateHandoverBadge() {
       targetNotes = notes;
     } else {
       // スタッフ：自分が投稿した未確認のみ表示
-      targetNotes = notes.filter(n => n.sender_line_uid === currentUser.line_uid);
+      targetNotes = notes.filter(n => n.sender_eo_uid === currentUser.eo_uid);
     }
 
     if (targetNotes.length === 0) {
@@ -2005,7 +2018,7 @@ async function updateHandoverBadge() {
     }
     const noteIds = targetNotes.map(n => n.id);
     // 全confirmationsを取得（確認済み＋完了済み判定に使う）
-    const { data: allConfirms } = await supabase.from('handover_confirmations').select('handover_id, line_uid, action')
+    const { data: allConfirms } = await supabase.from('handover_confirmations').select('handover_id, eo_uid, action')
       .in('handover_id', noteIds);
     // 誰かが確認済みのID
     const confirmedIds = new Set((allConfirms || []).map(c => c.handover_id));
@@ -2059,7 +2072,7 @@ async function loadHandoverNotes() {
 
     // 並び順：新しい順のみ（重要度の色分けは表示側で維持）
     const priorityOrder = { action: 0, check: 1, done: 2 };
-    const myUid = currentUser.line_uid;
+    const myUid = currentUser.eo_uid;
     handoverNotes.sort((a, b) => {
       return new Date(b.created_at) - new Date(a.created_at);
     });
@@ -2067,7 +2080,7 @@ async function loadHandoverNotes() {
     let html = '<div class="card">';
     handoverNotes.forEach(hw => {
       const confs = confirmMap[hw.id] || [];
-      const myConf = confs.find(c => c.line_uid === myUid);
+      const myConf = confs.find(c => c.eo_uid === myUid);
       html += renderHandoverCardHtml(hw, confs, myConf);
     });
     html += '</div>';
@@ -2080,7 +2093,7 @@ function renderHandoverCardHtml(hw, confs, myConf) {
   const pClass  = { action: 'hw-action', check: 'hw-check', done: 'hw-done' };
   const p = hw.priority || 'check';
   const confirmNames = (confs || []).map(c => c.display_name).join('・');
-  const isSender = hw.sender_line_uid === currentUser.line_uid;
+  const isSender = hw.sender_eo_uid === currentUser.eo_uid;
   const confirmedByMe = myConf ? true : false;
   // 誰かがtakeover/doneを押していたら完了済み
   const isCompleted = (confs || []).some(c => c.action === 'takeover' || c.action === 'done');
@@ -2120,14 +2133,14 @@ function renderHandoverInline(container) {
   // 引き継ぎノート画面と同じソート順：新しい順のみ
   const hwConfirmMap = window._hwConfirmMap || {};
   const priorityOrder = { action: 0, check: 1, done: 2 };
-  const myUid = currentUser.line_uid;
+  const myUid = currentUser.eo_uid;
   const sorted = [...handoverNotes].sort((a, b) => {
     return new Date(b.created_at) - new Date(a.created_at);
   });
   let html = '<div class="card">';
   sorted.forEach(hw => {
     const confs = hwConfirmMap[hw.id] || [];
-    const myConf = confs.find(c => c.line_uid === myUid);
+    const myConf = confs.find(c => c.eo_uid === myUid);
     html += renderHandoverCardHtml(hw, confs, myConf);
   });
   html += '</div>';
@@ -2148,7 +2161,7 @@ async function showHandoverDetail(handoverId) {
 
     // 確認情報を取得
     const { data: confs } = await supabase.from('handover_confirmations').select('*').eq('handover_id', handoverId);
-    const myConf = (confs || []).find(c => c.line_uid === currentUser.line_uid);
+    const myConf = (confs || []).find(c => c.eo_uid === currentUser.eo_uid);
     const confirmedList = document.getElementById('hw-confirmed-list');
     const unconfirmedList = document.getElementById('hw-unconfirmed-list');
     const confirmArea = document.getElementById('hw-confirm-area');
@@ -2163,7 +2176,7 @@ async function showHandoverDetail(handoverId) {
     const completedConf = (confs || []).find(c => c.action === 'takeover' || c.action === 'done');
 
     // 確認ボタン：投稿者本人・完了済み・自分が確認済みの場合はボタン非表示
-    const isSender = hw.sender_line_uid === currentUser.line_uid;
+    const isSender = hw.sender_eo_uid === currentUser.eo_uid;
     if (isSender) {
       confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #66bb6a; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#2e7d32; margin-bottom:10px;">📋 自分が投稿した引き継ぎです</div>`;
     } else if (isCompleted) {
@@ -2181,7 +2194,7 @@ async function showHandoverDetail(handoverId) {
     }
 
     // 確認済みメンバー
-    const confirmedUids = new Set((confs || []).map(c => c.line_uid));
+    const confirmedUids = new Set((confs || []).map(c => c.eo_uid));
     if ((confs || []).length > 0) {
       confirmedList.innerHTML = (confs || []).map(c =>
         `<div class="person-row"><div><div class="person-name">${escHtml(c.display_name)}</div><div class="person-time">${c.action === 'takeover' ? '引き継ぎました' : '対応しました'}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(c.confirmed_at)}</div><div class="check-yes">✅</div></div></div>`
@@ -2192,7 +2205,7 @@ async function showHandoverDetail(handoverId) {
 
     // 未確認メンバー：投稿者本人は除外、残りで未確認の人を表示
     const unconfirmed = allMembers.filter(m =>
-      m.line_uid !== hw.sender_line_uid && !confirmedUids.has(m.line_uid)
+      m.eo_uid !== hw.sender_eo_uid && !confirmedUids.has(m.eo_uid)
     );
     if (unconfirmed.length > 0) {
       unconfirmedList.innerHTML = unconfirmed.map(m =>
@@ -2211,7 +2224,7 @@ async function confirmHandover(action) {
   try {
     const { error } = await supabase.from('handover_confirmations').insert({
       handover_id: currentHandoverId,
-      line_uid: currentUser.line_uid,
+      eo_uid: currentUser.eo_uid,
       display_name: currentUser.display_name,
       action: action
     });
@@ -2231,20 +2244,20 @@ async function showDetail(messageId) {
   await recordRead(messageId);
   const { data: reads } = await supabase.from('read_receipts').select('*')
     .eq('message_id', messageId).order('read_at', { ascending: true });
-  // 現在グループに在籍中（approved）のメンバーのline_uidセット
-  const memberUids = new Set(members.map(m => m.line_uid));
+  // 現在グループに在籍中（approved）のメンバーのeo_uidセット
+  const memberUids = new Set(members.map(m => m.eo_uid));
   // 退出済みメンバーの既読は除外
   // 退出済みメンバーの既読は除外
-  const validReads = (reads || []).filter(r => memberUids.has(r.line_uid));
-  const readUids = new Set(validReads.map(r => r.line_uid));
+  const validReads = (reads || []).filter(r => memberUids.has(r.eo_uid));
+  const readUids = new Set(validReads.map(r => r.eo_uid));
   // 送信者・サイネージ端末を除いた受信者リスト
   // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
-  const receivers = members.filter(m => m.line_uid !== msg.sender_line_uid && !m.is_signage);
+  const receivers = members.filter(m => m.eo_uid !== msg.sender_eo_uid && !m.is_signage);
   const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
-  const readCount = [...readUids].filter(uid => uid !== msg.sender_line_uid && !members.find(m => m.line_uid === uid && m.is_signage)).length;
-  const unreadMembers = receivers.filter(m => !readUids.has(m.line_uid));
+  const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
+  const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
   document.getElementById('detail-title').textContent = getMessageTitle(msg.body, 20);
-  document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_line_uid)}　${formatTime(msg.created_at)}`;
+  document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
   document.getElementById('detail-read-count').textContent = readCount;
   document.getElementById('detail-unread-count').textContent = totalMembers - readCount;
@@ -2252,13 +2265,13 @@ async function showDetail(messageId) {
   const readListEl = document.getElementById('detail-read-list');
   // 既読リストから送信者・サイネージ端末を除外
   const receiverReads = validReads.filter(r => {
-    if (r.line_uid === msg.sender_line_uid) return false;
-    const member = members.find(m => m.line_uid === r.line_uid);
+    if (r.eo_uid === msg.sender_eo_uid) return false;
+    const member = members.find(m => m.eo_uid === r.eo_uid);
     return member && !member.is_signage;
   });
   if (receiverReads.length > 0) {
     readListEl.innerHTML = receiverReads.map(r => {
-      const member = members.find(m => m.line_uid === r.line_uid);
+      const member = members.find(m => m.eo_uid === r.eo_uid);
       if (!member) return ''; // 退出済みは表示しない
       return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">✅</div></div></div>`;
     }).join('');
@@ -2274,7 +2287,7 @@ async function showDetail(messageId) {
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
   if (deleteWrap) {
-    deleteWrap.style.display = msg.sender_line_uid === currentUser.line_uid ? 'block' : 'none';
+    deleteWrap.style.display = msg.sender_eo_uid === currentUser.eo_uid ? 'block' : 'none';
   }
   // ── アンケート回答UI制御 ──
   await applySurveyDetailUI(msg);
@@ -2291,7 +2304,7 @@ async function applySurveyDetailUI(msg) {
     return;
   }
   // サイネージ端末は回答UI非表示（見せる専用）
-  const myMember = members.find(m => m.line_uid === currentUser.line_uid);
+  const myMember = members.find(m => m.eo_uid === currentUser.eo_uid);
   if (myMember && myMember.is_signage) {
     wrap.style.display = 'none';
     return;
@@ -2321,7 +2334,7 @@ async function applySurveyDetailUI(msg) {
     const { data } = await supabase.from('message_responses')
       .select('*')
       .eq('message_id', msg.id)
-      .eq('line_uid', currentUser.line_uid)
+      .eq('eo_uid', currentUser.eo_uid)
       .maybeSingle();
     myResponse = data;
   } catch (e) { console.error(e); }
@@ -2414,11 +2427,11 @@ async function submitSurveyResponse() {
     showToast('送信中...');
     const { error } = await supabase.from('message_responses').upsert({
       message_id: currentDetailMessageId,
-      line_uid: currentUser.line_uid,
+      eo_uid: currentUser.eo_uid,
       response_text: text,
       status: 'answered',
       updated_at: new Date().toISOString()
-    }, { onConflict: 'message_id,line_uid' });
+    }, { onConflict: 'message_id, eo_uid' });
     if (error) throw error;
     showToast('回答しました！');
     // 状態反映：詳細画面・一覧両方を更新
@@ -2445,11 +2458,11 @@ async function submitSurveyNotApplicable() {
     showToast('送信中...');
     const { error } = await supabase.from('message_responses').upsert({
       message_id: currentDetailMessageId,
-      line_uid: currentUser.line_uid,
+      eo_uid: currentUser.eo_uid,
       response_text: null,
       status: 'not_applicable',
       updated_at: new Date().toISOString()
-    }, { onConflict: 'message_id,line_uid' });
+    }, { onConflict: 'message_id, eo_uid' });
     if (error) throw error;
     showToast('「該当なし」で記録しました');
     if (msg) await applySurveyDetailUI(msg);
@@ -2465,15 +2478,15 @@ let currentDetailMessageId = null; // 削除用に現在表示中のメッセー
 async function recordRead(messageId) {
   try {
     // サイネージ端末は既読記録しない
-    const currentMember = members.find(m => m.line_uid === currentUser.line_uid);
+    const currentMember = members.find(m => m.eo_uid === currentUser.eo_uid);
     if (currentMember && currentMember.is_signage) return;
     const { data: existing } = await supabase.from('read_receipts').select('id')
-      .eq('message_id', messageId).eq('line_uid', currentUser.line_uid).single();
+      .eq('message_id', messageId).eq('eo_uid', currentUser.eo_uid).single();
     if (existing) return;
-    await supabase.from('read_receipts').insert({ message_id: messageId, line_uid: currentUser.line_uid, read_at: new Date().toISOString() });
+    await supabase.from('read_receipts').insert({ message_id: messageId, eo_uid: currentUser.eo_uid, read_at: new Date().toISOString() });
     // 送信者自身が開いてもread_countを増やさない（送信者は分母・分子から除外）
     const msg = messages.find(m => m.id === messageId);
-    if (msg && msg.sender_line_uid !== currentUser.line_uid) {
+    if (msg && msg.sender_eo_uid !== currentUser.eo_uid) {
       await supabase.from('messages').update({ read_count: (msg.read_count || 0) + 1 }).eq('id', messageId);
     }
   } catch (e) {}
@@ -2581,7 +2594,7 @@ async function showSurveyList() {
     const denominator = members.filter(m => !m.is_signage).length;
     const html = surveys.map(s => {
       const counts = respCountMap[s.id] || { answered: 0, na: 0 };
-      const senderName = getMemberName(s.sender_line_uid);
+      const senderName = getMemberName(s.sender_eo_uid);
       const timeStr = formatTime(s.created_at);
       const title = getMessageTitle(s.body, 30);
       // 締切表示
@@ -2635,7 +2648,7 @@ async function showSurveyDetail(messageId) {
     // 現メンバー（サイネージ除外）取得
     const { data: memberList } = await supabase
       .from('group_members')
-      .select('line_uid, display_name, is_creator, is_signage')
+      .select('eo_uid, display_name, is_creator, is_signage')
       .eq('group_session_id', currentGroup.id)
       .eq('status', 'approved');
     const targetMembers = (memberList || []).filter(m => !m.is_signage);
@@ -2644,26 +2657,26 @@ async function showSurveyDetail(messageId) {
     const { data: resps } = await supabase.from('message_responses')
       .select('*').eq('message_id', messageId);
     const respMap = {};
-    (resps || []).forEach(r => { respMap[r.line_uid] = r; });
+    (resps || []).forEach(r => { respMap[r.eo_uid] = r; });
 
     // 既読取得
     const { data: reads } = await supabase.from('read_receipts')
-      .select('line_uid, read_at').eq('message_id', messageId);
+      .select('eo_uid, read_at').eq('message_id', messageId);
     const readMap = {};
-    (reads || []).forEach(r => { readMap[r.line_uid] = r; });
+    (reads || []).forEach(r => { readMap[r.eo_uid] = r; });
 
     // 3セクションに分類：未回答 → 該当なし → 回答済み
     const notAnswered = [];
     const notApplicable = [];
     const answered = [];
     targetMembers.forEach(m => {
-      const r = respMap[m.line_uid];
+      const r = respMap[m.eo_uid];
       if (!r) {
-        notAnswered.push({ ...m, read: !!readMap[m.line_uid] });
+        notAnswered.push({ ...m, read: !!readMap[m.eo_uid] });
       } else if (r.status === 'not_applicable') {
-        notApplicable.push({ ...m, response: r, read: !!readMap[m.line_uid] });
+        notApplicable.push({ ...m, response: r, read: !!readMap[m.eo_uid] });
       } else {
-        answered.push({ ...m, response: r, read: !!readMap[m.line_uid] });
+        answered.push({ ...m, response: r, read: !!readMap[m.eo_uid] });
       }
     });
 
@@ -2789,7 +2802,7 @@ async function loadReportData(tab) {
     // メッセージ取得
     const { data: msgs } = await supabase
       .from('messages')
-      .select('id, created_at, sender_line_uid, read_count')
+      .select('id, created_at, sender_eo_uid, read_count')
       .eq('group_session_id', currentGroup.id)
       .gte('created_at', start).lte('created_at', end)
       .neq('is_survey', true);
@@ -2800,7 +2813,7 @@ async function loadReportData(tab) {
     if (msgIds.length > 0) {
       const { data } = await supabase
         .from('read_receipts')
-        .select('message_id, line_uid, read_at')
+        .select('message_id, eo_uid, read_at')
         .in('message_id', msgIds);
       receipts = data || [];
     }
@@ -2808,13 +2821,13 @@ async function loadReportData(tab) {
     // メンバー取得
     const { data: members } = await supabase
       .from('group_members')
-      .select('id, display_name, line_uid, is_signage')
+      .select('id, display_name, eo_uid, is_signage')
       .eq('group_session_id', currentGroup.id)
       .eq('status', 'approved');
     const humanMembers = (members || []).filter(m => !m.is_signage);
     const memberCount = humanMembers.length;
     const memberMap = {};
-    humanMembers.forEach(m => { memberMap[m.line_uid] = m.display_name; });
+    humanMembers.forEach(m => { memberMap[m.eo_uid] = m.display_name; });
 
     // 統計計算
     const totalMsgs = (msgs || []).length;
@@ -2822,7 +2835,7 @@ async function loadReportData(tab) {
     // 平均既読率（送信時点のreceiver_countを使用・メンバー増減の影響を受けない）
     let totalRate = 0;
     (msgs || []).forEach(msg => {
-      const msgReceipts = receipts.filter(r => r.message_id === msg.id && r.line_uid !== msg.sender_line_uid && memberMap[r.line_uid]);
+      const msgReceipts = receipts.filter(r => r.message_id === msg.id && r.eo_uid !== msg.sender_eo_uid && memberMap[r.eo_uid]);
       // receiver_countが保存済みならそれを使う（送信時点で固定）
       // NULLの場合（旧メッセージ）は現在のサイネージ除外メンバー数から計算
       const receiverCount = msg.receiver_count != null ? msg.receiver_count : memberCount - 1;
@@ -2834,13 +2847,13 @@ async function loadReportData(tab) {
     const memberReadTimes = {};
     const memberReadCounts = {};
     receipts.forEach(r => {
-      if (!memberMap[r.line_uid]) return; // サイネージまたは退出済みを除外
+      if (!memberMap[r.eo_uid]) return; // サイネージまたは退出済みを除外
       const msg = (msgs || []).find(m => m.id === r.message_id);
       if (!msg) return;
       const diff = (new Date(r.read_at) - new Date(msg.created_at)) / 60000;
-      if (!memberReadTimes[r.line_uid]) { memberReadTimes[r.line_uid] = 0; memberReadCounts[r.line_uid] = 0; }
-      memberReadTimes[r.line_uid] += diff;
-      memberReadCounts[r.line_uid]++;
+      if (!memberReadTimes[r.eo_uid]) { memberReadTimes[r.eo_uid] = 0; memberReadCounts[r.eo_uid] = 0; }
+      memberReadTimes[r.eo_uid] += diff;
+      memberReadCounts[r.eo_uid]++;
     });
     let fastestName = '—'; let fastestMin = Infinity;
     Object.keys(memberReadTimes).forEach(uid => {
@@ -2853,13 +2866,13 @@ async function loadReportData(tab) {
 
     // 要注意スタッフ（既読率50%未満）- サイネージ除外
     const memberRateMap = {};
-    humanMembers.forEach(m => { memberRateMap[m.line_uid] = { name: m.display_name, read: 0, total: 0 }; });
+    humanMembers.forEach(m => { memberRateMap[m.eo_uid] = { name: m.display_name, read: 0, total: 0 }; });
     (msgs || []).forEach(msg => {
       const msgReceipts = receipts.filter(r => r.message_id === msg.id);
       humanMembers.forEach(m => {
-        if (m.line_uid === msg.sender_line_uid) return; // 送信者は除く
-        memberRateMap[m.line_uid].total++;
-        if (msgReceipts.find(r => r.line_uid === m.line_uid)) memberRateMap[m.line_uid].read++;
+        if (m.eo_uid === msg.sender_eo_uid) return; // 送信者は除く
+        memberRateMap[m.eo_uid].total++;
+        if (msgReceipts.find(r => r.eo_uid === m.eo_uid)) memberRateMap[m.eo_uid].read++;
       });
     });
     const caution = Object.values(memberRateMap)
@@ -2944,7 +2957,7 @@ async function updateIndustry() {
 async function deleteMessage() {
   if (!currentDetailMessageId) return;
   const msg = messages.find(m => m.id === currentDetailMessageId);
-  if (!msg || msg.sender_line_uid !== currentUser.line_uid) {
+  if (!msg || msg.sender_eo_uid !== currentUser.eo_uid) {
     showToast('自分のメッセージのみ削除できます'); return;
   }
   if (!confirm('このメッセージを削除しますか？\n既読データも削除されます。')) return;
@@ -2976,6 +2989,9 @@ async function updateDisplayName() {
 function showProfile() {
   document.getElementById('profile-name').textContent = currentUser.display_name || '---';
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
+  // [Phase 0 追加機能] eo_uid 表示
+  const eoUidEl2 = document.getElementById('profile-eo-uid');
+  if (eoUidEl2) eoUidEl2.textContent = '🔑 ' + (currentUser.eo_uid || '---');
   document.getElementById('profile-group-id').textContent = currentGroup?.group_id || '---';
   // 管理者セクションの表示切替
   const adminSection = document.getElementById('profile-admin-section');
@@ -3040,10 +3056,10 @@ async function checkSuperAdmin() {
   const SUPER_ADMIN_UID = "Uf476a68d2f6f8ccc8d539e3fd109cfa5";
   const btn = document.getElementById("super-admin-btn");
   if (!btn) return;
-  if (currentUser && currentUser.line_uid === SUPER_ADMIN_UID) {
+  if (false) { // [Phase 0] SUPER_ADMIN_UID(LINE UID)直接比較は廃止。adminsテーブル参照に統一
     btn.style.display = "block";
   } else {
-    const { data } = await supabase.from("admins").select("line_uid").eq("line_uid", currentUser.line_uid).single();
+    const { data } = await supabase.from("admins").select("eo_uid").eq("eo_uid", currentUser.eo_uid).single();
     btn.style.display = data ? "block" : "none";
   }
 }
@@ -3103,13 +3119,13 @@ async function leaveGroup() {
     // （退出後に分母だけ残って既読率が永遠に100%にならない問題を防ぐ）
     // 自分が送信者でないメッセージのIDを取得
     const receivedMsgIds = messages
-      .filter(msg => msg.sender_line_uid !== currentUser.line_uid)
+      .filter(msg => msg.sender_eo_uid !== currentUser.eo_uid)
       .map(msg => msg.id);
 
     if (receivedMsgIds.length > 0) {
       // 既読済みのメッセージIDを取得
       const { data: myReceipts } = await supabase.from('read_receipts').select('message_id')
-        .in('message_id', receivedMsgIds).eq('line_uid', currentUser.line_uid);
+        .in('message_id', receivedMsgIds).eq('eo_uid', currentUser.eo_uid);
       const readMsgIds = new Set((myReceipts || []).map(r => r.message_id));
 
       // 未読のメッセージだけ処理
@@ -3117,7 +3133,7 @@ async function leaveGroup() {
       for (const msgId of unreadMsgIds) {
         const msg = messages.find(m => m.id === msgId);
         if (!msg) continue;
-        await supabase.from('read_receipts').insert({ message_id: msgId, line_uid: currentUser.line_uid, read_at: new Date().toISOString() });
+        await supabase.from('read_receipts').insert({ message_id: msgId, eo_uid: currentUser.eo_uid, read_at: new Date().toISOString() });
         await supabase.from('messages').update({ read_count: (msg.read_count || 0) + 1 }).eq('id', msgId);
       }
     }
@@ -3142,7 +3158,7 @@ async function leaveGroup() {
     // ── 設計書 16-A-6 に準拠：メンバー脱退時に当該UIDのアンケート回答を削除（集計から完全に消す） ──
     // 注意: group_session_id 非限定削除。複数グループ在籍時は他グループの回答も消える点に留意
     try {
-      await supabase.from('message_responses').delete().eq('line_uid', currentUser.line_uid);
+      await supabase.from('message_responses').delete().eq('eo_uid', currentUser.eo_uid);
     } catch (e) {
       console.warn('アンケート回答のクリーンアップに失敗:', e);
     }
@@ -3166,8 +3182,8 @@ function generateGroupId() {
   const part2 = Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
   return `SL-${part1}-${part2}`;
 }
-function getMemberName(lineUid) {
-  const member = members.find(m => m.line_uid === lineUid);
+function getMemberName(eoUid) {
+  const member = members.find(m => m.eo_uid === eoUid);
   return member?.display_name || '不明';
 }
 function formatTime(isoString) {

@@ -792,7 +792,7 @@ function buildItemHtml(item) {
   if (humanCount > 0) {
     if (item._type === 'message') {
       const readCount = readCountMap[item.id] || 0;
-      const receiverCount = humanMembers.filter(m => m.line_uid !== item.sender_line_uid).length;
+      const receiverCount = humanMembers.filter(m => m.eo_uid !== item.sender_eo_uid).length;
       if (readCount >= receiverCount) {
         readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
       } else {
@@ -808,7 +808,7 @@ function buildItemHtml(item) {
       }
     }
   }
-  const senderMember = allMembers.find(m => m.line_uid === item.sender_line_uid);
+  const senderMember = allMembers.find(m => m.eo_uid === item.sender_eo_uid);
   const senderName = senderMember ? senderMember.display_name + '　' : '';
 
   // onclickはdata属性に逃がしてシングルクォート問題を回避（⑧対応）
@@ -909,12 +909,12 @@ async function loadMessage() {
 
     const [receiptsResult, confirmationsResult, membersResult] = await Promise.allSettled([
       msgIds.length > 0
-        ? sbClient.from('read_receipts').select('message_id,line_uid').in('message_id', msgIds)
+        ? sbClient.from('read_receipts').select('message_id, eo_uid').in('message_id', msgIds)
         : Promise.resolve({ data: [] }),
       handoverIds.length > 0
-        ? sbClient.from('handover_confirmations').select('handover_id,line_uid,display_name').in('handover_id', handoverIds)
+        ? sbClient.from('handover_confirmations').select('handover_id,eo_uid,display_name').in('handover_id', handoverIds)
         : Promise.resolve({ data: [] }),
-      sbClient.from('group_members').select('line_uid,display_name,is_signage')
+      sbClient.from('group_members').select('eo_uid,display_name,is_signage')
         .eq('group_session_id', currentGroupData.id).eq('status', 'approved')
     ]);
 
@@ -923,15 +923,15 @@ async function loadMessage() {
     const allMembers = membersResult.status === 'fulfilled' ? (membersResult.value.data || []) : [];
     const humanMembers = allMembers.filter(m => !m.is_signage);
     const humanCount = humanMembers.length;
-    const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.line_uid));
+    const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.eo_uid));
 
     // 既読数マップ（サイネージ端末・送信者除外）
     const senderMap = {};
-    messages.forEach(m => { senderMap[m.id] = m.sender_line_uid; });
+    messages.forEach(m => { senderMap[m.id] = m.sender_eo_uid; });
     const readCountMap = {};
     receipts.forEach(r => {
-      if (signageUids.has(r.line_uid)) return;
-      if (senderMap[r.message_id] === r.line_uid) return;
+      if (signageUids.has(r.eo_uid)) return;
+      if (senderMap[r.message_id] === r.eo_uid) return;
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
 
@@ -957,7 +957,7 @@ async function loadMessage() {
     const confirmedMap = {};
     confirmations.forEach(c => {
       if (!confirmedMap[c.handover_id]) confirmedMap[c.handover_id] = [];
-      confirmedMap[c.handover_id].push({ line_uid: c.line_uid, display_name: c.display_name });
+      confirmedMap[c.handover_id].push({ eo_uid: c.eo_uid, display_name: c.display_name });
     });
 
     // 引き継ぎに確認状況を付与
@@ -1039,7 +1039,7 @@ function openModalByIndex(index) {
   const hh = String(createdAt.getHours()).padStart(2, '0');
   const mm = String(createdAt.getMinutes()).padStart(2, '0');
   const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_line_uid || '');
+  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '');
 }
 
 async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid) {
@@ -1055,25 +1055,25 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
 
   try {
     const { data: members } = await sbClient.from('group_members')
-      .select('line_uid, display_name, is_signage')
+      .select('eo_uid, display_name, is_signage')
       .eq('group_session_id', currentGroupData.id)
       .eq('status', 'approved');
 
-    const humanMembers = (members || []).filter(m => !m.is_signage && m.line_uid !== senderUid);
+    const humanMembers = (members || []).filter(m => !m.is_signage && m.eo_uid !== senderUid);
 
     let readUids = [];
     if (itemType === 'message') {
       const { data: receipts } = await sbClient.from('read_receipts')
-        .select('line_uid').eq('message_id', itemId);
-      readUids = (receipts || []).map(r => r.line_uid);
+        .select('eo_uid').eq('message_id', itemId);
+      readUids = (receipts || []).map(r => r.eo_uid);
     } else {
       const { data: confirmations } = await sbClient.from('handover_confirmations')
-        .select('line_uid, display_name, action').eq('handover_id', itemId);
-      readUids = (confirmations || []).map(c => c.line_uid);
+        .select('eo_uid, display_name, action').eq('handover_id', itemId);
+      readUids = (confirmations || []).map(c => c.eo_uid);
     }
 
-    const readMembers = humanMembers.filter(m => readUids.includes(m.line_uid));
-    const unreadMembers = humanMembers.filter(m => !readUids.includes(m.line_uid));
+    const readMembers = humanMembers.filter(m => readUids.includes(m.eo_uid));
+    const unreadMembers = humanMembers.filter(m => !readUids.includes(m.eo_uid));
 
     let html = '';
     if (itemType === 'message') {

@@ -6,6 +6,10 @@
 <title>EdgeOps 超管理者ダッシュボード</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- crypto-js (eo_uid生成用・MD5計算) [Phase 0 5-1] -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<!-- auth.js (認証フロー独立化) [Phase 0 5-2] -->
+<script src="auth.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -464,8 +468,9 @@ async function init() {
       liff.login();
       return;
     }
-    const profile = await liff.getProfile();
-    currentUser = { line_uid: profile.userId, display_name: profile.displayName };
+    // [Phase 0 5-4] auth.js の resolveEoUid を使用してeo_uidを解決
+    const _auth = await resolveEoUid(sb);
+    currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, display_name: _auth.displayName };
   } catch(e) {
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('screen-denied').style.display = 'flex';
@@ -475,8 +480,8 @@ async function init() {
   // 超管理者チェック（adminsテーブル）
   const { data: adminRecord } = await sb
     .from('admins')
-    .select('line_uid')
-    .eq('line_uid', currentUser.line_uid)
+    .select('eo_uid')
+    .eq('eo_uid', currentUser.eo_uid)
     .single();
 
   if (!adminRecord) {
@@ -507,7 +512,7 @@ async function loadStats() {
     { data: industryData }
   ] = await Promise.all([
     sb.from('group_sessions').select('id'),
-    sb.from('group_members').select('line_uid, status, group_session_id'),
+    sb.from('group_members').select('eo_uid, status, group_session_id'),
     sb.from('group_members').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     sb.from('messages').select('*', { count: 'exact', head: true }),
     sb.from('group_sessions').select('id, industry')
@@ -519,10 +524,10 @@ async function loadStats() {
   const totalGroups = (allGroups || []).length;
   const activeGroups = activeGroupIds.size;
 
-  // ②総メンバー：ユニークなline_uid（重複排除・グループ跨ぎ）
-  const uniqueUids = new Set((allMembers || []).map(m => m.line_uid));
-  // ③承認済み：現在承認中のユニークline_uid
-  const uniqueApprovedUids = new Set(approvedMembers.map(m => m.line_uid));
+  // ②総メンバー：ユニークなeo_uid（重複排除・グループ跨ぎ）
+  const uniqueUids = new Set((allMembers || []).map(m => m.eo_uid));
+  // ③承認済み：現在承認中のユニークeo_uid
+  const uniqueApprovedUids = new Set(approvedMembers.map(m => m.eo_uid));
 
   const note = (t) => `<span style="font-size:10px;color:#9aa5b8;display:block;font-weight:400;margin-top:2px;">${t}</span>`;
 
@@ -641,11 +646,11 @@ async function loadMembers() {
     .order('created_at', { ascending: false })
     .limit(200);
 
-  // line_uid + group_session_id で集約（同じ人が同じグループに複数レコードある場合、最新のcreated_atを代表とする）
+  // eo_uid + group_session_id で集約（同じ人が同じグループに複数レコードある場合、最新のcreated_atを代表とする）
   // ※ created_at の DESC で取得済みなので、各キーの最初に出てくるレコードが最新＝代表
   const memberMap = new Map();
   (data || []).forEach(m => {
-    const key = `${m.line_uid}__${m.group_session_id}`;
+    const key = `${m.eo_uid}__${m.group_session_id}`;
     if (!memberMap.has(key)) {
       memberMap.set(key, m);  // 最新のレコードのみ保持
     }
@@ -691,7 +696,7 @@ function renderMembers(members) {
         <div class="group-item-header">
           <div>
             <div class="group-id" style="font-size:14px;font-family:inherit">${m.display_name || '名無し'}${creatorBadge}</div>
-            <div style="font-size:10px;color:#9aa5b8;font-family:monospace;margin-top:2px">${m.line_uid?.substring(0, 20)}...</div>
+            <div style="font-size:10px;color:#9aa5b8;font-family:monospace;margin-top:2px">${m.eo_uid?.substring(0, 20)}...</div>
           </div>
           <div class="status-badge status-${statusClass}">${statusLabel}</div>
         </div>
@@ -741,7 +746,7 @@ function filterMembers() {
   const q = document.getElementById('member-search').value.toLowerCase();
   const filtered = allMembers.filter(m =>
     m.display_name?.toLowerCase().includes(q) ||
-    m.line_uid?.toLowerCase().includes(q)
+    m.eo_uid?.toLowerCase().includes(q)
   );
   renderMembers(filtered);
 }
