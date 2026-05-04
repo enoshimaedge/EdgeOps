@@ -1340,6 +1340,26 @@ async function joinGroup() {
         document.getElementById('pending-group-id').textContent = groupIdInput;
         showScreen('screen-pending'); return;
       }
+      // [Phase 0 後 追加] 退出済みメンバーの再参加処理(チャッピー承認済み)
+      if (existing.status === 'left') {
+        const isSignage = document.getElementById('join-is-signage')?.checked || false;
+        const { error: rejoinError } = await supabase.from('group_members')
+          .update({
+            status: 'pending',
+            display_name: displayName,
+            is_signage: isSignage,
+            approved_at: null
+          })
+          .eq('id', existing.id);
+        if (rejoinError) throw rejoinError;
+        localStorage.setItem('sl_member_id', existing.id);
+        localStorage.setItem('sl_group_id', groupIdInput);
+        currentMemberId = existing.id;
+        document.getElementById('pending-group-id').textContent = groupIdInput;
+        showScreen('screen-pending');
+        showToast('参加申請を送りました。承認をお待ちください。');
+        return;
+      }
     }
     const isSignage = document.getElementById('join-is-signage')?.checked || false;
     const { data: member, error: memberError } = await supabase.from('group_members')
