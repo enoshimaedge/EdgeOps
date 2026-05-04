@@ -171,3 +171,162 @@ function generateDevEoUid() {
   const eoUid = generateEoUid(devProviderUid);
   return { eoUid, providerUid: devProviderUid };
 }
+
+// ─────────────────────────────────────────────
+// 8. 現在のユーザーの所属施設取得(Phase 0 Step 4 追加・2026/5/5)
+// ─────────────────────────────────────────────
+// 引数:
+//   supabaseClient - Supabaseクライアント
+//   eoUid - 取得対象のEdgeOps UID
+// 戻り値:
+//   { facilityUuid, facilityCode, plan, isMain } または null
+// 用途:
+//   Phase 1 manager.html での施設フィルタ・UI出し分けに使用
+// NOTE: 将来マルチ施設対応時は配列返却に変更する可能性あり(チャッピー指摘)
+// ─────────────────────────────────────────────
+async function getCurrentFacility(supabaseClient, eoUid) {
+  if (!supabaseClient || !eoUid) return null;
+  
+  // facility_managers から所属施設を JOIN で取得
+  const { data, error } = await supabaseClient
+    .from('facility_managers')
+    .select(`
+      facility_id,
+      is_main,
+      status,
+      facilities (
+        id,
+        facility_code,
+        plan
+      )
+    `)
+    .eq('eo_uid', eoUid)
+    .eq('status', 'active')
+    .maybeSingle();
+  
+  if (error) {
+    console.error('[auth.js] getCurrentFacility エラー:', error);
+    return null;
+  }
+  
+  if (!data || !data.facilities) return null;
+  
+  return {
+    facilityUuid: data.facilities.id,
+    facilityCode: data.facilities.facility_code,
+    plan: data.facilities.plan,
+    isMain: data.is_main
+  };
+}
+
+// ─────────────────────────────────────────────
+// 9. 現在のユーザーのロール判定(Phase 0 Step 4 追加・2026/5/5)
+// ─────────────────────────────────────────────
+// 引数:
+//   supabaseClient - Supabaseクライアント
+//   eoUid - 判定対象のEdgeOps UID
+//   groupSessionId - グループセッションID(省略可・グループ管理者判定用)
+// 戻り値:
+//   'super_admin' / 'facility_main' / 'facility_sub' /
+//   'group_manager' / 'member' / 'unknown'
+// 優先順位:
+//   super_admin > facility_main/sub > group_manager > member > unknown
+// 用途:
+//   Phase 1 manager.html で getCurrentRole() を使ってUI出し分け・施設フィルタを実現
+// NOTE: 将来「複合ロール」対応(super_admin かつ facility_main 等)が必要になった
+//       場合は、戻り値をオブジェクト({isSuperAdmin, isFacilityMain, ...})に拡張する
+//       予定(Phase 1.5以降想定・チャッピー指摘)
+// ─────────────────────────────────────────────
+async function getCurrentRole(supabaseClient, eoUid, groupSessionId = null) {
+  if (!supabaseClient || !eoUid) return 'unknown';
+  
+  // ① 超管理者チェック(adminsテーブル)
+  // NOTE: adminsにstatusカラム追加時はここで絞り込みを追加する(チャッピー指摘)
+  const { data: admin } = await supabaseClient
+    .from('admins')
+    .select('eo_uid')
+    .eq('eo_uid', eoUid)
+    .maybeSingle();
+  if (admin) return 'super_admin';
+  
+  // ② 施設管理者チェック(facility_managers テーブル)
+  const { data: fm } = await supabaseClient
+    .from('facility_managers')
+    .select('is_main, status')
+    .eq('eo_uid', eoUid)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (fm) {
+    return fm.is_main ? 'facility_main' : 'facility_sub';
+  }
+  
+  // ③ グループ管理者チェック(group_session_id 指定がある場合のみ)
+  if (groupSessionId) {
+    const { data: gm } = await supabaseClient
+      .from('group_members')
+      .select('is_creator, status')
+      .eq('eo_uid', eoUid)
+      .eq('group_session_id', groupSessionId)
+      .eq('status', 'approved')
+      .maybeSingle();
+    if (gm) {
+      return gm.is_creator ? 'group_manager' : 'member';
+    }
+  }
+  
+  // ④ どこにも所属なし
+  return 'unknown';
+}
+
+// ─────────────────────────────────────────────
+// 10. 監査ログ記録(Phase 0 Step 4 追加・Phase 1 で利用開始・2026/5/5)
+// ─────────────────────────────────────────────
+// 引数:
+//   supabaseClient - Supabaseクライアント
+//   params: {
+//     facilityId,        // UUID(省略可・null許容)
+//     actorEoUid,        // 操作者の eo_uid (必須)
+//     actorRole,         // 'super_admin' / 'facility_main' / 'facility_sub' /
+//                        // 'group_manager' / 'member'
+//     action,            // 'create' / 'update' / 'delete' / 'login' / 'export' (必須)
+//     targetType,        // 'facility' / 'member' / 'group' / 'message' / 'subscription' 等
+//     targetId,          // 操作対象のID
+//     beforeState,       // 変更前(JSONB) - 省略可
+//     afterState         // 変更後(JSONB) - 省略可
+//   }
+// 戻り値:
+//   { success: true, id } または { success: false, error }
+// 設計方針:
+//   ★ログ書き込み失敗時もユーザー操作は止めない(監査ログは補助機能であり、
+//     本機能停止はアンチパターン・チャッピー承認済)
+//   ★console.error でログ出力するが throw はしない
+// TODO: Phase 2で監視/アラート連携(チャッピー指摘)
+// ─────────────────────────────────────────────
+async function auditLog(supabaseClient, params) {
+  if (!supabaseClient || !params || !params.actorEoUid || !params.action) {
+    console.warn('[auth.js] auditLog: 必須パラメータ不足', params);
+    return { success: false, error: 'invalid params' };
+  }
+  
+  const { data, error } = await supabaseClient
+    .from('audit_logs')
+    .insert({
+      facility_id: params.facilityId || null,
+      actor_eo_uid: params.actorEoUid,
+      actor_role: params.actorRole || null,
+      action: params.action,
+      target_type: params.targetType || null,
+      target_id: params.targetId || null,
+      before_state: params.beforeState || null,
+      after_state: params.afterState || null
+    })
+    .select('id')
+    .single();
+  
+  if (error) {
+    console.error('[auth.js] auditLog INSERT エラー:', error);
+    return { success: false, error };
+  }
+  
+  return { success: true, id: data.id };
+}
