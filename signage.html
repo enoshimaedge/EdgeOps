@@ -424,7 +424,7 @@
       <div class="message-list" id="message-list-all" style="flex:1; overflow-y:auto;">
         <!-- 引き継ぎノートセクション -->
         <div id="section-handover" style="display:none;">
-          <div class="s-card-title" style="margin-bottom:6px;">📋 引き継ぎノート</div>
+          <div class="s-card-title" style="margin-bottom:6px;">📋 引き継ぎノート（72時間で非表示）</div>
           <div id="handover-list"></div>
           <div id="handover-accordion-btn" style="display:none; text-align:center; padding:6px 0 4px; font-size:13px; color:var(--green); cursor:pointer; font-weight:700;" onclick="toggleHandoverAccordion()"></div>
         </div>
@@ -882,6 +882,8 @@ async function loadMessage() {
   try {
     // 連絡は過去60日分のみ取得（DBには残るが表示しない）
     const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    // ★ バグ③ 修正: 引き継ぎノートは過去72時間分のみ取得（index.htmlと整合・v7.17準拠）
+    const cutoff72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     // 連絡とhandover_notesを並列取得
     const [msgResult, handoverResult] = await Promise.allSettled([
       sbClient.from('messages').select('*')
@@ -890,6 +892,7 @@ async function loadMessage() {
         .order('created_at', { ascending: false }),
       sbClient.from('handover_notes').select('*')
         .eq('group_session_id', currentGroupData.id)
+        .gte('created_at', cutoff72h)
         .order('created_at', { ascending: false })
     ]);
 
@@ -1309,6 +1312,11 @@ function startPolling() {
   if (updateTimer) clearInterval(updateTimer);
   updateTimer = setInterval(async () => {
     // トークン再検証（設計書事故ポイント②：キャッシュしない）
+    // ★ バグ⑥ 修正: オフライン時はトークン再検証をスキップ（誤検知防止）
+    if (!navigator.onLine) {
+      // オフラインバナーで通知済み・データ更新も意味がないのでスキップ
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     try {

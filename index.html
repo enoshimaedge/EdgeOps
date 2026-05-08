@@ -1547,16 +1547,34 @@ async function loadMessages() {
 
     // read_receiptsを取得してread_countを実態に合わせて補正
     // （サイネージ端末が参加前にread_countが加算されたズレを防ぐ）
+    // ★ EdgeOps受信対象モデル R(M)/K(M) 準拠（v7.17 第18章 / v1.14 第21章）
+    //    送信時に未参加だったメンバーの既読は read_count に加算しない
     if (messages.length > 0) {
       const msgIds = messages.map(m => m.id);
       const { data: receipts } = await supabase.from('read_receipts')
         .select('message_id, eo_uid').in('message_id', msgIds);
       const signageUids = new Set(members.filter(m => m.is_signage).map(m => m.eo_uid));
+
+      // ★ 全メンバー（過去含む・status='left'等も含む）の参加時刻マップを作成
+      //    members には status='approved' しか入っていないため、別途全件取得
+      const { data: allMembersForJoinedAt } = await supabase.from('group_members')
+        .select('eo_uid, created_at')
+        .eq('group_session_id', currentGroup.id);
+      const memberJoinedAt = new Map();
+      (allMembersForJoinedAt || []).forEach(m => {
+        memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+      });
+
       const realReadMap = {};
       (receipts || []).forEach(r => {
         if (signageUids.has(r.eo_uid)) return;
         const msg = messages.find(m => m.id === r.message_id);
-        if (msg && r.eo_uid === msg.sender_eo_uid) return; // 送信者除外
+        if (!msg) return;
+        if (r.eo_uid === msg.sender_eo_uid) return; // 送信者除外
+        // ★ 送信時に未参加（joinedAt > msg.created_at）のメンバーを除外
+        const joinedAt = memberJoinedAt.get(r.eo_uid);
+        if (joinedAt === undefined) return;
+        if (joinedAt > new Date(msg.created_at).getTime()) return;
         realReadMap[r.message_id] = (realReadMap[r.message_id] || 0) + 1;
       });
       // read_countをrealReadMapで上書き
@@ -1712,7 +1730,7 @@ function renderMessages() {
         ? msg.receiver_count
         : members.filter(m => m.eo_uid !== msg.sender_eo_uid && !m.is_signage).length;
       const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
-      const unreadCount = receiverCount - (msg.read_count || 0);
+      const unreadCount = Math.max(0, receiverCount - (msg.read_count || 0));
       const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
@@ -1746,7 +1764,7 @@ function renderMessages() {
           <div class="msg-meta">${senderName}　${timeStr}</div>
           <div class="msg-read-bar">
             <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
-            <div class="read-count">${msg.read_count || 0}/${receiverCount}人既読</div>
+            <div class="read-count">${Math.min(msg.read_count || 0, receiverCount)}/${receiverCount}人既読</div>
           </div>
           ${unreadCount > 0 ? `<div class="unread-names">❌ 未読 ${unreadCount}名</div>` : ''}
         </div>`;
@@ -1970,7 +1988,12 @@ async function sendMessage() {
   try {
     showToast('送信中...');
     // 送信時点の受信者数を固定保存（後からメンバーが増えても分母が変わらないようにする）
-    const receiverCountAtSend = members.filter(m => m.eo_uid !== currentUser.eo_uid && !m.is_signage).length;
+    // ★ status='approved' フィルタ追加：離脱予定や保留中のメンバーをカウントに含めない（v7.17 第18章準拠）
+    const receiverCountAtSend = members.filter(m =>
+      m.status === 'approved' &&
+      m.eo_uid !== currentUser.eo_uid &&
+      !m.is_signage
+    ).length;
 
     // ── アンケート対応(管理者かつチェック時のみ true) ──
     // グローバル変数 isCreator を使用（members 依存を排除しタイミング問題を回避）
@@ -2273,9 +2296,27 @@ async function showDetail(messageId) {
     .eq('message_id', messageId).order('read_at', { ascending: true });
   // 現在グループに在籍中（approved）のメンバーのeo_uidセット
   const memberUids = new Set(members.map(m => m.eo_uid));
+
+  // ★ 全メンバー（過去含む・status='left'等も含む）の参加時刻マップを作成（v7.17 第18章準拠）
+  //    送信後に参加したメンバーの既読を read_count から除外するため
+  const { data: allMembersForJoinedAtDetail } = await supabase.from('group_members')
+    .select('eo_uid, created_at')
+    .eq('group_session_id', currentGroup.id);
+  const detailMemberJoinedAt = new Map();
+  (allMembersForJoinedAtDetail || []).forEach(m => {
+    detailMemberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+  });
+  const msgCreatedAtMs = new Date(msg.created_at).getTime();
+
   // 退出済みメンバーの既読は除外
-  // 退出済みメンバーの既読は除外
-  const validReads = (reads || []).filter(r => memberUids.has(r.eo_uid));
+  // ★ さらに送信後に参加したメンバーの既読も除外（v7.17 第18章準拠）
+  const validReads = (reads || []).filter(r => {
+    if (!memberUids.has(r.eo_uid)) return false;
+    const joinedAt = detailMemberJoinedAt.get(r.eo_uid);
+    if (joinedAt === undefined) return false;
+    if (joinedAt > msgCreatedAtMs) return false;
+    return true;
+  });
   const readUids = new Set(validReads.map(r => r.eo_uid));
   // 送信者・サイネージ端末を除いた受信者リスト
   // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
@@ -2286,8 +2327,8 @@ async function showDetail(messageId) {
   document.getElementById('detail-title').textContent = getMessageTitle(msg.body, 20);
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
-  document.getElementById('detail-read-count').textContent = readCount;
-  document.getElementById('detail-unread-count').textContent = totalMembers - readCount;
+  document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
+  document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
   document.getElementById('detail-total-count').textContent = totalMembers;
   const readListEl = document.getElementById('detail-read-list');
   // 既読リストから送信者・サイネージ端末を除外
@@ -3249,12 +3290,25 @@ function getMessageTitle(body, maxLen) {
   return s + (body.length > maxLen ? '…' : '');
 }
 function showScreen(id) {
+  // ★ バグ② 修正: 現在の screen-home スクロール位置を保存（戻ったときに復元するため）
+  const currentActive = document.querySelector('.screen.active');
+  if (currentActive && currentActive.id === 'screen-home') {
+    sessionStorage.setItem('scrollPos_screen-home', String(window.scrollY));
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(id);
   if (target) {
     target.classList.add('active');
     if (id === 'screen-approval') loadApprovals();
-    if (id === 'screen-home') loadMessages();
+    if (id === 'screen-home') {
+      // ★ バグ② 修正: loadMessages完了後にスクロール位置を復元
+      loadMessages().then(() => {
+        const saved = sessionStorage.getItem('scrollPos_screen-home');
+        if (saved !== null) {
+          window.scrollTo(0, parseInt(saved, 10));
+        }
+      });
+    }
     if (id === 'screen-handover') loadHandoverNotes();
     if (id === 'screen-compose') { selectedPriority = 'info'; selectPriority('info'); renderTemplates(); selectedComposeType = 'msg'; applyComposeType('msg'); selectedHandoverPriority = 'action'; applyHandoverPriorityUI('action'); }
   }
