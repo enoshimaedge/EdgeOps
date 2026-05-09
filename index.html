@@ -537,6 +537,15 @@
     cursor: pointer; font-family: inherit;
     display: block; width: 100%; text-align: center;
   }
+  .join-new-group-btn {
+    width: 100%; padding: 12px 16px;
+    background: var(--green); color: white;
+    border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    transition: background 0.15s;
+  }
+  .join-new-group-btn:active { background: var(--green-dark); }
 </style>
 </head>
 <body>
@@ -1170,6 +1179,10 @@
     <div class="group-switcher-title">📋 グループを切り替える</div>
     <div class="group-switcher-list" id="group-switcher-list">
       <div class="spinner" style="margin:20px auto;"></div>
+    </div>
+    <!-- ★ 案C: 他のグループに参加するための導線(2026/05/09 追加) -->
+    <div style="padding:12px 16px 20px; border-top:1px solid var(--border);">
+      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ 他のグループに参加 / 作成</button>
     </div>
   </div>
 </div>
@@ -3545,6 +3558,24 @@ async function updateGroupSwitcherBtn() {
     .eq('status', 'approved');
   const others = Math.max(0, (count || 0) - 1);
   btn.textContent = `📋 他のグループに切替 (${others})`;
+}
+
+// ★ 案C: ボトムシート → 起動画面(screen-start) への遷移(2026/05/09 追加)
+//   既存グループに所属したまま、新しいグループに参加申請 / 新規作成 できるようにする
+//   退出は不要・restoreSession の影響を受けないよう showScreen で直接遷移
+function goToJoinNewGroup() {
+  closeBottomSheet();
+  // 入力欄を初期化(前回の入力が残らないように)
+  const dnInput = document.getElementById('input-display-name');
+  const gidInput = document.getElementById('input-group-id');
+  const gnInput = document.getElementById('input-group-name');
+  if (dnInput) dnInput.value = currentUser?.line_name || '';
+  if (gidInput) gidInput.value = '';
+  if (gnInput) gnInput.value = '';
+  // 期限切れ通知は非表示(またぎ用途では関係ない)
+  const expiry = document.getElementById('start-expiry-notice');
+  if (expiry) expiry.style.display = 'none';
+  showScreen('screen-start');
 }
 
 window.addEventListener('load', init);
