@@ -480,6 +480,63 @@
     font-family: inherit; color: var(--text-mid); transition: all 0.15s;
   }
   .filter-chip.active { background: var(--navy); border-color: var(--navy); color: white; }
+
+  /* ── グループ切替ボトムシート ── */
+  .group-switcher-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 300;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .group-switcher-overlay.open { opacity: 1; pointer-events: auto; }
+  .group-switcher-sheet {
+    position: fixed; bottom: 0; left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    width: 100%; max-width: 430px;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    z-index: 301;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 75vh;
+    overflow-y: auto;
+    padding-bottom: 24px;
+  }
+  .group-switcher-sheet.open { transform: translateX(-50%) translateY(0); }
+  .group-switcher-handle {
+    width: 40px; height: 4px;
+    background: var(--border); border-radius: 2px;
+    margin: 12px auto 16px;
+  }
+  .group-switcher-title {
+    font-size: 15px; font-weight: 700;
+    padding: 0 16px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .group-switcher-list {
+    padding: 12px 16px 0;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .group-card {
+    padding: 14px 16px;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .group-card:active { background: var(--bg); }
+  .group-card.current { border-color: var(--green); background: var(--green-light); cursor: default; }
+  .group-card .group-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .group-card .group-meta { font-size: 12px; color: var(--text-light); font-family: monospace; }
+  .group-switch-btn {
+    margin-top: 10px; padding: 6px 14px;
+    background: rgba(255,255,255,0.15);
+    color: white; border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 8px; font-size: 12px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    display: block; width: 100%; text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -983,6 +1040,8 @@
         <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-expires">📅 有効期限：取得中...</div>
         <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-members">👥 参加中：取得中...</div>
       </div>
+      <button class="group-switch-btn" id="group-switch-btn" onclick="showGroupSwitcher()">📋 他のグループに切替 (...)</button>
+      <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:6px;" id="profile-group-name-display"></div>
     </div>
     <div id="profile-admin-section" style="display:none;">
       <div class="card" style="padding:16px; margin-bottom:12px;">
@@ -1102,6 +1161,15 @@
       <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank"
          style="color:var(--green); text-decoration:none;">プライバシーポリシー</a>
       <br><span style="font-size:11px;">© 2026 江の島エッジ合同会社</span>
+    </div>
+  </div>
+  <!-- ══ グループ切替ボトムシート ══ -->
+  <div class="group-switcher-overlay" id="group-switcher-overlay" onclick="closeBottomSheet()"></div>
+  <div class="group-switcher-sheet" id="group-switcher-sheet">
+    <div class="group-switcher-handle"></div>
+    <div class="group-switcher-title">📋 グループを切り替える</div>
+    <div class="group-switcher-list" id="group-switcher-list">
+      <div class="spinner" style="margin:20px auto;"></div>
     </div>
   </div>
 </div>
@@ -1325,6 +1393,27 @@ async function joinGroup() {
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!groupIdInput) { showToast('グループIDを入力してください'); return; }
+  // ★ v1.3 Step 6: 20グループ上限チェック(チャッピーレビュー反映)
+  // status は 'approved' と 'pending' の両方をカウント(申請大量化攻撃を防ぐ)
+  try {
+    const { count: myGroupCount, error: countError } = await supabase
+      .from('group_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('eo_uid', currentUser.eo_uid)
+      .in('status', ['approved', 'pending']);
+    if (countError) {
+      showToast('参加可能グループ数の確認に失敗しました');
+      return;
+    }
+    if (myGroupCount >= 20) {
+      alert('所属しすぎですね!\n参加できるグループは最大20までです。\n(申請中のグループも含む)\nプロフィール画面で不要なグループから退出してから再度お試しください。');
+      return;
+    }
+  } catch (e) {
+    console.error('20グループ上限チェック失敗:', e);
+    showToast('参加可能グループ数の確認に失敗しました');
+    return;
+  }
   try {
     showToast('グループを検索中...');
     const { data: group, error } = await supabase
@@ -3061,6 +3150,9 @@ function showProfile() {
   const eoUidEl2 = document.getElementById('profile-eo-uid');
   if (eoUidEl2) eoUidEl2.textContent = '🔑 ' + (currentUser.eo_uid || '---');
   document.getElementById('profile-group-id').textContent = currentGroup?.group_id || '---';
+  const gnDisplayEl = document.getElementById('profile-group-name-display');
+  if (gnDisplayEl) gnDisplayEl.textContent = currentGroup?.group_name || '';
+  updateGroupSwitcherBtn();
   // 管理者セクションの表示切替
   const adminSection = document.getElementById('profile-admin-section');
   if (adminSection) {
@@ -3321,6 +3413,140 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
+// ═══════════════════════════════════════════
+// グループまたぎ機能 (v1.3)
+// ═══════════════════════════════════════════
+
+async function loadMyGroups() {
+  const { data: memberships, error } = await supabase
+    .from('group_members')
+    .select('id, group_session_id, is_creator, display_name')
+    .eq('eo_uid', currentUser.eo_uid)
+    .eq('status', 'approved')
+    .limit(20);
+
+  if (error || !memberships) return [];
+
+  const groupIds = memberships.map(m => m.group_session_id);
+  const { data: groups } = await supabase
+    .from('group_sessions')
+    .select('id, group_id, group_name')
+    .in('id', groupIds);
+
+  const merged = memberships.map(m => {
+    const g = (groups || []).find(x => x.id === m.group_session_id);
+    return {
+      member_id: m.id,
+      group_session_id: m.group_session_id,
+      group_id: g?.group_id,
+      group_name: g?.group_name,
+      is_creator: m.is_creator || false,
+      display_name: m.display_name,
+      is_current: m.group_session_id === currentGroup?.id
+    };
+  });
+
+  merged.sort((a, b) => {
+    if (a.is_creator !== b.is_creator) return a.is_creator ? -1 : 1;
+    return (a.group_name || '').localeCompare(b.group_name || '');
+  });
+
+  return merged;
+}
+
+async function switchGroup(newGroupSessionId, newMemberId) {
+  if (currentGroup?.id === newGroupSessionId) {
+    closeBottomSheet();
+    return;
+  }
+
+  stopPolling();
+
+  const { data: newGroup } = await supabase
+    .from('group_sessions')
+    .select('*')
+    .eq('id', newGroupSessionId)
+    .maybeSingle();
+
+  const { data: newMember } = await supabase
+    .from('group_members')
+    .select('*')
+    .eq('id', newMemberId)
+    .maybeSingle();
+
+  if (!newGroup || !newMember) {
+    showToast('グループ情報の取得に失敗しました');
+    startPolling();
+    return;
+  }
+
+  // ★ sl_group_id には SL-XXXXXX-XXXX 形式の group_id を保存（UUID は絶対NG）
+  localStorage.setItem('sl_member_id', newMemberId);
+  localStorage.setItem('sl_group_id', newGroup.group_id);
+
+  // 既存 restoreSession (L1217-1219) と同じ順で状態を更新
+  currentMemberId = newMemberId;
+  currentGroup = newGroup;
+  // ★ チャッピー②指摘反映: currentUser を group_members の値で完全再生成
+  //   eo_uid / line_name / picture_url は不変(同じ人なので保持)
+  //   display_name のみグループごとに切替(現場で「前グループの名前で投稿」事故を防ぐ)
+  //   将来 currentUser にグループ依存フィールド(role, facility_id 等)が増えても安全
+  currentUser = {
+    ...currentUser,
+    display_name: newMember.display_name
+  };
+  isCreator = newMember.is_creator || false;
+
+  closeBottomSheet();
+
+  await loadHome();
+  showScreen('screen-home');
+
+  showToast(`「${newGroup.group_name || newGroup.group_id}」に切り替えました`);
+}
+
+async function showGroupSwitcher() {
+  const listEl = document.getElementById('group-switcher-list');
+  if (listEl) listEl.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
+
+  document.getElementById('group-switcher-overlay').classList.add('open');
+  document.getElementById('group-switcher-sheet').classList.add('open');
+
+  const myGroups = await loadMyGroups();
+
+  const listHtml = myGroups.map(g => {
+    const roleLabel = g.is_creator ? '管理者' : 'メンバー';
+    const icon = g.is_current ? '✅' : '🔄';
+    const cardClass = g.is_current ? 'group-card current' : 'group-card';
+    const onclick = g.is_current ? '' :
+      `onclick="switchGroup('${g.group_session_id}','${g.member_id}')"`;
+    return `
+      <div class="${cardClass}" ${onclick}>
+        <div class="group-name">${icon} ${escHtml(g.group_name || g.group_id || '')}${g.is_current ? ' (現在)' : ''}</div>
+        <div class="group-meta">${escHtml(g.group_id || '')} ・ ${roleLabel}</div>
+      </div>`;
+  }).join('');
+
+  if (listEl) listEl.innerHTML = listHtml || '<div style="padding:16px;color:var(--text-light);">グループが見つかりません</div>';
+}
+
+function closeBottomSheet() {
+  document.getElementById('group-switcher-overlay').classList.remove('open');
+  document.getElementById('group-switcher-sheet').classList.remove('open');
+}
+
+async function updateGroupSwitcherBtn() {
+  const btn = document.getElementById('group-switch-btn');
+  if (!btn || !currentUser?.eo_uid) return;
+  const { count } = await supabase
+    .from('group_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('eo_uid', currentUser.eo_uid)
+    .eq('status', 'approved');
+  const others = Math.max(0, (count || 0) - 1);
+  btn.textContent = `📋 他のグループに切替 (${others})`;
+}
+
 window.addEventListener('load', init);
 </script>
 </body>
