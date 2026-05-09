@@ -1334,7 +1334,7 @@ async function joinGroup() {
       .eq('group_session_id', group.id).eq('status', 'approved');
     if (count >= group.max_members) { showToast('このグループは満員です（最大50名）'); return; }
     const { data: existing } = await supabase.from('group_members').select('*')
-      .eq('group_session_id', group.id).eq('eo_uid', currentUser.eo_uid).single();
+      .eq('group_session_id', group.id).eq('eo_uid', currentUser.eo_uid).maybeSingle();
     if (existing) {
       if (existing.status === 'approved') {
         localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
@@ -2549,7 +2549,7 @@ async function recordRead(messageId) {
     const currentMember = members.find(m => m.eo_uid === currentUser.eo_uid);
     if (currentMember && currentMember.is_signage) return;
     const { data: existing } = await supabase.from('read_receipts').select('id')
-      .eq('message_id', messageId).eq('eo_uid', currentUser.eo_uid).single();
+      .eq('message_id', messageId).eq('eo_uid', currentUser.eo_uid).maybeSingle();
     if (existing) return;
     await supabase.from('read_receipts').insert({ message_id: messageId, eo_uid: currentUser.eo_uid, read_at: new Date().toISOString() });
     // 送信者自身が開いてもread_countを増やさない（送信者は分母・分子から除外）
@@ -3127,7 +3127,7 @@ async function checkSuperAdmin() {
   if (false) { // [Phase 0] SUPER_ADMIN_UID(LINE UID)直接比較は廃止。adminsテーブル参照に統一
     btn.style.display = "block";
   } else {
-    const { data } = await supabase.from("admins").select("eo_uid").eq("eo_uid", currentUser.eo_uid).single();
+    const { data } = await supabase.from("admins").select("eo_uid").eq("eo_uid", currentUser.eo_uid).maybeSingle();
     btn.style.display = data ? "block" : "none";
   }
 }
