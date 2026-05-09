@@ -740,6 +740,41 @@
   </div>
 </div>
 
+<!-- ══ 案C-改:他のグループに参加申請専用画面(新規作成不可・既存ユーザー専用) ══ -->
+<div class="screen" id="screen-join-only">
+  <div class="header">
+    <div>
+      <div class="header-title">📋 他のグループに参加</div>
+      <div class="header-sub">既存グループはそのまま保持されます / Join another group</div>
+    </div>
+  </div>
+  <div class="content">
+    <div style="text-align:center; padding: 24px 0 16px;">
+      <div style="font-size:44px; margin-bottom:8px;">🔗</div>
+      <div style="font-size:16px; font-weight:700; margin-bottom:6px;">参加したいグループのIDを入力してください</div>
+      <div style="font-size:13px; color:var(--text-light);">グループの管理者から共有されたIDを入力します
+      <br><span style="font-size:11px;">Enter the group ID shared by the admin</span></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">表示名(このグループでの名前) / Display Name in this Group</label>
+      <input class="form-input" id="input-display-name-join-only" type="text" placeholder="例：山田 太郎(夜勤)" maxlength="20">
+      <div style="font-size:11px; color:var(--text-light); margin-top:4px;">グループごとに別の表示名を使えます</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">グループID / Group ID</label>
+      <input class="form-input" id="input-group-id-join-only" type="text" placeholder="例：SL-XXXXXX-XXXX" maxlength="20" style="font-family:monospace; text-transform:uppercase;">
+    </div>
+    <div style="margin-top:24px; display:flex; gap:10px;">
+      <button class="btn btn-secondary" onclick="cancelJoinNewGroup()" style="flex:1;">キャンセル</button>
+      <button class="btn btn-primary" onclick="submitJoinOnly()" style="flex:2;">参加申請する</button>
+    </div>
+    <div style="margin-top:24px; padding:12px; background:var(--bg); border-radius:8px; font-size:12px; color:var(--text-light); line-height:1.6;">
+      💡 <strong>新規グループの作成について</strong><br>
+      新しいグループを作成したい場合は、いったん EdgeOps を終了して、起動画面から「新しいグループを作る」を選んでください。
+    </div>
+  </div>
+</div>
+
 <!-- ══ 画面②：参加承認待ち ══ -->
 <div class="screen" id="screen-pending">
   <div class="header">
@@ -1180,9 +1215,9 @@
     <div class="group-switcher-list" id="group-switcher-list">
       <div class="spinner" style="margin:20px auto;"></div>
     </div>
-    <!-- ★ 案C: 他のグループに参加するための導線(2026/05/09 追加) -->
+    <!-- ★ 案C-改: 他のグループに参加するための導線(参加申請のみ・新規作成は含まない) -->
     <div style="padding:12px 16px 20px; border-top:1px solid var(--border);">
-      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ 他のグループに参加 / 作成</button>
+      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ 他のグループに参加</button>
     </div>
   </div>
 </div>
@@ -3560,22 +3595,41 @@ async function updateGroupSwitcherBtn() {
   btn.textContent = `📋 他のグループに切替 (${others})`;
 }
 
-// ★ 案C: ボトムシート → 起動画面(screen-start) への遷移(2026/05/09 追加)
-//   既存グループに所属したまま、新しいグループに参加申請 / 新規作成 できるようにする
-//   退出は不要・restoreSession の影響を受けないよう showScreen で直接遷移
+// ★ 案C-改:ボトムシート →「参加申請専用画面」への遷移(2026/05/09 追加)
+//   既存グループを保持したまま、新しいグループへの参加申請のみ可能(新規作成は含まない)
+//   設計書 v1.3 第2章2-2「プロフ画面から新規グループ作成はできない」を厳守
 function goToJoinNewGroup() {
   closeBottomSheet();
-  // 入力欄を初期化(前回の入力が残らないように)
-  const dnInput = document.getElementById('input-display-name');
-  const gidInput = document.getElementById('input-group-id');
-  const gnInput = document.getElementById('input-group-name');
+  // 入力欄を初期化
+  const dnInput = document.getElementById('input-display-name-join-only');
+  const gidInput = document.getElementById('input-group-id-join-only');
   if (dnInput) dnInput.value = currentUser?.line_name || '';
   if (gidInput) gidInput.value = '';
-  if (gnInput) gnInput.value = '';
-  // 期限切れ通知は非表示(またぎ用途では関係ない)
-  const expiry = document.getElementById('start-expiry-notice');
-  if (expiry) expiry.style.display = 'none';
-  showScreen('screen-start');
+  showScreen('screen-join-only');
+}
+
+// ★ 案C-改:キャンセル → プロフィール画面に戻る(現在のグループ状態は維持)
+function cancelJoinNewGroup() {
+  showScreen('screen-profile');
+}
+
+// ★ 案C-改:参加申請の実行(既存 joinGroup() に転送する形でロジック共通化)
+//   既存の joinGroup() は input-display-name / input-group-id を読むので、
+//   join-only 専用入力欄の値をそこにコピーしてから呼び出す(既存ロジック改変ゼロ)
+async function submitJoinOnly() {
+  const dnInput = document.getElementById('input-display-name-join-only');
+  const gidInput = document.getElementById('input-group-id-join-only');
+  const dnValue = (dnInput?.value || '').trim();
+  const gidValue = (gidInput?.value || '').trim().toUpperCase();
+  if (!dnValue) { showToast('表示名を入力してください'); return; }
+  if (!gidValue) { showToast('グループIDを入力してください'); return; }
+  // 既存 joinGroup() が読む既定の入力欄に値をセット
+  const stdDn = document.getElementById('input-display-name');
+  const stdGid = document.getElementById('input-group-id');
+  if (stdDn) stdDn.value = dnValue;
+  if (stdGid) stdGid.value = gidValue;
+  // 既存ロジック呼び出し(20グループ上限チェック・重複チェック・状態管理など全部既存仕様)
+  await joinGroup();
 }
 
 window.addEventListener('load', init);
