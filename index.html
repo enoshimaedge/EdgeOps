@@ -1228,12 +1228,60 @@
 // ═══════════════════════════════════════════
 
 // ═══════════════════════════════════════════
-// 設定
+// 設定(Phase D Step 4-A:環境分岐レイヤ・2026/5/13)
 // ═══════════════════════════════════════════
-const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
-const LIFF_ID = '2009827939-rZo06gWm';
+// 環境判定:window.location.hostname で prod/staging/dev を切り替え
+// - app.edgeops.jp → prod(本番)
+// - edgeops-staging.vercel.app / staging.edgeops.jp → staging
+// - localhost / 127.0.0.1 / .local → dev
+// - 不明なホスト → prod にフォールバック(安全側)
+//
+// Phase D Step 4-B で auth.js が line-auth Edge Function を呼ぶ際、
+// ここの LINE_AUTH_URL を参照する設計。
+// ═══════════════════════════════════════════
+
+const ENV_CONFIG = {
+  prod: {
+    SUPABASE_URL: 'https://eomsdvwklntrtiiksnro.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA',
+    LIFF_ID: '2009827939-rZo06gWm',
+    LINE_AUTH_URL: 'https://eomsdvwklntrtiiksnro.supabase.co/functions/v1/line-auth'
+  },
+  staging: {
+    SUPABASE_URL: 'https://lxptelyviuucqmwxqxly.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4cHRlbHl2aXV1Y3Ftd3hxeGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNDUyNjIsImV4cCI6MjA5MzYyMTI2Mn0.ppYm-MogmOc8OmbVbCrpfe-tk4BWXi6l4z2NnwCkgso',
+    LIFF_ID: '2009827936-jvYNcPNH',
+    LINE_AUTH_URL: 'https://lxptelyviuucqmwxqxly.supabase.co/functions/v1/line-auth'
+  },
+  dev: {
+    SUPABASE_URL: 'https://lxptelyviuucqmwxqxly.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4cHRlbHl2aXV1Y3Ftd3hxeGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNDUyNjIsImV4cCI6MjA5MzYyMTI2Mn0.ppYm-MogmOc8OmbVbCrpfe-tk4BWXi6l4z2NnwCkgso',
+    LIFF_ID: '2009827936-jvYNcPNH',
+    LINE_AUTH_URL: 'https://lxptelyviuucqmwxqxly.supabase.co/functions/v1/line-auth'
+  }
+};
+
+function detectEnvironment() {
+  const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+  if (host === 'app.edgeops.jp') return 'prod';
+  if (host.includes('staging') || host === 'staging.edgeops.jp') return 'staging';
+  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return 'dev';
+  // 不明なホストは安全側で prod にフォールバック
+  return 'prod';
+}
+
+const CURRENT_ENV = detectEnvironment();
+const CFG = ENV_CONFIG[CURRENT_ENV];
+
+// 既存コード互換のため、グローバル定数として展開(Step 4-B以降の変更を最小化)
+const SUPABASE_URL = CFG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
+const LIFF_ID = CFG.LIFF_ID;
+const LINE_AUTH_URL = CFG.LINE_AUTH_URL;
 const POLL_INTERVAL = 5000;
+
+// デバッグ用ログ(本番でも害なし・問題発生時の切り分けに有用)
+console.log('[EdgeOps] Environment:', CURRENT_ENV, '| hostname:', window.location.hostname);
 
 
 // ═══════════════════════════════════════════
