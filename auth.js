@@ -1,9 +1,26 @@
 // =================================================================
-// auth.js - EdgeOps認証フロー独立化 (Phase 0)
+// auth.js - EdgeOps認証フロー独立化
 // =================================================================
 // チャッピー追加5条件のうち③localStorageキー命名固定を遵守
 // チャッピー指摘③Adapter層インターフェース定義を含む
 // 作成日: 2026-05-04 (Phase 0 第5章)
+// 改修日: 2026-05-13 (Phase D Step 4-B)
+// =================================================================
+// Phase D Step 4-B 改修内容:
+//   - resolveEoUid を line-auth Edge Function 経由に書き換え
+//   - prod/staging 環境では Supabase Auth経由JWT発行フローに移行
+//   - dev 環境では従来のクライアント側MD5計算を維持(LIFFなしでのテスト用)
+//   - clearAuthCache に supabaseClient.auth.signOut() を追加
+//   - eo_uid 計算式: CryptoJS.MD5(providerUid + EO_UID_SALT) は維持
+//     (チャッピー第7回判定:auth.js generateEoUid() を正本とする)
+//
+// チャッピー第6回判定反映:旧方式維持・差分最小
+// チャッピー第7回判定反映:MD5維持・crypto-js統一・コード=真実 原則
+// チャッピー第8回判定反映:環境分岐は最低限・実機E2E可能化
+//
+// 前提:
+//   - window.LINE_AUTH_URL, window.CURRENT_ENV, window.CFG が index.html で定義済
+//   - dev 環境では LINE_AUTH_URL があっても呼ばない
 // =================================================================
 
 // ─────────────────────────────────────────────
@@ -58,6 +75,10 @@ const currentAdapter = LINEAdapter;
 // ─────────────────────────────────────────────
 // 3. eo_uid生成(salt値「edgeops_v1_2026」は絶対に変更しない)
 // ─────────────────────────────────────────────
+// 注意:Phase D 後はクライアント側計算は dev 環境のみ使用
+// prod/staging では line-auth Edge Function 側で同じ式で計算される
+// (Edge Function コード:CryptoJS.MD5 で完全一致・第7回判定確定)
+// ─────────────────────────────────────────────
 const EO_UID_SALT = 'edgeops_v1_2026';
 
 function generateEoUid(providerUid) {
@@ -75,12 +96,132 @@ function generateEoUid(providerUid) {
 //   supabaseClient - 呼び出し元のSupabaseクライアントインスタンス
 // 戻り値:
 //   { eoUid, displayName, pictureUrl, providerUid }
+//
+// Phase D Step 4-B 改修:
+//   - prod/staging 環境:line-auth Edge Function 経由でJWT認証
+//   - dev 環境:従来通りクライアント側計算(LIFFなしテスト用)
 // ─────────────────────────────────────────────
 async function resolveEoUid(supabaseClient) {
   if (!supabaseClient) {
     throw new Error('resolveEoUid: supabaseClient is required');
   }
 
+  // 環境判定(index.html で定義された CURRENT_ENV を参照)
+  const env = (typeof CURRENT_ENV !== 'undefined') ? CURRENT_ENV : 'prod';
+  console.log('[auth.js] resolveEoUid env=', env);
+
+  // ════════════════════════════════════════════
+  // dev 環境:従来フロー(クライアント側計算)
+  // ════════════════════════════════════════════
+  if (env === 'dev') {
+    return await resolveEoUidLegacy(supabaseClient);
+  }
+
+  // ════════════════════════════════════════════
+  // prod/staging 環境:line-auth 経由(Phase D 新フロー)
+  // ════════════════════════════════════════════
+  return await resolveEoUidViaLineAuth(supabaseClient);
+}
+
+// ─────────────────────────────────────────────
+// 4-A. 新フロー:line-auth Edge Function 経由
+// ─────────────────────────────────────────────
+async function resolveEoUidViaLineAuth(supabaseClient) {
+  // (a) LIFF id_token 取得
+  let id_token;
+  try {
+    id_token = liff.getIDToken();
+    if (!id_token) {
+      throw new Error('liff.getIDToken() returned empty');
+    }
+  } catch (e) {
+    console.error('[auth.js] LIFF id_token 取得失敗:', e);
+    throw new Error('LIFF id_token unavailable: ' + (e?.message || e));
+  }
+
+  // (b) LINEAdapter から displayName / pictureUrl も取得(従来互換)
+  const displayName = await currentAdapter.getDisplayName();
+  const pictureUrl = await currentAdapter.getPictureUrl();
+  const { providerUid } = await currentAdapter.getCurrentUserAuthInfo();
+
+  // (c) localStorageキャッシュ確認(高速化目的・従来互換)
+  // 注意:JWT認証は毎回必要なのでキャッシュ判定後も line-auth は呼ぶ
+  // ただしキャッシュがあればJWT発行待ちUIが短く感じる(キャッシュは表示用のみ)
+
+  // (d) line-auth Edge Function 呼び出し
+  const lineAuthUrl = (typeof LINE_AUTH_URL !== 'undefined') ? LINE_AUTH_URL : null;
+  if (!lineAuthUrl) {
+    throw new Error('LINE_AUTH_URL is not defined. Check index.html ENV_CONFIG.');
+  }
+
+  let lineAuthResult;
+  try {
+    const res = await fetch(lineAuthUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_token })
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error('[auth.js] line-auth エラー:', res.status, errBody);
+      throw new Error('line-auth failed: HTTP ' + res.status + ' ' + errBody);
+    }
+
+    lineAuthResult = await res.json();
+  } catch (e) {
+    console.error('[auth.js] line-auth fetch 失敗:', e);
+    throw new Error('line-auth fetch failed: ' + (e?.message || e));
+  }
+
+  const { access_token, refresh_token, eo_uid, rid } = lineAuthResult;
+  if (!access_token || !refresh_token || !eo_uid) {
+    console.error('[auth.js] line-auth レスポンス不正:', lineAuthResult);
+    throw new Error('line-auth invalid response');
+  }
+  console.log('[auth.js] line-auth ok rid=', rid, 'eo_uid=', eo_uid);
+
+  // (e) Supabase Auth に session をセット(以降のクエリが JWT 付きになる)
+  const { error: setSessionErr } = await supabaseClient.auth.setSession({
+    access_token,
+    refresh_token
+  });
+  if (setSessionErr) {
+    console.error('[auth.js] setSession エラー:', setSessionErr);
+    throw new Error('setSession failed: ' + setSessionErr.message);
+  }
+
+  // (f) localStorage キャッシュ更新(従来互換)
+  localStorage.setItem(LS_KEYS.EO_UID, eo_uid);
+  localStorage.setItem(LS_KEYS.PROVIDER, 'line');
+  localStorage.setItem(LS_KEYS.PROVIDER_UID, providerUid);
+
+  // (g) users テーブルに display_name を upsert(初回ログイン+表示名更新)
+  // Phase D 以降は JWT 認証なので RLS 通過。RLS が is_self() で守る。
+  // Hook が JWT に eo_uid claim を載せている前提。
+  try {
+    await supabaseClient.from('users').upsert(
+      { eo_uid, display_name: displayName, language: 'ja' },
+      { onConflict: 'eo_uid' }
+    );
+  } catch (e) {
+    // upsert失敗は致命的ではない(既存ユーザーで RLS UPDATE が引っかかる可能性)
+    // ログだけ出して継続
+    console.warn('[auth.js] users upsert 失敗(継続):', e);
+  }
+
+  // (h) 戻り値は従来互換
+  return { eoUid: eo_uid, displayName, pictureUrl, providerUid };
+}
+
+// ─────────────────────────────────────────────
+// 4-B. 旧フロー:クライアント側計算(dev 環境のみ)
+// ─────────────────────────────────────────────
+// Phase 0 までの実装をそのまま残す
+// 注意:RLS が有効な状態(prod/staging Phase D 完了後)では動作しない
+//      → だから dev 環境のみで使う
+// ─────────────────────────────────────────────
+async function resolveEoUidLegacy(supabaseClient) {
   // (a) Adapterから現在の認証情報を取得
   const { provider, providerUid } = await currentAdapter.getCurrentUserAuthInfo();
   const displayName = await currentAdapter.getDisplayName();
@@ -159,8 +300,19 @@ async function isAdmin(supabaseClient, eoUid) {
 // ─────────────────────────────────────────────
 // 6. 認証クリア(ログアウト時)
 // ─────────────────────────────────────────────
-function clearAuthCache() {
+// Phase D Step 4-B 拡張:Supabase Auth session も明示的に signOut
+// ─────────────────────────────────────────────
+async function clearAuthCache(supabaseClient) {
   Object.values(LS_KEYS).forEach(key => localStorage.removeItem(key));
+
+  // Phase D 以降は Supabase Auth session も消す
+  if (supabaseClient && supabaseClient.auth) {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (e) {
+      console.warn('[auth.js] signOut 失敗(継続):', e);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -186,7 +338,7 @@ function generateDevEoUid() {
 // ─────────────────────────────────────────────
 async function getCurrentFacility(supabaseClient, eoUid) {
   if (!supabaseClient || !eoUid) return null;
-  
+
   // facility_managers から所属施設を JOIN で取得
   const { data, error } = await supabaseClient
     .from('facility_managers')
@@ -203,14 +355,14 @@ async function getCurrentFacility(supabaseClient, eoUid) {
     .eq('eo_uid', eoUid)
     .eq('status', 'active')
     .maybeSingle();
-  
+
   if (error) {
     console.error('[auth.js] getCurrentFacility エラー:', error);
     return null;
   }
-  
+
   if (!data || !data.facilities) return null;
-  
+
   return {
     facilityUuid: data.facilities.id,
     facilityCode: data.facilities.facility_code,
@@ -239,7 +391,7 @@ async function getCurrentFacility(supabaseClient, eoUid) {
 // ─────────────────────────────────────────────
 async function getCurrentRole(supabaseClient, eoUid, groupSessionId = null) {
   if (!supabaseClient || !eoUid) return 'unknown';
-  
+
   // ① 超管理者チェック(adminsテーブル)
   // NOTE: adminsにstatusカラム追加時はここで絞り込みを追加する(チャッピー指摘)
   const { data: admin } = await supabaseClient
@@ -248,7 +400,7 @@ async function getCurrentRole(supabaseClient, eoUid, groupSessionId = null) {
     .eq('eo_uid', eoUid)
     .maybeSingle();
   if (admin) return 'super_admin';
-  
+
   // ② 施設管理者チェック(facility_managers テーブル)
   const { data: fm } = await supabaseClient
     .from('facility_managers')
@@ -259,7 +411,7 @@ async function getCurrentRole(supabaseClient, eoUid, groupSessionId = null) {
   if (fm) {
     return fm.is_main ? 'facility_main' : 'facility_sub';
   }
-  
+
   // ③ グループ管理者チェック(group_session_id 指定がある場合のみ)
   if (groupSessionId) {
     const { data: gm } = await supabaseClient
@@ -273,7 +425,7 @@ async function getCurrentRole(supabaseClient, eoUid, groupSessionId = null) {
       return gm.is_creator ? 'group_manager' : 'member';
     }
   }
-  
+
   // ④ どこにも所属なし
   return 'unknown';
 }
@@ -307,7 +459,7 @@ async function auditLog(supabaseClient, params) {
     console.warn('[auth.js] auditLog: 必須パラメータ不足', params);
     return { success: false, error: 'invalid params' };
   }
-  
+
   const { data, error } = await supabaseClient
     .from('audit_logs')
     .insert({
@@ -322,11 +474,11 @@ async function auditLog(supabaseClient, params) {
     })
     .select('id')
     .single();
-  
+
   if (error) {
     console.error('[auth.js] auditLog INSERT エラー:', error);
     return { success: false, error };
   }
-  
+
   return { success: true, id: data.id };
 }
