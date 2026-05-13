@@ -3425,6 +3425,34 @@ async function leaveGroup() {
     } catch (e) {
       console.warn('アンケート回答のクリーンアップに失敗:', e);
     }
+    // ── グループ脱退後の遷移処理(2026/5/14 修正・複数グループ所属者対応・チャッピー第19/段階6.5判定反映) ──
+    // 退出したグループのIDを記憶(残りグループ取得時の除外用)
+    const leftGroupSessionId = currentGroup?.id;
+
+    try {
+      // 残り所属グループを取得(自分の eo_uid で approved・退出したグループは除外・created_at DESC で最新1件)
+      const { data: remainingMemberships } = await supabase
+        .from('group_members')
+        .select('id, group_session_id')
+        .eq('eo_uid', currentUser.eo_uid)
+        .eq('status', 'approved')
+        .neq('group_session_id', leftGroupSessionId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (remainingMemberships && remainingMemberships.length > 0) {
+        // ★ 残りグループあり → switchGroup() で自動切替(localStorage は switchGroup 内で更新)
+        const next = remainingMemberships[0];
+        showToast('グループを退出しました');
+        await switchGroup(next.group_session_id, next.id);
+        return;
+      }
+    } catch (err) {
+      // 残りグループ取得失敗時は従来動作にフォールバック(チャッピー段階6.5判定追加条件)
+      console.warn('残りグループ取得失敗・従来動作にフォールバック:', err);
+    }
+
+    // 残りグループなし or 取得失敗 → 従来動作(localStorage 全消去 + screen-start)
     localStorage.clear(); currentGroup = null; currentMemberId = null;
     showScreen('screen-start'); showToast('グループを退出しました');
   } catch (e) { showToast('エラーが発生しました。'); }
