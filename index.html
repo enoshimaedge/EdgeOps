@@ -3370,7 +3370,10 @@ async function checkSuperAdmin() {
 
 function openAdminPanel() {
   // ?uid=パラメータは廃止(admin.html側でliff.getProfile()のみで認証・adminsテーブルで権限確認)
-  liff.openWindow({ url: "https://app.edgeops.jp/admin.html", external: true });
+  // [2026/5/14 修正] 学び13 / 課題① 対応・チャッピー第24回判定承認済み
+  // 真因:external: true で Chrome 外部ブラウザ起動するとLINEのJWTセッション喪失 → アクセス拒否
+  // 対策:external: true 削除して LINE 内ブラウザで開く → JWT継続 → 認証成功
+  liff.openWindow({ url: "https://app.edgeops.jp/admin.html" });
 }
 
 // ── サイネージURL管理 ──
