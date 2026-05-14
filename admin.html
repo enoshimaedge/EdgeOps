@@ -502,18 +502,37 @@ async function init() {
     // [Phase 0 5-4] auth.js の resolveEoUid を使用してeo_uidを解決
     const _auth = await resolveEoUid(sb);
     currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, display_name: _auth.displayName };
+
+    // ★★★ DIAG 開始(2026/5/15 課題①再発調査・チャッピー第26回判定 GO・検証後即削除) ★★★
+    alert('[DIAG1] resolveEoUid OK eo_uid=' + _auth.eoUid);
+    console.log('[admin.html DIAG1] resolveEoUid OK eo_uid=', _auth.eoUid);
+
+    const { data: sessionData } = await sb.auth.getSession();
+    alert('[DIAG-SESSION] hasSession=' + !!sessionData?.session);
+    console.log('[admin.html DIAG-SESSION]', sessionData?.session);
+    // ★★★ DIAG ここまで ★★★
+
   } catch(e) {
+    // ★★★ DIAG 追加 ★★★
+    alert('[DIAG-ERR] ' + (e?.message || e));
+    console.error('[admin.html DIAG-ERR]', e);
+    // ★★★ DIAG ここまで ★★★
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('screen-denied').style.display = 'flex';
     return;
   }
 
   // 超管理者チェック（adminsテーブル）
-  const { data: adminRecord } = await sb
+  const { data: adminRecord, error: adminErr } = await sb
     .from('admins')
     .select('eo_uid')
     .eq('eo_uid', currentUser.eo_uid)
     .single();
+
+  // ★★★ DIAG 追加 ★★★
+  alert('[DIAG2] admin=' + JSON.stringify(adminRecord) + ' err=' + JSON.stringify(adminErr));
+  console.log('[admin.html DIAG2] admins SELECT result=', adminRecord, 'error=', adminErr);
+  // ★★★ DIAG ここまで ★★★
 
   if (!adminRecord) {
     document.getElementById('screen-loading').style.display = 'none';
