@@ -1432,6 +1432,48 @@ async function resolveIsCreator(groupSessionId, myMemberId) {
 }
 
 // ═══════════════════════════════════════════
+// 既存所属への自動復帰(LINE側キャッシュリセット対策・学び13)
+// ═══════════════════════════════════════════
+// 2026/5/14 午後 LINE側キャッシュリセット事案対応・チャッピー第22回判定承認済み
+// eo_uid から既存 approved 所属を検索し、あれば最新1件へ自動復帰する。
+// createGroup() / joinGroup() の冒頭で呼び出して、screen-start 誤操作による
+// 孤児グループ作成・二重所属を構造的に防御する。
+//
+// 戻り値: true=既存所属へ復帰した / false=既存所属なし(通常フロー継続)
+async function restoreExistingMembershipIfAny() {
+  try {
+    if (!currentUser?.eo_uid) return false;
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('id, group_session_id, display_name, is_creator, group_sessions(*)')
+      .eq('eo_uid', currentUser.eo_uid)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) {
+      console.warn('restoreExistingMembershipIfAny query error:', error);
+      return false;
+    }
+    if (!data || data.length === 0) return false;
+    const m = data[0];
+    if (!m.group_sessions) return false;
+    localStorage.setItem('sl_member_id', m.id);
+    localStorage.setItem('sl_group_id', m.group_sessions.group_id);
+    currentMemberId = m.id;
+    currentGroup = m.group_sessions;
+    currentUser.display_name = m.display_name;
+    isCreator = await resolveIsCreator(m.group_session_id, m.id);
+    await loadHome();
+    showScreen('screen-home');
+    showToast('既存のグループに復帰しました');
+    return true;
+  } catch (e) {
+    console.error('restoreExistingMembershipIfAny failed:', e);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════
 // 友達登録再確認
 // ═══════════════════════════════════════════
 async function recheckFriendship() {
@@ -1463,6 +1505,9 @@ async function createGroup() {
   const groupNameVal = document.getElementById('input-group-name').value.trim();
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!industryVal) { showToast('業種を選択してください'); return; }
+  // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(孤児グループ作成防止)
+  const restored = await restoreExistingMembershipIfAny();
+  if (restored) return;
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
@@ -1489,6 +1534,9 @@ async function joinGroup() {
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!groupIdInput) { showToast('グループIDを入力してください'); return; }
+  // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(二重所属防止)
+  const restored = await restoreExistingMembershipIfAny();
+  if (restored) return;
   // ★ v1.3 Step 6: 20グループ上限チェック(チャッピーレビュー反映)
   // status は 'approved' と 'pending' の両方をカウント(申請大量化攻撃を防ぐ)
   try {
