@@ -8,6 +8,37 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- crypto-js (eo_uid生成用・MD5計算) [Phase 0 5-1] -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<!-- [2026/5/14 追加] 課題① admin.html「アクセス拒否」修正・チャッピー第23回判定 承認済み
+     真因:Phase D Step 4-B で auth.js が line-auth Edge Function 経由に書き換わったが、
+     admin.html 側に LINE_AUTH_URL の定義がなく、resolveEoUid 内で throw → アクセス拒否。
+     対策:index.html L1243-1284 と同じ環境定義を auth.js 読込前に追加(値完全一致厳守)。 -->
+<script>
+const ENV_CONFIG = {
+  prod: {
+    LINE_AUTH_URL: 'https://eomsdvwklntrtiiksnro.supabase.co/functions/v1/line-auth'
+  },
+  staging: {
+    LINE_AUTH_URL: 'https://lxptelyviuucqmwxqxly.supabase.co/functions/v1/line-auth'
+  },
+  dev: {
+    LINE_AUTH_URL: 'https://lxptelyviuucqmwxqxly.supabase.co/functions/v1/line-auth'
+  }
+};
+
+function detectEnvironment() {
+  const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+  if (host === 'app.edgeops.jp') return 'prod';
+  if (host.includes('staging') || host === 'staging.edgeops.jp') return 'staging';
+  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return 'dev';
+  // 不明なホストは安全側で prod にフォールバック
+  return 'prod';
+}
+
+const CURRENT_ENV = detectEnvironment();
+const LINE_AUTH_URL = ENV_CONFIG[CURRENT_ENV].LINE_AUTH_URL;
+
+console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.location.hostname);
+</script>
 <!-- auth.js (認証フロー独立化) [Phase 0 5-2] -->
 <script src="auth.js"></script>
 <style>
