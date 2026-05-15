@@ -494,39 +494,62 @@ async function init() {
 
   // 必ずliff.getProfile()のみで認証（?uid=パラメータ方式は廃止・セキュリティ強化）
   try {
+    // ★★★ DIAG-V2 開始(2026/5/15 昼・課題①再発(9:30〜)真因確定用) ★★★
+    alert('[DIAG-V2-A] init() 開始・liff.init() を呼びます');
     await liff.init({ liffId: LIFF_ID });
+    alert('[DIAG-V2-B] liff.init() 完了・isLoggedIn=' + liff.isLoggedIn() + ' / isInClient=' + (liff.isInClient ? liff.isInClient() : 'undef'));
     if (!liff.isLoggedIn()) {
+      alert('[DIAG-V2-C] isLoggedIn=false なので liff.login() に飛びます');
       liff.login();
       return;
     }
+    alert('[DIAG-V2-D] resolveEoUid を呼びます');
     // [Phase 0 5-4] auth.js の resolveEoUid を使用してeo_uidを解決
     const _auth = await resolveEoUid(sb);
+    alert('[DIAG-V2-E] resolveEoUid 成功 eo_uid=' + _auth.eoUid);
     currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, display_name: _auth.displayName };
+    // ★★★ DIAG-V2 ここまで ★★★
   } catch(e) {
     // [2026/5/15 追加] 課題①真因確定対応・チャッピー第27回判定 承認済み
     //   真因:LIFF access token 期限切れで liff.getIDToken() throw → アクセス拒否誤判定。
     //   対策:expired を検知したら liff.logout() → liff.login() で再認可フローに飛ばす。
     //   PCブラウザ対応(liff.isInClient判定)は後日 Phase 1 で検討。
+
+    // ★★★ DIAG-V2 強化:エラー全情報を画面表示(2026/5/15 昼) ★★★
+    const errMsg = (e?.message || 'no-message');
+    const errName = (e?.name || 'no-name');
+    const errCode = (e?.code || 'no-code');
+    alert('[DIAG-V2-ERR-1/3] message=' + errMsg);
+    alert('[DIAG-V2-ERR-2/3] name=' + errName + ' / code=' + errCode);
+    alert('[DIAG-V2-ERR-3/3] toString=' + String(e).slice(0, 200));
+    console.error('[admin.html DIAG-V2-ERR] full error object:', e);
+    // ★★★ DIAG-V2 ここまで ★★★
+
     console.error('[admin.html] init error:', e);
-    const msg = (e?.message || '').toLowerCase();
+    const msg = errMsg.toLowerCase();
     if (msg.includes('expired') || msg.includes('access token')) {
+      alert('[DIAG-V2-RECOVERY] expired 検知 → liff.logout/login へ');
       try { liff.logout(); } catch(_) {}
       liff.login();
       return;
     }
+    alert('[DIAG-V2-DENY] expired 検知に引っかからず screen-denied へ');
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('screen-denied').style.display = 'flex';
     return;
   }
 
   // 超管理者チェック（adminsテーブル）
-  const { data: adminRecord } = await sb
+  alert('[DIAG-V2-F] admins SELECT を呼びます');
+  const { data: adminRecord, error: adminErr } = await sb
     .from('admins')
     .select('eo_uid')
     .eq('eo_uid', currentUser.eo_uid)
     .single();
+  alert('[DIAG-V2-G] admins 結果 adminRecord=' + JSON.stringify(adminRecord) + ' / err=' + JSON.stringify(adminErr));
 
   if (!adminRecord) {
+    alert('[DIAG-V2-DENY-ADMIN] adminRecord 空 → screen-denied へ');
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('screen-denied').style.display = 'flex';
     return;
