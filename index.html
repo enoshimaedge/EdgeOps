@@ -1500,33 +1500,6 @@ async function recheckFriendship() {
 // グループ作成・参加
 // ═══════════════════════════════════════════
 async function createGroup() {
-  // ★[一時デバッグ・2026/5/16 第38回判定反映] JWT/currentUser診断(真因究明用・確定後削除)
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    let payload = null;
-    if (session?.access_token) {
-      try {
-        payload = JSON.parse(atob(session.access_token.split('.')[1]));
-        console.log('[DEBUG createGroup] JWT payload:', payload);
-      } catch (parseErr) {
-        console.error('[DEBUG createGroup] JWT parse error:', parseErr);
-      }
-    }
-    alert('【JWT/currentUser診断】\n' + JSON.stringify({
-      jwt_eo_uid: payload?.eo_uid,
-      sub: payload?.sub,
-      role: payload?.role,
-      currentUser_eo_uid: currentUser?.eo_uid,
-      currentUser_display_name: currentUser?.display_name,
-      currentMemberId: typeof currentMemberId !== 'undefined' ? currentMemberId : null,
-      currentGroup: currentGroup?.id || currentGroup?.group_id || null,
-      session_exists: !!session
-    }, null, 2));
-  } catch (debugErr) {
-    alert('【JWT診断】解析失敗: ' + debugErr.message);
-  }
-  // ★デバッグここまで(第38回判定後に必ず削除)
-
   const displayName = document.getElementById('input-display-name').value.trim();
   const industryVal = document.getElementById('input-industry').value;
   const groupNameVal = document.getElementById('input-group-name').value.trim();
@@ -1553,19 +1526,7 @@ async function createGroup() {
     localStorage.setItem('sl_group_id', groupId);
     currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id; isCreator = true;
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
-  } catch (e) {
-    console.error(e);
-    // ★[一時デバッグ・2026/5/16 第38回判定反映] Supabaseエラー全分解(真因究明用・確定後削除)
-    alert('[createGroup ERROR]\n' + JSON.stringify({
-      message: e?.message,
-      code: e?.code,
-      details: e?.details,
-      hint: e?.hint,
-      stack: e?.stack
-    }, null, 2));
-    // ★デバッグここまで(第38回判定後に必ず削除)
-    showToast('エラーが発生しました。再試行してください。');
-  }
+  } catch (e) { console.error(e); showToast('エラーが発生しました。再試行してください。'); }
 }
 
 async function joinGroup() {
