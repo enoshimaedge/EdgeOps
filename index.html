@@ -3470,9 +3470,27 @@ async function leaveGroup() {
     }
     await supabase.from('group_members').update({ status: 'left', is_creator: false }).eq('id', currentMemberId);
     // ── 設計書 16-A-6 に準拠：メンバー脱退時に当該UIDのアンケート回答を削除（集計から完全に消す） ──
-    // 注意: group_session_id 非限定削除。複数グループ在籍時は他グループの回答も消える点に留意
+    // [2026/5/16 課題⑨修正・チャッピー第40回判定GO] group_session_id 限定削除
+    // message_responses に group_session_id カラムが存在しないため messages 経由で2クエリに分割
+    // currentGroup.id は UUID 形式・messages.group_session_id と互換性あり（確認済）
+    // またぎ機能利用者が1グループ脱退した時に他グループの回答まで消える問題を解消
     try {
-      await supabase.from('message_responses').delete().eq('eo_uid', currentUser.eo_uid);
+      const { data: groupMessages, error: msgErr } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('group_session_id', currentGroup.id);
+      if (msgErr) throw msgErr;
+      const messageIds = (groupMessages || []).map(m => m.id);
+      if (messageIds.length > 0) {
+        const { error: respErr } = await supabase
+          .from('message_responses')
+          .delete()
+          .eq('eo_uid', currentUser.eo_uid)
+          .in('message_id', messageIds);
+        if (respErr) throw respErr;
+      } else {
+        console.log('[leaveGroup] no message_responses to delete (no messages in this group)');
+      }
     } catch (e) {
       console.warn('アンケート回答のクリーンアップに失敗:', e);
     }
