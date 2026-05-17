@@ -2843,7 +2843,7 @@ function openSignage() {
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
     liff.openWindow({ url: url, external: true });
   } else {
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -2852,7 +2852,7 @@ function openVacanMap() {
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
     liff.openWindow({ url: url, external: true });
   } else {
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
