@@ -564,6 +564,23 @@
   </div>
 </div>
 
+<!-- ══ [Phase 4-2G] 全画面拡大ビューア(ピンチズーム/ダブルタップ/背景タップで閉じる) ══ -->
+<div id="full-image-viewer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:10000; touch-action:none; overflow:hidden;">
+  <!-- 閉じるボタン -->
+  <button type="button" id="full-image-close-btn" onclick="closeFullImageViewer()" style="position:absolute; top:max(12px, env(safe-area-inset-top)); right:12px; z-index:10002; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.6); color:white; border:1.5px solid rgba(255,255,255,0.3); font-size:20px; font-weight:600; cursor:pointer; line-height:1; padding:0;">×</button>
+  <!-- ローディング表示 -->
+  <div id="full-image-loading" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:white; font-size:14px; text-align:center;">
+    <div class="spinner" style="margin:0 auto 10px; border-color:rgba(255,255,255,0.3); border-top-color:white;"></div>
+    画像を読込中...
+  </div>
+  <!-- 画像ステージ(ピンチズーム/パン用ラッパ) -->
+  <div id="full-image-stage" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+    <img id="full-image-content" alt="" style="max-width:100%; max-height:100%; object-fit:contain; transform-origin:center center; transition:transform 0.15s ease-out; user-select:none; -webkit-user-select:none; pointer-events:auto;">
+  </div>
+  <!-- ヒント -->
+  <div id="full-image-hint" style="position:absolute; bottom:max(16px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.7); font-size:11px; text-align:center; pointer-events:none;">ピンチで拡縮・ダブルタップで切替・背景タップで閉じる</div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ══ 友達未登録ブロック画面 ══ -->
@@ -988,7 +1005,11 @@
       <!-- [Phase 4-2F] 画像表示エリア(画像ありメッセージ時のみ表示) -->
       <div id="detail-image-wrap" style="display:none; margin-top:12px;">
         <img id="detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer;">
-        <div id="detail-image-status" style="font-size:11px; color:var(--text-light); margin-top:4px;"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div id="detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
+          <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
+          <button type="button" id="detail-image-delete-btn" onclick="deleteImageOnly(window.__currentDetailMessageId, 'message')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">🗑️ 画像を削除</button>
+        </div>
       </div>
     </div>
     <!-- ══ アンケート回答UI(アンケートメッセージのみ表示) ══ -->
@@ -1067,7 +1088,11 @@
       <!-- [Phase 4-2F] 引き継ぎ画像表示エリア -->
       <div id="hw-detail-image-wrap" style="display:none; margin-top:12px;">
         <img id="hw-detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer;">
-        <div id="hw-detail-image-status" style="font-size:11px; color:var(--text-light); margin-top:4px;"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div id="hw-detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
+          <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
+          <button type="button" id="hw-detail-image-delete-btn" onclick="deleteImageOnly(window.__currentHandoverId, 'handover')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">🗑️ 画像を削除</button>
+        </div>
       </div>
     </div>
     <!-- 確認ボタンエリア -->
@@ -1901,19 +1926,27 @@ function observeImageThumbnails(container) {
 // 戻り値: '' (画像なし) または '<div class="msg-thumb-wrap">...</div>'
 function renderImageThumbnailHtml(item) {
   if (!item) return '';
-  // image_mode='deleted' は 4-2I で削除済プレースホルダ実装(現状は非表示)
-  if (item.image_mode === 'deleted') return '';
+  // [Phase 4-2I] image_mode='deleted' は「🗑️ 削除済」プレースホルダ表示
+  if (item.image_mode === 'deleted') {
+    return `<div class="msg-thumb-wrap" style="margin-top:8px;">
+      <div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:12px;">
+        🗑️ 画像は削除されました
+      </div>
+    </div>`;
+  }
   // image_url + thumbnail_url のどちらかがあれば表示対象(優先: thumbnail_url)
   const thumbPath = item.thumbnail_url || item.image_url;
   if (!thumbPath) return '';
   const escPath = escHtml(thumbPath);
-  // 1×1透明GIF(プレースホルダ)・src未設定状態で観測待ち
+  const fullPath = item.image_url ? escHtml(item.image_url) : escPath;
+  // [Phase 4-2G] クリックで全画面拡大(フル画像取得)
   return `<div class="msg-thumb-wrap" style="margin-top:8px;">
     <img data-thumbnail-path="${escPath}"
+         data-full-path="${fullPath}"
          alt="画像読込中..."
          loading="lazy"
-         style="max-width:160px; max-height:120px; border-radius:6px; background:#e4e8f0; object-fit:cover; display:block; cursor:pointer;"
-         onclick="event.stopPropagation(); /* [Phase 4-2G]全画面拡大は次サブステップで実装 */">
+         style="max-width:160px; max-height:120px; border-radius:6px; background:#e4e8f0; object-fit:cover; display:block; cursor:zoom-in;"
+         onclick="event.stopPropagation(); openFullImageViewer('${fullPath}')">
   </div>`;
 }
 
@@ -1926,21 +1959,36 @@ async function _renderDetailImage(item, wrapId, imgId, statusId) {
   // リセット(前回表示の残骸を消す)
   img.src = '';
   img.removeAttribute('data-thumbnail-path');
+  img.removeAttribute('data-full-path');
+  img.onclick = null;
   if (status) status.textContent = '';
-  if (!item || item.image_mode === 'deleted') {
+  if (!item) {
     wrap.style.display = 'none';
     return;
   }
+  // [Phase 4-2I] 削除済プレースホルダ
+  if (item.image_mode === 'deleted') {
+    wrap.style.display = 'block';
+    img.style.display = 'none';
+    if (status) {
+      status.innerHTML = '<div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:13px;">🗑️ 画像は削除されました</div>';
+    }
+    return;
+  }
+  img.style.display = 'block';
   const thumbPath = item.thumbnail_url || item.image_url;
   if (!thumbPath) {
     wrap.style.display = 'none';
     return;
   }
-  // フル画像のstorage_pathも保持(4-2G 全画面拡大で使用予定)
   img.setAttribute('data-thumbnail-path', thumbPath);
-  if (item.image_url && item.image_url !== thumbPath) {
+  if (item.image_url) {
     img.setAttribute('data-full-path', item.image_url);
   }
+  // [Phase 4-2G] クリックで全画面拡大(フル画像取得)
+  const fullPath = item.image_url || thumbPath;
+  img.style.cursor = 'zoom-in';
+  img.onclick = function(ev) { ev.stopPropagation(); openFullImageViewer(fullPath); };
   wrap.style.display = 'block';
   // 詳細画面は1枚のみなので即時取得(IntersectionObserverを使わない)
   try {
@@ -1949,7 +1997,7 @@ async function _renderDetailImage(item, wrapId, imgId, statusId) {
       img.src = url;
       if (status && item.image_size) {
         const kb = Math.round(item.image_size / 1024);
-        status.textContent = `画像 ${kb}KB`;
+        status.textContent = `画像 ${kb}KB ・ タップで拡大`;
       }
     } else {
       img.alt = '画像を読み込めませんでした';
@@ -1960,6 +2008,339 @@ async function _renderDetailImage(item, wrapId, imgId, statusId) {
     img.alt = '画像を読み込めませんでした';
     img.style.background = '#fee';
     if (status) status.textContent = '画像読込失敗';
+  }
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2G] 全画面拡大ビューア (ピンチズーム + ダブルタップ + パン)
+// ═══════════════════════════════════════════
+// 起動: openFullImageViewer(storage_path) を呼ぶ
+//   - storage_path から create-signed-url 経由でフル画像URLを取得
+//   - 取得完了後にビューアにフェードイン
+// 操作:
+//   - ピンチ: 2本指でズーム (scale 1.0 ~ 4.0)
+//   - ダブルタップ: 等倍⇔2倍切替
+//   - 1本指ドラッグ(拡大時のみ): パン
+//   - 背景タップ(画像外): 閉じる
+//   - ×ボタン: 閉じる
+// ═══════════════════════════════════════════
+const FULL_IMAGE_MIN_SCALE = 1.0;
+const FULL_IMAGE_MAX_SCALE = 4.0;
+const FULL_IMAGE_DOUBLE_TAP_SCALE = 2.0;
+let __fullImageState = null; // { scale, tx, ty, startScale, startTx, startTy, startDist, startMidX, startMidY, lastTapAt }
+
+async function openFullImageViewer(storagePath) {
+  if (!storagePath) return;
+  const viewer = document.getElementById('full-image-viewer');
+  const imgEl = document.getElementById('full-image-content');
+  const loadingEl = document.getElementById('full-image-loading');
+  if (!viewer || !imgEl) return;
+  // 初期化
+  imgEl.src = '';
+  imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+  __fullImageState = { scale: 1, tx: 0, ty: 0, startScale: 1, startTx: 0, startTy: 0, startDist: 0, startMidX: 0, startMidY: 0, lastTapAt: 0, panStartX: 0, panStartY: 0, panning: false };
+  viewer.style.display = 'block';
+  if (loadingEl) loadingEl.style.display = 'block';
+  imgEl.style.visibility = 'hidden';
+  // bodyスクロール停止
+  document.body.style.overflow = 'hidden';
+  // ESCキーで閉じる
+  document.addEventListener('keydown', _fullImageEscHandler);
+  // 画面外タッチで閉じる(viewer のクリック・タッチ)
+  viewer.addEventListener('click', _fullImageBackgroundClickHandler);
+  // フル画像URL取得(キャッシュ利用)
+  try {
+    const url = await getSignedThumbUrl(storagePath); // 同じキャッシュ機構を流用
+    if (!url) {
+      if (loadingEl) loadingEl.innerHTML = '画像を読み込めませんでした<br><span style="font-size:11px;">×ボタンで閉じる</span>';
+      return;
+    }
+    imgEl.onload = function() {
+      if (loadingEl) loadingEl.style.display = 'none';
+      imgEl.style.visibility = 'visible';
+      _attachFullImageGestures(imgEl);
+    };
+    imgEl.onerror = function() {
+      if (loadingEl) loadingEl.innerHTML = '画像を読み込めませんでした<br><span style="font-size:11px;">×ボタンで閉じる</span>';
+    };
+    imgEl.src = url;
+  } catch (e) {
+    if (loadingEl) loadingEl.innerHTML = '画像を読み込めませんでした<br><span style="font-size:11px;">×ボタンで閉じる</span>';
+  }
+}
+
+function closeFullImageViewer() {
+  const viewer = document.getElementById('full-image-viewer');
+  const imgEl = document.getElementById('full-image-content');
+  if (!viewer) return;
+  viewer.style.display = 'none';
+  if (imgEl) {
+    _detachFullImageGestures(imgEl);
+    imgEl.src = '';
+    imgEl.style.transform = '';
+  }
+  __fullImageState = null;
+  document.body.style.overflow = '';
+  document.removeEventListener('keydown', _fullImageEscHandler);
+  viewer.removeEventListener('click', _fullImageBackgroundClickHandler);
+}
+
+function _fullImageEscHandler(ev) {
+  if (ev.key === 'Escape') closeFullImageViewer();
+}
+
+function _fullImageBackgroundClickHandler(ev) {
+  // 画像本体・閉じるボタン・ヒントへのクリックは閉じない
+  const t = ev.target;
+  if (!t) return;
+  if (t.id === 'full-image-content') return;
+  if (t.id === 'full-image-close-btn') return;
+  if (t.closest && t.closest('#full-image-close-btn')) return;
+  closeFullImageViewer();
+}
+
+// ジェスチャ実装(touch + pointer 両対応)
+let __fullImageHandlers = null;
+
+function _attachFullImageGestures(imgEl) {
+  if (!imgEl) return;
+  _detachFullImageGestures(imgEl); // 二重登録防止
+
+  const onTouchStart = (ev) => {
+    if (!__fullImageState) return;
+    if (ev.touches.length === 2) {
+      // ピンチ開始
+      ev.preventDefault();
+      const t1 = ev.touches[0], t2 = ev.touches[1];
+      const dx = t2.clientX - t1.clientX, dy = t2.clientY - t1.clientY;
+      __fullImageState.startDist = Math.hypot(dx, dy);
+      __fullImageState.startScale = __fullImageState.scale;
+      __fullImageState.startTx = __fullImageState.tx;
+      __fullImageState.startTy = __fullImageState.ty;
+      __fullImageState.startMidX = (t1.clientX + t2.clientX) / 2;
+      __fullImageState.startMidY = (t1.clientY + t2.clientY) / 2;
+      __fullImageState.panning = false;
+    } else if (ev.touches.length === 1) {
+      // 1本指: ダブルタップ判定 + パン開始
+      const now = Date.now();
+      const dt = now - __fullImageState.lastTapAt;
+      __fullImageState.lastTapAt = now;
+      if (dt < 300 && dt > 0) {
+        // ダブルタップ
+        ev.preventDefault();
+        if (__fullImageState.scale > 1.05) {
+          // 拡大中 → 等倍に戻す
+          _animateFullImageTransform(1, 0, 0, imgEl);
+        } else {
+          // 等倍 → 2倍にズーム
+          _animateFullImageTransform(FULL_IMAGE_DOUBLE_TAP_SCALE, 0, 0, imgEl);
+        }
+        __fullImageState.lastTapAt = 0; // 連続ダブルタップ防止
+        return;
+      }
+      // パン開始(拡大時のみ意味あり)
+      if (__fullImageState.scale > 1.05) {
+        __fullImageState.panning = true;
+        __fullImageState.panStartX = ev.touches[0].clientX;
+        __fullImageState.panStartY = ev.touches[0].clientY;
+        __fullImageState.startTx = __fullImageState.tx;
+        __fullImageState.startTy = __fullImageState.ty;
+      }
+    }
+  };
+
+  const onTouchMove = (ev) => {
+    if (!__fullImageState) return;
+    if (ev.touches.length === 2) {
+      // ピンチ中
+      ev.preventDefault();
+      const t1 = ev.touches[0], t2 = ev.touches[1];
+      const dx = t2.clientX - t1.clientX, dy = t2.clientY - t1.clientY;
+      const dist = Math.hypot(dx, dy);
+      if (__fullImageState.startDist > 0) {
+        let newScale = __fullImageState.startScale * (dist / __fullImageState.startDist);
+        newScale = Math.max(FULL_IMAGE_MIN_SCALE * 0.9, Math.min(FULL_IMAGE_MAX_SCALE, newScale));
+        __fullImageState.scale = newScale;
+        // ピンチ中央を中心に拡縮(簡易): 平行移動は維持
+        imgEl.style.transition = 'none';
+        imgEl.style.transform = `translate(${__fullImageState.tx}px, ${__fullImageState.ty}px) scale(${newScale})`;
+      }
+    } else if (ev.touches.length === 1 && __fullImageState.panning) {
+      // パン中
+      ev.preventDefault();
+      const t = ev.touches[0];
+      const dx = t.clientX - __fullImageState.panStartX;
+      const dy = t.clientY - __fullImageState.panStartY;
+      __fullImageState.tx = __fullImageState.startTx + dx;
+      __fullImageState.ty = __fullImageState.startTy + dy;
+      imgEl.style.transition = 'none';
+      imgEl.style.transform = `translate(${__fullImageState.tx}px, ${__fullImageState.ty}px) scale(${__fullImageState.scale})`;
+    }
+  };
+
+  const onTouchEnd = (ev) => {
+    if (!__fullImageState) return;
+    __fullImageState.panning = false;
+    // 等倍以下に縮小したら中央に戻す
+    if (__fullImageState.scale < 1.05) {
+      _animateFullImageTransform(1, 0, 0, imgEl);
+    } else {
+      // バウンス(画面外に出すぎたら戻す・簡易)
+      imgEl.style.transition = 'transform 0.15s ease-out';
+    }
+  };
+
+  // ホイールズーム(PC向け・補助)
+  const onWheel = (ev) => {
+    if (!__fullImageState) return;
+    ev.preventDefault();
+    const delta = -ev.deltaY * 0.002;
+    let newScale = __fullImageState.scale * (1 + delta);
+    newScale = Math.max(FULL_IMAGE_MIN_SCALE, Math.min(FULL_IMAGE_MAX_SCALE, newScale));
+    __fullImageState.scale = newScale;
+    if (newScale <= 1.05) { __fullImageState.tx = 0; __fullImageState.ty = 0; }
+    imgEl.style.transition = 'transform 0.1s ease-out';
+    imgEl.style.transform = `translate(${__fullImageState.tx}px, ${__fullImageState.ty}px) scale(${newScale})`;
+  };
+
+  // PCダブルクリック
+  const onDblClick = (ev) => {
+    if (!__fullImageState) return;
+    ev.preventDefault();
+    if (__fullImageState.scale > 1.05) {
+      _animateFullImageTransform(1, 0, 0, imgEl);
+    } else {
+      _animateFullImageTransform(FULL_IMAGE_DOUBLE_TAP_SCALE, 0, 0, imgEl);
+    }
+  };
+
+  imgEl.addEventListener('touchstart', onTouchStart, { passive: false });
+  imgEl.addEventListener('touchmove', onTouchMove, { passive: false });
+  imgEl.addEventListener('touchend', onTouchEnd);
+  imgEl.addEventListener('touchcancel', onTouchEnd);
+  imgEl.addEventListener('wheel', onWheel, { passive: false });
+  imgEl.addEventListener('dblclick', onDblClick);
+
+  __fullImageHandlers = { onTouchStart, onTouchMove, onTouchEnd, onWheel, onDblClick };
+}
+
+function _detachFullImageGestures(imgEl) {
+  if (!imgEl || !__fullImageHandlers) return;
+  const h = __fullImageHandlers;
+  imgEl.removeEventListener('touchstart', h.onTouchStart);
+  imgEl.removeEventListener('touchmove', h.onTouchMove);
+  imgEl.removeEventListener('touchend', h.onTouchEnd);
+  imgEl.removeEventListener('touchcancel', h.onTouchEnd);
+  imgEl.removeEventListener('wheel', h.onWheel);
+  imgEl.removeEventListener('dblclick', h.onDblClick);
+  __fullImageHandlers = null;
+}
+
+function _animateFullImageTransform(scale, tx, ty, imgEl) {
+  if (!__fullImageState) return;
+  __fullImageState.scale = scale;
+  __fullImageState.tx = tx;
+  __fullImageState.ty = ty;
+  imgEl.style.transition = 'transform 0.2s ease-out';
+  imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2H] 画像削除フロー (delete-image Edge Function 呼出)
+// ═══════════════════════════════════════════
+// 起動: deleteImageOnly(itemId, context) ('message' | 'handover')
+//   - 自分が送信者かつ image_mode='attached' のメッセージのみ削除可能
+//   - 確認ダイアログ → delete-image Edge Function → 描画更新
+//   - 削除後はサーバー側で image_mode='deleted' に更新される
+// feature_flags.image_delete が FALSE なら削除ボタン非表示・送信直前にも再確認
+// ═══════════════════════════════════════════
+async function isImageDeleteEnabled() {
+  try {
+    const flags = await getFeatureFlags(false);
+    return !!(flags && flags.image_upload && flags.image_delete);
+  } catch (_) { return false; }
+}
+
+async function deleteImageOnly(itemId, context) {
+  if (!itemId) { showToast('対象が指定されていません'); return; }
+  if (context !== 'message' && context !== 'handover') {
+    showToast('内部エラー(context)');
+    return;
+  }
+  // 削除機能フラグ強制再取得(緊急OFF即時反映)
+  let flags;
+  try { flags = await getFeatureFlags(true); }
+  catch (_) { flags = null; }
+  if (!flags || !flags.image_upload || !flags.image_delete) {
+    showToast('画像削除は現在利用できません');
+    return;
+  }
+  // 確認ダイアログ
+  if (!confirm('この画像を削除しますか？\n本文は残り、画像のみ削除されます。\n削除した画像は復元できません。')) return;
+
+  showToast('削除中...');
+  try {
+    if (typeof window.callImageFunction !== 'function') {
+      throw new Error('AUTH_HELPER_MISSING');
+    }
+    const url = `${SUPABASE_URL}/functions/v1/delete-image`;
+    const res = await window.callImageFunction(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: itemId, context: context })
+    });
+    if (!res || !res.ok) {
+      let errorCode = 'SERVER_ERROR';
+      try {
+        const errBody = await res.text();
+        if (errBody) {
+          try {
+            const errJson = JSON.parse(errBody);
+            errorCode = errJson.error || errJson.code || `HTTP_${res.status}`;
+          } catch (_) { errorCode = `HTTP_${res.status}`; }
+        } else { errorCode = `HTTP_${res.status}`; }
+      } catch (_) { errorCode = `HTTP_${(res && res.status) || 'UNKNOWN'}`; }
+      throw new Error(errorCode);
+    }
+    showToast('画像を削除しました');
+    // 描画更新
+    if (context === 'message') {
+      await loadMessages();
+      // 詳細画面表示中なら再描画
+      const detailScreen = document.getElementById('screen-detail');
+      if (detailScreen && detailScreen.classList.contains('active')) {
+        try { await showDetail(itemId); } catch (_) {}
+      } else {
+        showScreen('screen-home');
+      }
+    } else {
+      await loadHandoverNotes();
+      const hwDetailScreen = document.getElementById('screen-handover-detail');
+      if (hwDetailScreen && hwDetailScreen.classList.contains('active')) {
+        try { await showHandoverDetail(itemId); } catch (_) {}
+      } else {
+        showScreen('screen-handover');
+      }
+    }
+  } catch (e) {
+    const code = (e && e.message) || 'UNKNOWN_ERROR';
+    let msg = '削除に失敗しました';
+    if (code === 'NOT_OWNER' || code === 'FORBIDDEN' || code.startsWith('HTTP_403')) {
+      msg = '自分が投稿した画像のみ削除できます';
+    } else if (code === 'ALREADY_DELETED' || code === 'NOT_FOUND' || code.startsWith('HTTP_404')) {
+      msg = 'この画像はすでに削除されています';
+      // 表示を最新化
+      if (context === 'message') { try { await loadMessages(); } catch (_) {} }
+      else { try { await loadHandoverNotes(); } catch (_) {} }
+    } else if (code === 'AUTH_TOKEN_INVALID' || code === 'AUTH_TOKEN_EXPIRED' || code === 'AUTH_TOKEN_MISSING') {
+      msg = '認証エラー。LINEを開き直してください';
+    } else if (code === 'FEATURE_DISABLED' || code === 'IMAGE_DELETE_DISABLED') {
+      msg = '画像削除は現在利用できません';
+    } else if (code.startsWith('HTTP_5') || code === 'SERVER_ERROR') {
+      msg = '通信エラー。もう一度お試しください';
+    }
+    showToast(msg);
+    console.error('[Phase 4-2H] 画像削除失敗:', code);
   }
 }
 
@@ -3130,6 +3511,17 @@ async function showHandoverDetail(handoverId) {
     document.getElementById('hw-detail-body').innerHTML = linkify(hw.content || '');
     // [Phase 4-2F] 引き継ぎ画像表示
     try { _renderDetailImage(hw, 'hw-detail-image-wrap', 'hw-detail-image-thumb', 'hw-detail-image-status'); } catch (_) {}
+    // [Phase 4-2H] 削除ボタンの表示制御
+    window.__currentHandoverId = hw.id;
+    (async function() {
+      const delBtn = document.getElementById('hw-detail-image-delete-btn');
+      if (!delBtn) return;
+      const isOwner = hw.sender_eo_uid === currentUser.eo_uid;
+      const hasImage = hw.image_mode === 'attached' && (hw.image_url || hw.thumbnail_url);
+      if (!isOwner || !hasImage) { delBtn.style.display = 'none'; return; }
+      const enabled = await isImageDeleteEnabled();
+      delBtn.style.display = enabled ? 'inline-block' : 'none';
+    })();
 
     // 確認情報を取得
     const { data: confs } = await supabase.from('handover_confirmations').select('*').eq('handover_id', handoverId);
@@ -3251,6 +3643,17 @@ async function showDetail(messageId) {
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
   // [Phase 4-2F] 画像表示(画像ありメッセージのみ・サムネを即時取得)
   try { _renderDetailImage(msg, 'detail-image-wrap', 'detail-image-thumb', 'detail-image-status'); } catch (_) {}
+  // [Phase 4-2H] 削除ボタンの表示制御(自分が送信者かつ image_mode='attached' かつ feature_flags.image_delete=ON)
+  window.__currentDetailMessageId = msg.id;
+  (async function() {
+    const delBtn = document.getElementById('detail-image-delete-btn');
+    if (!delBtn) return;
+    const isOwner = msg.sender_eo_uid === currentUser.eo_uid;
+    const hasImage = msg.image_mode === 'attached' && (msg.image_url || msg.thumbnail_url);
+    if (!isOwner || !hasImage) { delBtn.style.display = 'none'; return; }
+    const enabled = await isImageDeleteEnabled();
+    delBtn.style.display = enabled ? 'inline-block' : 'none';
+  })();
   document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
   document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
   document.getElementById('detail-total-count').textContent = totalMembers;
