@@ -1406,7 +1406,7 @@ const SUPABASE_URL = CFG.SUPABASE_URL;
 const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
 const LIFF_ID = CFG.LIFF_ID;
 const LINE_AUTH_URL = CFG.LINE_AUTH_URL;
-const POLL_INTERVAL = 5000;
+const POLL_INTERVAL = 30000; // [チャッピー第53回判定後] 5秒→30秒(サムネ画像のチカチカ防止・LIFFは即時性不要)
 
 // デバッグ用ログ(本番でも害なし・問題発生時の切り分けに有用)
 console.log('[EdgeOps] Environment:', CURRENT_ENV, '| hostname:', window.location.hostname);
@@ -1484,7 +1484,20 @@ const IMAGE_QUALITY_THUMB = 0.7;
 const IMAGE_MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 function _loadImageFromFile(file) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    // [チャッピー第53回判定後] EXIF orientation 対応(iPhone縦撮り写真の横向き表示問題)
+    // モダンブラウザ(iOS Safari 14+, Chrome 79+ 等)では createImageBitmap で
+    // imageOrientation:'from-image' を指定すると、EXIF orientation を自動反映する
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+        resolve({ img: bitmap, objectUrl: null });
+        return;
+      } catch (_) {
+        // フォールバックへ
+      }
+    }
+    // フォールバック: 従来のImage + objectURL(orientationは反映されない・古いブラウザ向け)
     let objectUrl = null;
     try {
       objectUrl = URL.createObjectURL(file);
