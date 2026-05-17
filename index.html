@@ -546,6 +546,33 @@
     transition: background 0.15s;
   }
   .join-new-group-btn:active { background: var(--green-dark); }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善① 横画面対応] チャッピー第50回判定 条件付きGO 準拠
+   * - 条件: (orientation: landscape) AND (min-width: 768px) のみ適用
+   * - スマホ縦画面・スマホ横画面(<768px)は現状維持
+   * - 本文エリアは max-width:900px で中央寄せ・可読性確保
+   * - 既存JSロジックには触らない・サイネージバグ修正3件と完全独立
+   * ══════════════════════════════════════════════════════ */
+  @media (orientation: landscape) and (min-width: 768px) {
+    body {
+      max-width: none;
+    }
+    .screen {
+      max-width: none;
+    }
+    .content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .header {
+      padding-left: max(16px, calc((100vw - 900px) / 2 + 16px));
+      padding-right: max(16px, calc((100vw - 900px) / 2 + 16px));
+    }
+  }
 </style>
 </head>
 <body>
@@ -851,6 +878,26 @@
             <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
           </svg>
           サイネージ
+        </button>
+      </div>
+      <!-- [UI改善② LINKボタン] チャッピー第50回判定準拠
+           - グループ管理者が profile 画面から URL 設定 → 表示
+           - currentGroup.link_url が NULL または空ならボタン非表示
+           - 押下時は noopener,noreferrer で別タブ起動 -->
+      <div id="link-btn" style="display:none;">
+        <button onclick="openCustomLink()" title="カスタムリンク" style="
+          display:flex; align-items:center; gap:4px;
+          background:rgba(255,255,255,0.18); border:1.5px solid rgba(255,255,255,0.6);
+          border-radius:20px; padding:5px 10px;
+          color:white; font-size:11px; font-weight:700;
+          cursor:pointer; font-family:inherit;
+          white-space:nowrap; transition:background 0.15s;
+        " onmouseenter="this.style.background='rgba(255,255,255,0.3)'" onmouseleave="this.style.background='rgba(255,255,255,0.18)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          LINK
         </button>
       </div>
       <div id="vacan-btn" style="display:none;">
@@ -1182,6 +1229,25 @@
         <button class="btn btn-secondary" onclick="showSurveyList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
           📊 アンケート集計結果 / Survey Results
         </button>
+        <!-- [UI改善② LINKボタン設定] チャッピー第50回判定準拠
+             - グループ管理者が自グループ用URLを設定・変更・削除
+             - https:// のみ許可・最大2048文字
+             - 空文字は NULL に正規化
+             - 超管理者は関与しない(初期ST版方針) -->
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">🔗 カスタムLINK</div>
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:8px; line-height:1.5;">
+            グループ専用の外部リンクを設定できます。設定すると、ホーム画面のヘッダーに「LINK」ボタンが表示され、メンバー全員がアクセスできます。
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">URL(https://〜・最大2048文字)</label>
+            <input class="form-input" id="profile-link-url" type="url" placeholder="https://example.com/" maxlength="2048" inputmode="url">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">💾 保存 / Save</button>
+            <button class="btn" onclick="removeLinkUrl()" style="background:#fff; color:#e53935; border:1.5px solid #e53935; padding:12px 16px;">🗑️ 削除</button>
+          </div>
+        </div>
         <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
           <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージ管理</div>
@@ -2747,6 +2813,9 @@ async function loadHome() {
   } else {
     vacanBtn.style.display = 'none';
   }
+
+  // [UI改善② LINKボタン] currentGroup.link_url が設定されているグループのみLINKボタン表示
+  updateLinkButton();
 
   // is_signage=trueのメンバーのみサイネージボタンを表示
   const signageBtn = document.getElementById('signage-btn');
@@ -4348,6 +4417,104 @@ async function updateIndustry() {
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
 
+// ═══════════════════════════════════════════
+// [UI改善② LINKボタン] チャッピー第50回判定準拠
+// ═══════════════════════════════════════════
+// 設計原則:
+//   - グループ管理者(isCreator)のみが自グループのlink_urlを設定・変更・削除
+//   - https:// のみ許可(http://・javascript: 等は拒否)
+//   - 最大2048文字
+//   - 空文字は NULL に正規化
+//   - URL未設定時(NULL)は index.html / signage.html 双方でLINKボタン非表示
+//   - 押下時は noopener,noreferrer で別タブ起動(XSS・タブナビゲーション対策)
+//   - DB側 CHECK制約により不正値は弾かれる(二重防御)
+
+// ── カスタムLINK URLを保存(管理者のみ・httpsのみ・空文字はNULL正規化) ──
+async function updateLinkUrl() {
+  if (!isCreator) { showToast('管理者のみ変更できます'); return; }
+  const inputEl = document.getElementById('profile-link-url');
+  if (!inputEl) return;
+  const raw = (inputEl.value || '').trim();
+  // 空文字なら削除扱いに誘導(明示的にremoveLinkUrlを呼ぶよう促す)
+  if (raw === '') {
+    showToast('URLを削除するには「🗑️ 削除」ボタンを押してください');
+    return;
+  }
+  // クライアントサイドバリデーション(DB CHECK制約と同一ロジック)
+  if (!/^https:\/\//.test(raw)) {
+    showToast('URLは https:// で始まる必要があります');
+    return;
+  }
+  if (raw.length > 2048) {
+    showToast('URLは2048文字以内にしてください');
+    return;
+  }
+  try {
+    const { error } = await supabase.from('group_sessions')
+      .update({ link_url: raw }).eq('id', currentGroup.id);
+    if (error) {
+      // DB CHECK制約違反など
+      console.error('[updateLinkUrl] DB error:', error);
+      showToast('保存に失敗しました。URL形式を確認してください。');
+      return;
+    }
+    currentGroup.link_url = raw;
+    updateLinkButton();
+    showToast('カスタムLINKを保存しました');
+  } catch (e) {
+    console.error('[updateLinkUrl] exception:', e);
+    showToast('保存に失敗しました。');
+  }
+}
+
+// ── カスタムLINK URLを削除(管理者のみ・NULL正規化) ──
+async function removeLinkUrl() {
+  if (!isCreator) { showToast('管理者のみ変更できます'); return; }
+  if (!currentGroup?.link_url) {
+    showToast('削除対象のLINKがありません');
+    return;
+  }
+  if (!confirm('カスタムLINKを削除しますか?\n削除するとメンバー全員のLINKボタンが非表示になります。')) return;
+  try {
+    const { error } = await supabase.from('group_sessions')
+      .update({ link_url: null }).eq('id', currentGroup.id);
+    if (error) throw error;
+    currentGroup.link_url = null;
+    const inputEl = document.getElementById('profile-link-url');
+    if (inputEl) inputEl.value = '';
+    updateLinkButton();
+    showToast('カスタムLINKを削除しました');
+  } catch (e) {
+    console.error('[removeLinkUrl] exception:', e);
+    showToast('削除に失敗しました。');
+  }
+}
+
+// ── ヘッダーのLINKボタン表示制御(currentGroup.link_url の有無で切替) ──
+function updateLinkButton() {
+  const btn = document.getElementById('link-btn');
+  if (!btn) return;
+  // currentGroup.link_url が文字列で空文字以外の場合のみ表示
+  const url = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url.trim() : '';
+  if (url && /^https:\/\//.test(url)) {
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// ── カスタムLINK押下時のハンドラ(noopener,noreferrer で別タブ起動) ──
+function openCustomLink() {
+  const url = currentGroup?.link_url;
+  if (!url || typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
+    showToast('LINKが設定されていません');
+    return;
+  }
+  // セキュリティ対策: noopener,noreferrer 必須(チャッピー第50回判定 条件6)
+  window.open(url.trim(), '_blank', 'noopener,noreferrer');
+}
+
 // ── メッセージ削除 ──
 async function deleteMessage() {
   if (!currentDetailMessageId) return;
@@ -4402,6 +4569,9 @@ function showProfile() {
   // 業種をセレクトにセット（管理者のみ）
   const indEl = document.getElementById('profile-industry');
   if (indEl) indEl.value = currentGroup?.industry || '';
+  // [UI改善② LINKボタン] カスタムLINK URLを入力欄にセット(管理者のみ)
+  const linkEl = document.getElementById('profile-link-url');
+  if (linkEl) linkEl.value = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url : '';
   // LINEプロフィール画像を表示
   const avatarEl = document.getElementById('profile-avatar');
   if (avatarEl) {
