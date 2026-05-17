@@ -656,15 +656,16 @@ async function loadStorageUsage() {
   if (!listEl || !summaryEl) return;
 
   try {
-    // messages と handover_notes から image_mode='attached' を全件取得
-    // 取得カラム: グループID、画像サイズ、サムネサイズ、アップロード日時
+    // [チャッピー第54回判定 GO] ⑧admin.html 写真件数表示修正
+    // 旧:image_mode='attached' で絞り込み → 実装値が 'expandable'/'fixed' なので0件問題
+    // 新:image_url IS NOT NULL で絞り込み(image_mode値に依存しない確実な抽出)
     const [msgRes, hwRes, groupsRes] = await Promise.all([
       sb.from('messages')
         .select('group_session_id, image_size, thumbnail_size, image_uploaded_at')
-        .eq('image_mode', 'attached'),
+        .not('image_url', 'is', null),
       sb.from('handover_notes')
         .select('group_session_id, image_size, thumbnail_size, image_uploaded_at')
-        .eq('image_mode', 'attached'),
+        .not('image_url', 'is', null),
       sb.from('group_sessions').select('id, group_id, industry')
     ]);
 
