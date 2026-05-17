@@ -1483,6 +1483,44 @@ const IMAGE_QUALITY_FULL = 0.8;
 const IMAGE_QUALITY_THUMB = 0.7;
 const IMAGE_MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
+// [チャッピー第53回判定後・3回目] LIFF WebView の Image オブジェクトは EXIF を適用しないため
+// JPEG ファイルから orientation値(1-8) を手動パース・Canvas変換時に正しく回転させる
+async function _readExifOrientation(file) {
+  try {
+    const arrayBuffer = await file.slice(0, 65536).arrayBuffer();
+    const view = new DataView(arrayBuffer);
+    if (view.byteLength < 4 || view.getUint16(0) !== 0xFFD8) return 1;
+    let offset = 2;
+    while (offset < view.byteLength - 4) {
+      const marker = view.getUint16(offset);
+      if (marker === 0xFFE1) {
+        if (view.getUint32(offset + 4) !== 0x45786966) return 1;
+        const tiffOffset = offset + 10;
+        const little = view.getUint16(tiffOffset) === 0x4949;
+        const get16 = (o) => view.getUint16(o, little);
+        const get32 = (o) => view.getUint32(o, little);
+        if (get16(tiffOffset + 2) !== 0x002A) return 1;
+        const firstIfd = tiffOffset + get32(tiffOffset + 4);
+        const entries = get16(firstIfd);
+        for (let i = 0; i < entries; i++) {
+          const entry = firstIfd + 2 + i * 12;
+          if (get16(entry) === 0x0112) {
+            return get16(entry + 8);
+          }
+        }
+        return 1;
+      } else if ((marker & 0xFF00) !== 0xFF00) {
+        return 1;
+      } else {
+        offset += 2 + view.getUint16(offset + 2);
+      }
+    }
+    return 1;
+  } catch (_) {
+    return 1;
+  }
+}
+
 function _loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
     let objectUrl = null;
@@ -1502,23 +1540,55 @@ function _loadImageFromFile(file) {
   });
 }
 
-function _drawToJpegBlob(img, maxDim, quality) {
+function _drawToJpegBlob(img, maxDim, quality, orientation) {
   return new Promise((resolve, reject) => {
     try {
       const w = img.naturalWidth || img.width;
       const h = img.naturalHeight || img.height;
       if (!w || !h) { reject(new Error('CANVAS_FAILED')); return; }
+      // 縮小後のサイズ計算(元画像の dimensions ベース・回転前)
       let cw = w, ch = h;
       if (w > maxDim || h > maxDim) {
         if (w >= h) { cw = maxDim; ch = Math.max(1, Math.round(h * maxDim / w)); }
         else { ch = maxDim; cw = Math.max(1, Math.round(w * maxDim / h)); }
       }
+      const ori = orientation || 1;
+      const swap = (ori >= 5 && ori <= 8);
       const canvas = document.createElement('canvas');
-      canvas.width = cw; canvas.height = ch;
+      // canvas dimension は orientation 5-8 で縦横入れ替え
+      canvas.width = swap ? ch : cw;
+      canvas.height = swap ? cw : ch;
       const ctx = canvas.getContext('2d');
       if (!ctx) { reject(new Error('CANVAS_FAILED')); return; }
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, cw, ch);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // EXIF orientation に応じた変換適用(Stack Overflow標準実装)
+      // ※ width/height は元画像の dimensions(swap前)を使う
+      switch (ori) {
+        case 2:
+          ctx.translate(cw, 0); ctx.scale(-1, 1);
+          break;
+        case 3:
+          ctx.translate(cw, ch); ctx.rotate(Math.PI);
+          break;
+        case 4:
+          ctx.translate(0, ch); ctx.scale(1, -1);
+          break;
+        case 5:
+          ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1);
+          break;
+        case 6:
+          ctx.rotate(0.5 * Math.PI); ctx.translate(0, -ch);
+          break;
+        case 7:
+          ctx.rotate(0.5 * Math.PI); ctx.translate(cw, -ch); ctx.scale(-1, 1);
+          break;
+        case 8:
+          ctx.rotate(-0.5 * Math.PI); ctx.translate(-cw, 0);
+          break;
+        default:
+          break;
+      }
       ctx.drawImage(img, 0, 0, cw, ch);
       canvas.toBlob(blob => {
         if (!blob) { reject(new Error('CANVAS_FAILED')); return; }
@@ -1564,19 +1634,24 @@ async function compressImageForUpload(file) {
 
   let loaded = null;
   try {
+    // [チャッピー第53回判定後・3回目] EXIF orientation 手動パース・LIFF WebView対応
+    const orientation = await _readExifOrientation(file);
     loaded = await _loadImageFromFile(file);
-    const fullBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_FULL, IMAGE_QUALITY_FULL);
-    const thumbBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_THUMB, IMAGE_QUALITY_THUMB);
+    const fullBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_FULL, IMAGE_QUALITY_FULL, orientation);
+    const thumbBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_THUMB, IMAGE_QUALITY_THUMB, orientation);
     if (fullBlob.size > IMAGE_MAX_OUTPUT_SIZE_BYTES) {
       throw new Error('SIZE_OVER_5MB');
     }
+    const origW = loaded.img.naturalWidth || loaded.img.width;
+    const origH = loaded.img.naturalHeight || loaded.img.height;
+    const swap = (orientation >= 5 && orientation <= 8);
     return {
       fullBlob: fullBlob,
       thumbBlob: thumbBlob,
       fullSize: fullBlob.size,
       thumbSize: thumbBlob.size,
-      width: loaded.img.naturalWidth || loaded.img.width,
-      height: loaded.img.naturalHeight || loaded.img.height
+      width: swap ? origH : origW,
+      height: swap ? origW : origH
     };
   } finally {
     if (loaded && loaded.objectUrl) {
