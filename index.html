@@ -555,6 +555,15 @@
   <div style="color:#4a6080; font-size:14px;">EdgeOps を起動中...</div>
 </div>
 
+<!-- ══ [Phase 4-2D] 画像処理中モーダル(圧縮中のUI待機オーバーレイ) ══ -->
+<div id="image-processing-modal" style="display:none; position:fixed; inset:0; background:rgba(15,30,53,0.55); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+  <div style="background:white; padding:24px 28px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.2); text-align:center; max-width:300px;">
+    <div class="spinner" style="margin:0 auto 12px;"></div>
+    <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">画像を準備中...</div>
+    <div style="font-size:12px; color:var(--text-light); line-height:1.5;">この処理には数秒かかる場合があります</div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ══ 友達未登録ブロック画面 ══ -->
@@ -932,6 +941,24 @@
       <label class="form-label" id="compose-body-label">メッセージ内容 / Message</label>
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
+    <!-- ══ [Phase 4-2C] 画像投稿UI(feature_flags=trueの時のみ表示) ══ -->
+    <!-- 隠しfile input(📷ボタン押下時にclick()される) -->
+    <input type="file" id="compose-image-file" accept="image/*" style="display:none;" onchange="onComposeImageFileSelected(event)">
+    <div class="form-group" id="compose-image-area" style="margin-bottom:16px;">
+      <button type="button" id="compose-image-btn" onclick="onComposeImageButtonClick()" style="display:none; align-items:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
+        📷 写真を追加 / Add Photo
+      </button>
+      <!-- ══ [Phase 4-2D] プレビュー領域(画像選択後に表示) ══ -->
+      <div id="compose-image-preview-wrap" style="display:none; margin-top:10px; padding:10px; background:#f8f9fb; border:1px solid var(--border); border-radius:8px;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <img id="compose-image-preview-img" alt="プレビュー" style="width:80px; height:80px; object-fit:cover; border-radius:6px; background:#e4e8f0;">
+          <div style="flex:1; min-width:0;">
+            <div id="compose-image-preview-info" style="font-size:12px; color:var(--text-mid); margin-bottom:6px; word-break:break-all;">画像準備完了</div>
+            <button type="button" onclick="onComposeImageCancel()" style="padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">✕ 取り消し</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- ══ アンケート機能(管理者のみ表示・通常メッセージ時のみ表示) ══ -->
     <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#f0fff4; border:1px solid #06C755; border-radius:8px; box-sizing:border-box;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600;">
@@ -1299,11 +1326,267 @@ let currentHandoverId = null;
 let homeFilter = 'msg'; // 'msg' | 'handover' | 'all'
 
 // ═══════════════════════════════════════════
+// [Phase 4-2B] 画像投稿機能 - feature_flags 状態管理
+// ═══════════════════════════════════════════
+// チャッピー第49回判定(II): 起動時+5分キャッシュ・送信直前は再確認
+// マスタースイッチ image_upload=FALSE で完全無効化(緊急OFF最大5分以内)
+// ═══════════════════════════════════════════
+let __featureFlagsCache = null;
+let __featureFlagsExpiresAt = 0;
+const FEATURE_FLAGS_TTL_MS = 5 * 60 * 1000; // 5分
+const TARGET_FEATURE_FLAGS = ['image_upload', 'image_upload_message', 'image_upload_handover', 'image_delete'];
+const DEFAULT_FEATURE_FLAGS = { image_upload: false, image_upload_message: false, image_upload_handover: false, image_delete: false };
+
+async function getFeatureFlags(forceRefresh) {
+  const now = Date.now();
+  if (!forceRefresh && __featureFlagsCache && now < __featureFlagsExpiresAt) {
+    return __featureFlagsCache;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('feature_flags')
+      .select('flag_name, enabled')
+      .in('flag_name', TARGET_FEATURE_FLAGS);
+    if (error) throw error;
+    const map = Object.assign({}, DEFAULT_FEATURE_FLAGS);
+    (data || []).forEach(row => { if (row && row.flag_name in map) map[row.flag_name] = !!row.enabled; });
+    __featureFlagsCache = map;
+    __featureFlagsExpiresAt = now + FEATURE_FLAGS_TTL_MS;
+    return map;
+  } catch (e) {
+    console.error('[Phase 4-2B] feature_flags取得失敗(安全側で全FALSE):', e);
+    // 取得失敗時は安全側で全FALSE(画像UI非表示)
+    return Object.assign({}, DEFAULT_FEATURE_FLAGS);
+  }
+}
+
+// 送信直前用: マスタースイッチ+context別フラグを強制再取得して許可判定
+async function isImageUploadAllowedForContext(context) {
+  const flags = await getFeatureFlags(true);
+  if (!flags.image_upload) return false;
+  if (context === 'message') return !!flags.image_upload_message;
+  if (context === 'handover') return !!flags.image_upload_handover;
+  return false;
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2A] クライアント画像圧縮ヘルパー
+// ═══════════════════════════════════════════
+// チャッピー第49回判定(III): Main thread + 処理中モーダル(WebWorkerはPro版以降)
+// 仕様書 v2.5 5-4 準拠: フル1920px品質80% + サムネ400px品質70%
+// 出力5MB超過時は SIZE_OVER_5MB エラー
+// ═══════════════════════════════════════════
+const IMAGE_MAX_DIMENSION_FULL = 1920;
+const IMAGE_MAX_DIMENSION_THUMB = 400;
+const IMAGE_QUALITY_FULL = 0.8;
+const IMAGE_QUALITY_THUMB = 0.7;
+const IMAGE_MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+function _loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    let objectUrl = null;
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (_) {
+      reject(new Error('IMAGE_LOAD_FAILED'));
+      return;
+    }
+    const img = new Image();
+    img.onload = () => resolve({ img: img, objectUrl: objectUrl });
+    img.onerror = () => {
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      reject(new Error('IMAGE_LOAD_FAILED'));
+    };
+    img.src = objectUrl;
+  });
+}
+
+function _drawToJpegBlob(img, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    try {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h) { reject(new Error('CANVAS_FAILED')); return; }
+      let cw = w, ch = h;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { cw = maxDim; ch = Math.max(1, Math.round(h * maxDim / w)); }
+        else { ch = maxDim; cw = Math.max(1, Math.round(w * maxDim / h)); }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('CANVAS_FAILED')); return; }
+      ctx.fillStyle = '#FFFFFF'; // JPEG透過対策(白背景埋め)
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('CANVAS_FAILED')); return; }
+        resolve(blob);
+      }, 'image/jpeg', quality);
+    } catch (e) {
+      reject(new Error('CANVAS_FAILED'));
+    }
+  });
+}
+
+// 戻り値: { fullBlob, thumbBlob, fullSize, thumbSize, width, height }
+// 例外: INVALID_MIME / IMAGE_LOAD_FAILED / CANVAS_FAILED / SIZE_OVER_5MB
+async function compressImageForUpload(file) {
+  if (!file) throw new Error('INVALID_MIME');
+  const mime = (file.type || '').toLowerCase();
+  // 仕様書 5-3: image/jpeg, image/png, image/webp, image/heic を許容(HEICはブラウザ次第)
+  if (!mime.startsWith('image/')) throw new Error('INVALID_MIME');
+  let loaded = null;
+  try {
+    loaded = await _loadImageFromFile(file);
+    const fullBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_FULL, IMAGE_QUALITY_FULL);
+    const thumbBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_THUMB, IMAGE_QUALITY_THUMB);
+    if (fullBlob.size > IMAGE_MAX_OUTPUT_SIZE_BYTES) {
+      throw new Error('SIZE_OVER_5MB');
+    }
+    return {
+      fullBlob: fullBlob,
+      thumbBlob: thumbBlob,
+      fullSize: fullBlob.size,
+      thumbSize: thumbBlob.size,
+      width: loaded.img.naturalWidth || loaded.img.width,
+      height: loaded.img.naturalHeight || loaded.img.height
+    };
+  } finally {
+    if (loaded && loaded.objectUrl) {
+      try { URL.revokeObjectURL(loaded.objectUrl); } catch (_) {}
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2C/D] 画像投稿UI状態管理(ボタン表示・選択ファイル保持)
+// ═══════════════════════════════════════════
+// __pendingImageFile: 選択中のFile(送信時にcompressImageForUpload→sendImageMessageへ)
+// Phase 4-2E sendImageMessage() が参照する。本Phase(4-2A〜D)では送信側は未実装。
+// ═══════════════════════════════════════════
+window.__pendingImageFile = null;
+let __imageProcessingModalShown = false;
+
+async function applyImageUploadButtonVisibility() {
+  // compose画面の📷ボタン表示制御。feature_flagsの状態により出し分け。
+  // selectedComposeType と TARGET_FEATURE_FLAGS の組合せで判定。
+  const btn = document.getElementById('compose-image-btn');
+  if (!btn) return;
+  try {
+    const flags = await getFeatureFlags(false);
+    if (!flags.image_upload) { btn.style.display = 'none'; return; }
+    const ctx = (typeof selectedComposeType === 'string') ? selectedComposeType : 'msg';
+    if (ctx === 'msg' && !flags.image_upload_message) { btn.style.display = 'none'; return; }
+    if (ctx === 'handover' && !flags.image_upload_handover) { btn.style.display = 'none'; return; }
+    btn.style.display = 'inline-flex';
+  } catch (_) {
+    btn.style.display = 'none';
+  }
+}
+
+function _showImageProcessingModal(show) {
+  const modal = document.getElementById('image-processing-modal');
+  if (!modal) return;
+  modal.style.display = show ? 'flex' : 'none';
+  __imageProcessingModalShown = !!show;
+  // 送信ボタンの二重押下防止
+  const sendBtn = document.getElementById('compose-send-btn');
+  if (sendBtn) sendBtn.disabled = !!show;
+}
+
+function _resetPendingImage() {
+  window.__pendingImageFile = null;
+  const previewWrap = document.getElementById('compose-image-preview-wrap');
+  const previewImg = document.getElementById('compose-image-preview-img');
+  if (previewImg) {
+    if (previewImg.src && previewImg.src.startsWith('blob:')) {
+      try { URL.revokeObjectURL(previewImg.src); } catch (_) {}
+    }
+    previewImg.src = '';
+  }
+  if (previewWrap) previewWrap.style.display = 'none';
+  const fileInput = document.getElementById('compose-image-file');
+  if (fileInput) fileInput.value = '';
+}
+
+function onComposeImageButtonClick() {
+  // 📷ボタン押下: file input をトリガー(スマホはカメラ/ギャラリー選択ダイアログ)
+  const fileInput = document.getElementById('compose-image-file');
+  if (fileInput) fileInput.click();
+}
+
+async function onComposeImageFileSelected(ev) {
+  const file = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (!file) return;
+  // 二重選択防止
+  if (__imageProcessingModalShown) return;
+  // 圧縮前のバリデーション(MIME・サイズの最低限チェック)
+  if (!file.type || !file.type.startsWith('image/')) {
+    showToast('画像ファイルを選択してください');
+    return;
+  }
+  // 起動時キャッシュではなく、選択時点でcontext別フラグを軽く再確認(キャッシュ許容)
+  const flags = await getFeatureFlags(false);
+  const ctx = (typeof selectedComposeType === 'string') ? selectedComposeType : 'msg';
+  if (!flags.image_upload || (ctx === 'msg' && !flags.image_upload_message) || (ctx === 'handover' && !flags.image_upload_handover)) {
+    showToast('画像投稿は現在利用できません');
+    applyImageUploadButtonVisibility();
+    return;
+  }
+  // 圧縮中モーダル表示(チャッピー条件: Main thread + 処理中モーダル)
+  _showImageProcessingModal(true);
+  try {
+    const result = await compressImageForUpload(file);
+    // プレビューはサムネを使う(メモリ節約)
+    const previewWrap = document.getElementById('compose-image-preview-wrap');
+    const previewImg = document.getElementById('compose-image-preview-img');
+    const previewInfo = document.getElementById('compose-image-preview-info');
+    if (previewImg) {
+      if (previewImg.src && previewImg.src.startsWith('blob:')) {
+        try { URL.revokeObjectURL(previewImg.src); } catch (_) {}
+      }
+      previewImg.src = URL.createObjectURL(result.thumbBlob);
+    }
+    if (previewInfo) {
+      const kb = Math.round(result.fullSize / 1024);
+      previewInfo.textContent = `画像準備完了 / ${result.width}×${result.height} / ${kb}KB`;
+    }
+    if (previewWrap) previewWrap.style.display = 'block';
+    // 送信時の本体は元File(sendImageMessage側で再圧縮 or 圧縮済Blobを引き渡し)
+    // Phase 4-2E実装時に圧縮結果を直接渡す形に変更可能(現状は元Fileを保持し再圧縮も許容)
+    window.__pendingImageFile = file;
+    window.__pendingImageCompressed = result; // 圧縮結果をキャッシュ(4-2Eで使用)
+  } catch (e) {
+    const code = (e && e.message) || 'UNKNOWN';
+    let msg = '画像の処理に失敗しました';
+    if (code === 'INVALID_MIME') msg = '画像ファイルを選択してください';
+    else if (code === 'IMAGE_LOAD_FAILED') msg = '画像を読み込めませんでした';
+    else if (code === 'CANVAS_FAILED') msg = '画像の変換に失敗しました';
+    else if (code === 'SIZE_OVER_5MB') msg = '画像サイズが大きすぎます(5MB超)。別の画像を選んでください';
+    showToast(msg);
+    _resetPendingImage();
+    console.error('[Phase 4-2A] 圧縮失敗:', code, e);
+  } finally {
+    _showImageProcessingModal(false);
+  }
+}
+
+function onComposeImageCancel() {
+  // プレビュー横の✕ボタン: 選択画像をクリア
+  _resetPendingImage();
+}
+
+// ═══════════════════════════════════════════
 // 初期化
 // ═══════════════════════════════════════════
 async function init() {
   try {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // [Phase 4-2B] feature_flagsプリロード(fire-and-forget・起動阻害しない)
+    // 5分キャッシュを起動時にウォームアップ。失敗時は安全側で全FALSE扱い。
+    getFeatureFlags(true).catch(()=>{});
 
     const liffInitPromise = liff.init({ liffId: LIFF_ID });
     const timeoutPromise = new Promise((_, reject) =>
@@ -2139,6 +2422,9 @@ function applyComposeType(type) {
   if (sendBtn) sendBtn.textContent = isMsgActive ? '📢 送信する / Send' : '📋 引き継ぎを投稿する';
   // アンケートセクションは「通常メッセージ」かつ「グループ管理者」のときのみ表示
   applySurveyVisibility(isMsgActive);
+  // [Phase 4-2C] タイプ切替時に画像ボタン表示制御＆選択中画像をクリア(context変更で画像保持は不自然)
+  try { _resetPendingImage(); } catch (_) {}
+  try { applyImageUploadButtonVisibility(); } catch (_) {}
 }
 
 // アンケートセクションの表示制御（グループ管理者かつ通常メッセージ作成時のみ表示）
