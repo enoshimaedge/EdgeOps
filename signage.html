@@ -411,6 +411,8 @@
   }
   .signage-bottom.collapsed {
     max-height: 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
     opacity: 0;
     margin-top: 0 !important;
     padding-top: 0 !important;
@@ -999,13 +1001,14 @@ function buildItemHtml(item) {
 
   // ── [簡素案・サイネージ画像表示] 画像ありラベル ──
   // 設計:
-  //   - index.html と同じ判定式: image_mode==='attached' && (image_url || thumbnail_url)
+  //   - 判定式: image_url または thumbnail_url が存在するか
   //   - 画像本体・サムネは表示せず「📷 画像あり」アイコンのみ
   //   - サイネージは表示専用(編集UIなし)
   //   - Edge Function 呼び出しなし・DB変更なし・既存ロジックには触らない
   //   - メッセージ・引き継ぎノート両方に対応(両者とも buildItemHtml を通るため)
+  //   [チャッピー第53回判定後] image_mode 依存を撤廃(値の不整合対策)
   let imageLabel = '';
-  if (item.image_mode === 'attached' && (item.image_url || item.thumbnail_url)) {
+  if (item.image_url || item.thumbnail_url) {
     imageLabel = `<span class="message-priority" style="background:rgba(33,150,243,0.15); color:#90caf9; border:1px solid rgba(144,202,249,0.5); margin-left:6px;">📷 画像あり</span>`;
   }
 
