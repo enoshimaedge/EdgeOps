@@ -374,6 +374,67 @@
     flex-shrink: 0;
   }
   #offline-banner.show { display: block; }
+  /* ══════════════════════════════════════════════════════
+   * [UI改善② LINKボタン] チャッピー第50回判定準拠
+   * - グループ管理者が index.html で設定したカスタムURLを表示
+   * - link_url 未設定時は非表示
+   * - 既存 vacan-header-btn と同寸法・並んで表示
+   * ══════════════════════════════════════════════════════ */
+  .link-header-btn {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    border-radius: 20px;
+    padding: 5px 10px;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .link-header-btn:hover { background: rgba(255,255,255,0.3); }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
+   * - signage-bottom 全体(天気カード+QRカード)をアコーディオン化
+   * - 初期状態は展開・localStorage で状態保持
+   * - 天気取得・QR生成・ポーリング・認証には触らない(条件8)
+   * ══════════════════════════════════════════════════════ */
+  .signage-bottom {
+    transition: max-height 0.35s ease, opacity 0.25s ease, margin-top 0.25s ease, padding 0.25s ease;
+    overflow: hidden;
+    opacity: 1;
+  }
+  .signage-bottom.collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .bottom-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    color: rgba(255,255,255,0.85);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+    margin-top: 8px;
+  }
+  .bottom-toggle-btn:hover { background: rgba(255,255,255,0.15); }
 </style>
 </head>
 <body>
@@ -404,6 +465,15 @@
     </div>
     <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
       <div class="last-updated" id="last-updated-display">最終更新：--:--</div>
+      <button id="link-btn"
+         onclick="openCustomLinkSignage()"
+         class="link-header-btn vacan-header-btn" style="display:none;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        LINK
+      </button>
       <button id="vacan-btn"
          onclick="window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'"
          class="vacan-header-btn" style="display:none;">
@@ -438,8 +508,16 @@
       </div>
     </div>
 
+    <!-- [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
+         トグルボタン押下で signage-bottom 全体(天気+QR)を折りたたむ
+         localStorage 'signage_bottom_collapsed' で状態保持 -->
+    <button id="bottom-toggle-btn" class="bottom-toggle-btn" onclick="toggleBottomAccordion()">
+      <span id="bottom-toggle-icon">▼</span>
+      <span id="bottom-toggle-label">折りたたむ</span>
+    </button>
+
     <!-- 天気・祝日 + QRコード（下部固定） -->
-    <div class="signage-bottom">
+    <div class="signage-bottom" id="signage-bottom">
       <div class="s-card" id="card-weather">
         <div class="s-card-title">🌤 天気・気温　<span id="weather-region-name" style="font-size:10px; color:rgba(255,255,255,0.4); font-weight:400; letter-spacing:0;"></span></div>
         <div class="weather-row" id="weather-row">
@@ -621,6 +699,88 @@ function showMain() {
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('error-screen').classList.remove('active');
   document.getElementById('main-screen').classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+// [UI改善② LINKボタン] チャッピー第50回判定準拠
+// ═══════════════════════════════════════════
+// 設計原則(index.htmlと同等):
+//   - currentGroupData.link_url が https://〜 で設定されていればボタン表示
+//   - 未設定・空・不正値は非表示
+//   - 押下時は window.open に noopener,noreferrer で別タブ起動
+//   - サイネージ管理者編集UIは index.html 側のみ・signage.htmlは表示専用
+
+function updateLinkButtonSignage() {
+  const btn = document.getElementById('link-btn');
+  if (!btn) return;
+  const url = (currentGroupData && typeof currentGroupData.link_url === 'string')
+              ? currentGroupData.link_url.trim() : '';
+  if (url && /^https:\/\//.test(url)) {
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function openCustomLinkSignage() {
+  const url = currentGroupData?.link_url;
+  if (!url || typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
+    return; // 念のため(ボタンが表示されていれば通常はここに来ない)
+  }
+  // セキュリティ対策: noopener,noreferrer 必須(チャッピー第50回判定 条件6)
+  // 別タブ起動 — Fully Kioskで戻る不安定なら同一タブ遷移に切替判断あり
+  window.open(url.trim(), '_blank', 'noopener,noreferrer');
+}
+
+// ═══════════════════════════════════════════
+// [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
+// ═══════════════════════════════════════════
+// 設計原則:
+//   - signage-bottom 全体(天気カード+QRカード)を1つのアコーディオン領域として扱う
+//   - 初期状態は展開
+//   - localStorage 'signage_bottom_collapsed' で状態保持(true/false 文字列)
+//   - 天気取得・QR生成・ポーリング・認証・signage_token処理には触らない(条件8)
+
+const SIGNAGE_BOTTOM_STORAGE_KEY = 'signage_bottom_collapsed';
+
+function toggleBottomAccordion() {
+  const bottom = document.getElementById('signage-bottom');
+  const icon = document.getElementById('bottom-toggle-icon');
+  const label = document.getElementById('bottom-toggle-label');
+  if (!bottom || !icon || !label) return;
+  const isCollapsed = bottom.classList.toggle('collapsed');
+  if (isCollapsed) {
+    icon.textContent = '▲';
+    label.textContent = '表示する';
+  } else {
+    icon.textContent = '▼';
+    label.textContent = '折りたたむ';
+  }
+  try {
+    localStorage.setItem(SIGNAGE_BOTTOM_STORAGE_KEY, isCollapsed ? 'true' : 'false');
+  } catch (e) {
+    // localStorage 不可環境(プライベートモード等)でも動作継続
+    console.warn('[toggleBottomAccordion] localStorage write failed:', e);
+  }
+}
+
+function restoreBottomAccordionState() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(SIGNAGE_BOTTOM_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[restoreBottomAccordionState] localStorage read failed:', e);
+  }
+  // 保存値が 'true' のときのみ折りたたみ状態で起動・それ以外は展開(初期状態)
+  if (saved === 'true') {
+    const bottom = document.getElementById('signage-bottom');
+    const icon = document.getElementById('bottom-toggle-icon');
+    const label = document.getElementById('bottom-toggle-label');
+    if (bottom) bottom.classList.add('collapsed');
+    if (icon) icon.textContent = '▲';
+    if (label) label.textContent = '表示する';
+  }
 }
 
 function updateLastUpdated() {
@@ -837,10 +997,22 @@ function buildItemHtml(item) {
     }
   }
 
+  // ── [簡素案・サイネージ画像表示] 画像ありラベル ──
+  // 設計:
+  //   - index.html と同じ判定式: image_mode==='attached' && (image_url || thumbnail_url)
+  //   - 画像本体・サムネは表示せず「📷 画像あり」アイコンのみ
+  //   - サイネージは表示専用(編集UIなし)
+  //   - Edge Function 呼び出しなし・DB変更なし・既存ロジックには触らない
+  //   - メッセージ・引き継ぎノート両方に対応(両者とも buildItemHtml を通るため)
+  let imageLabel = '';
+  if (item.image_mode === 'attached' && (item.image_url || item.thumbnail_url)) {
+    imageLabel = `<span class="message-priority" style="background:rgba(33,150,243,0.15); color:#90caf9; border:1px solid rgba(144,202,249,0.5); margin-left:6px;">📷 画像あり</span>`;
+  }
+
   return `
     <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}</div>
+        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}${imageLabel}</div>
         ${readBadge}
       </div>
       <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(body)}</div>
@@ -1396,7 +1568,14 @@ async function init() {
     if (vacanBtn) { vacanBtn.style.display = 'flex'; vacanBtn.style.alignItems = 'center'; }
   }
 
+  // [UI改善② LINKボタン] currentGroupData.link_url が設定されているグループのみLINKボタン表示
+  updateLinkButtonSignage();
+
   showMain();
+
+  // [UI改善③ 天気QR折りたたみ] localStorage から状態復元(初期は展開)
+  restoreBottomAccordionState();
+
   setupOfflineDetection();
   setupLayoutDetection();
   scheduleNightlyReload();

@@ -450,6 +450,18 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
           <div class="loading-small">読み込み中...</div>
         </div>
       </div>
+
+      <!-- [Phase 4-3] Storage使用量(画像投稿機能)・グループ別 -->
+      <div class="industry-bar" style="margin-top:16px;">
+        <div class="section-title">🖼️ 画像Storage使用量（グループ別）</div>
+        <div id="storage-usage-summary" style="font-size:12px; color:#6a7a90; margin-bottom:10px;">
+          <div class="loading-small">読み込み中...</div>
+        </div>
+        <div id="storage-usage-list"></div>
+        <div id="storage-usage-empty" style="display:none; padding:14px; text-align:center; color:#9aa5b8; font-size:13px;">
+          画像投稿はまだありません
+        </div>
+      </div>
     </div>
 
     <!-- グループタブ -->
@@ -542,7 +554,8 @@ async function init() {
 
 // ── 全データ読み込み ──
 async function loadAllData() {
-  await Promise.all([loadStats(), loadGroups(), loadMembers()]);
+  // [Phase 4-3] loadStorageUsage を追加(既存3関数と並列実行・既存ロジック非変更)
+  await Promise.all([loadStats(), loadGroups(), loadMembers(), loadStorageUsage()]);
 }
 
 // ── 統計 ──
@@ -616,6 +629,142 @@ async function loadStats() {
     </div>
   `).join('');
   document.getElementById('industry-breakdown').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-3] Storage使用量表示(画像投稿機能・グループ別)
+// ═══════════════════════════════════════════
+// 集計対象: messages + handover_notes の image_mode='attached'
+// 表示: グループ別の使用量 / 上限 / 30日超分(自動削除予定見通し・Phase 5実装予定)
+// 既存ロジックへの侵入ゼロ・新セクション追加のみ
+// ═══════════════════════════════════════════
+const STORAGE_LIMIT_BYTES_PER_GROUP = 1 * 1024 * 1024 * 1024; // 1GB/グループ(暫定値・仕様確定後に調整可能)
+const STORAGE_30DAY_MS = 30 * 24 * 60 * 60 * 1000;
+
+function _formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+async function loadStorageUsage() {
+  const listEl = document.getElementById('storage-usage-list');
+  const summaryEl = document.getElementById('storage-usage-summary');
+  const emptyEl = document.getElementById('storage-usage-empty');
+  if (!listEl || !summaryEl) return;
+
+  try {
+    // messages と handover_notes から image_mode='attached' を全件取得
+    // 取得カラム: グループID、画像サイズ、サムネサイズ、アップロード日時
+    const [msgRes, hwRes, groupsRes] = await Promise.all([
+      sb.from('messages')
+        .select('group_session_id, image_size, thumbnail_size, image_uploaded_at')
+        .eq('image_mode', 'attached'),
+      sb.from('handover_notes')
+        .select('group_session_id, image_size, thumbnail_size, image_uploaded_at')
+        .eq('image_mode', 'attached'),
+      sb.from('group_sessions').select('id, group_id, industry')
+    ]);
+
+    const messages = msgRes.data || [];
+    const handovers = hwRes.data || [];
+    const groups = groupsRes.data || [];
+
+    // グループ別集計
+    const usageMap = {}; // group_id → { total, over30days, count }
+    const now = Date.now();
+
+    [...messages, ...handovers].forEach(item => {
+      if (!item.group_session_id) return;
+      if (!usageMap[item.group_session_id]) {
+        usageMap[item.group_session_id] = { total: 0, over30days: 0, count: 0 };
+      }
+      const size = (item.image_size || 0) + (item.thumbnail_size || 0);
+      usageMap[item.group_session_id].total += size;
+      usageMap[item.group_session_id].count++;
+      if (item.image_uploaded_at) {
+        const uploaded = new Date(item.image_uploaded_at).getTime();
+        if (!isNaN(uploaded) && (now - uploaded) > STORAGE_30DAY_MS) {
+          usageMap[item.group_session_id].over30days += size;
+        }
+      }
+    });
+
+    // 全体合計
+    let grandTotal = 0, grandOver30 = 0, grandCount = 0;
+    Object.values(usageMap).forEach(u => {
+      grandTotal += u.total;
+      grandOver30 += u.over30days;
+      grandCount += u.count;
+    });
+
+    // サマリー表示
+    summaryEl.innerHTML = `
+      <div style="display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center;">
+        <span><strong style="color:#1a2f4a; font-size:14px;">合計 ${_formatBytes(grandTotal)}</strong></span>
+        <span style="color:#9aa5b8;">画像 ${grandCount}件 / グループ ${Object.keys(usageMap).length}件</span>
+        ${grandOver30 > 0 ? `<span style="color:#f57c00;">30日超 ${_formatBytes(grandOver30)}（自動削除予定）</span>` : ''}
+      </div>
+    `;
+
+    // 画像なしの場合
+    if (Object.keys(usageMap).length === 0) {
+      listEl.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'block';
+      return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    // グループ別行表示(使用量大きい順)
+    const groupInfoMap = {};
+    groups.forEach(g => { groupInfoMap[g.id] = g; });
+
+    const sorted = Object.entries(usageMap).sort((a, b) => b[1].total - a[1].total);
+
+    const rowsHtml = sorted.map(([groupSessionId, usage]) => {
+      const g = groupInfoMap[groupSessionId];
+      const displayId = g ? (g.group_id || groupSessionId.substring(0, 8)) : groupSessionId.substring(0, 8);
+      const industry = g && g.industry ? (INDUSTRY_LABELS[g.industry] || g.industry) : '-';
+      const pct = Math.min(100, Math.round((usage.total / STORAGE_LIMIT_BYTES_PER_GROUP) * 100));
+      const pctColor = pct >= 90 ? '#e53935' : (pct >= 70 ? '#f57c00' : '#06C755');
+      const over30Note = usage.over30days > 0
+        ? `<span style="color:#f57c00; font-size:11px;">（30日超 ${_formatBytes(usage.over30days)}）</span>`
+        : '';
+      return `
+        <div style="padding:10px 12px; border:1px solid #e4e8f0; border-radius:8px; margin-bottom:8px; background:white;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px; flex-wrap:wrap;">
+            <div style="font-weight:600; color:#1a2f4a; font-size:13px;">${escHtmlAdmin(displayId)}</div>
+            <div style="font-size:12px; color:#6a7a90;">${escHtmlAdmin(industry)}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div style="flex:1; background:#f0f3f7; border-radius:4px; height:8px; overflow:hidden;">
+              <div style="width:${pct}%; height:100%; background:${pctColor}; transition:width 0.3s;"></div>
+            </div>
+            <div style="font-size:12px; color:#6a7a90; min-width:60px; text-align:right;">${pct}%</div>
+          </div>
+          <div style="font-size:11px; color:#6a7a90;">
+            ${_formatBytes(usage.total)} / ${_formatBytes(STORAGE_LIMIT_BYTES_PER_GROUP)}
+            ・ 画像 ${usage.count}件
+            ${over30Note}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    listEl.innerHTML = rowsHtml;
+  } catch (e) {
+    console.error('[Phase 4-3] Storage使用量取得失敗:', e);
+    summaryEl.innerHTML = '<span style="color:#e53935;">⚠️ Storage使用量の取得に失敗しました</span>';
+    listEl.innerHTML = '';
+  }
+}
+
+// admin.html 内で使うHTMLエスケープ(共通化)
+function escHtmlAdmin(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── グループ一覧 ──
