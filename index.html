@@ -1531,12 +1531,37 @@ function _drawToJpegBlob(img, maxDim, quality) {
 }
 
 // 戻り値: { fullBlob, thumbBlob, fullSize, thumbSize, width, height }
-// 例外: INVALID_MIME / IMAGE_LOAD_FAILED / CANVAS_FAILED / SIZE_OVER_5MB
+// 例外: INVALID_MIME / HEIC_UNSUPPORTED / IMAGE_LOAD_FAILED / CANVAS_FAILED / SIZE_OVER_5MB
 async function compressImageForUpload(file) {
   if (!file) throw new Error('INVALID_MIME');
+
   const mime = (file.type || '').toLowerCase();
-  // 仕様書 5-3: image/jpeg, image/png, image/webp, image/heic を許容(HEICはブラウザ次第)
-  if (!mime.startsWith('image/')) throw new Error('INVALID_MIME');
+  const name = (file.name || '').toLowerCase();
+
+  // [チャッピー第52回判定 修正3] HEIC/HEIF を明示拒否(MIME・拡張子の両方で判定)
+  // iPhone標準のHEIC撮影をスクショ案内で誘導(仕様書v2.5 第14章 項目13・第5章5-3に整合)
+  const isHeic =
+    mime === 'image/heic' ||
+    mime === 'image/heif' ||
+    name.endsWith('.heic') ||
+    name.endsWith('.heif');
+  if (isHeic) {
+    throw new Error('HEIC_UNSUPPORTED');
+  }
+
+  // 仕様書v2.5 5-3(改): JPEG / PNG / WebP のみ対応(HEIC/HEIF は撤回・拒否)
+  const allowed =
+    mime === 'image/jpeg' ||
+    mime === 'image/png' ||
+    mime === 'image/webp' ||
+    name.endsWith('.jpg') ||
+    name.endsWith('.jpeg') ||
+    name.endsWith('.png') ||
+    name.endsWith('.webp');
+  if (!allowed) {
+    throw new Error('INVALID_MIME');
+  }
+
   let loaded = null;
   try {
     loaded = await _loadImageFromFile(file);
@@ -1570,10 +1595,12 @@ window.__pendingImageFile = null;
 let __imageProcessingModalShown = false;
 
 async function applyImageUploadButtonVisibility() {
-  // compose画面の📷ボタン表示制御。feature_flagsの状態により出し分け。
-  // selectedComposeType と TARGET_FEATURE_FLAGS の組合せで判定。
+  // compose画面の📷ボタン表示制御。feature_flagsの状態 + isCreatorロールにより出し分け。
+  // [チャッピー第52回判定 修正1] isCreator !== true の場合は無条件で非表示
+  // 一般スタッフには📷ボタンが表示されないことを明示的に保証(仕様書v2.5 第14章 項目7)
   const btn = document.getElementById('compose-image-btn');
   if (!btn) return;
+  if (isCreator !== true) { btn.style.display = 'none'; return; }
   try {
     const flags = await getFeatureFlags(false);
     if (!flags.image_upload) { btn.style.display = 'none'; return; }
@@ -1620,6 +1647,11 @@ function onComposeImageButtonClick() {
 async function onComposeImageFileSelected(ev) {
   const file = ev && ev.target && ev.target.files && ev.target.files[0];
   if (!file) return;
+  // [チャッピー第52回判定 修正2] isCreator !== true なら拒否(表示制御の二重防御)
+  if (isCreator !== true) {
+    showToast('画像投稿はグループ管理者のみ利用できます');
+    return;
+  }
   // 二重選択防止
   if (__imageProcessingModalShown) return;
   // 圧縮前のバリデーション(MIME・サイズの最低限チェック)
@@ -1661,9 +1693,10 @@ async function onComposeImageFileSelected(ev) {
   } catch (e) {
     const code = (e && e.message) || 'UNKNOWN';
     let msg = '画像の処理に失敗しました';
-    if (code === 'INVALID_MIME') msg = '画像ファイルを選択してください';
+    if (code === 'INVALID_MIME') msg = '画像ファイルを選択してください(JPEG・PNG・WebP形式)';
+    else if (code === 'HEIC_UNSUPPORTED') msg = 'HEIC形式には対応していません。スクリーンショットを撮るか、JPEG・PNG・WebP形式の画像を選んでください';
     else if (code === 'IMAGE_LOAD_FAILED') msg = '画像を読み込めませんでした';
-    else if (code === 'CANVAS_FAILED') msg = '画像の変換に失敗しました';
+    else if (code === 'CANVAS_FAILED') msg = '画像の変換に失敗しました。JPEG・PNG・WebP形式の画像を選んでください';
     else if (code === 'SIZE_OVER_5MB') msg = '画像サイズが大きすぎます(5MB超)。別の画像を選んでください';
     showToast(msg);
     _resetPendingImage();
@@ -1691,6 +1724,12 @@ function onComposeImageCancel() {
 // ═══════════════════════════════════════════
 async function sendImageMessage() {
   const body = document.getElementById('compose-body').value.trim();
+
+  // [チャッピー第52回判定 修正2] isCreator !== true なら送信拒否(送信入口の二重防御)
+  if (isCreator !== true) {
+    showToast('画像投稿はグループ管理者のみ利用できます');
+    return;
+  }
 
   // ガード: 画像が選択されていない場合は通常フローへ戻す(理論上は呼ばれない)
   if (!window.__pendingImageFile) {
@@ -1724,7 +1763,9 @@ async function sendImageMessage() {
       _showImageProcessingModal(false);
       const code = (e && e.message) || 'UNKNOWN';
       if (code === 'SIZE_OVER_5MB') showToast('画像サイズが大きすぎます。別の画像を選んでください');
-      else if (code === 'INVALID_MIME') showToast('画像ファイルを選択してください');
+      else if (code === 'HEIC_UNSUPPORTED') showToast('HEIC形式には対応していません。スクリーンショットを撮るか、JPEG・PNG・WebP形式の画像を選んでください');
+      else if (code === 'INVALID_MIME') showToast('画像ファイルを選択してください(JPEG・PNG・WebP形式)');
+      else if (code === 'CANVAS_FAILED') showToast('画像の変換に失敗しました。JPEG・PNG・WebP形式の画像を選んでください');
       else showToast('画像の処理に失敗しました');
       // 画像由来エラー: 画像はクリアするが本文は残す
       _resetPendingImage();
