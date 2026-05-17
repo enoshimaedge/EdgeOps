@@ -467,21 +467,24 @@
     </div>
     <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
       <div class="last-updated" id="last-updated-display">最終更新：--:--</div>
-      <button id="link-btn"
-         onclick="openCustomLinkSignage()"
-         class="link-header-btn vacan-header-btn" style="display:none;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-        </svg>
-        LINK
-      </button>
-      <button id="vacan-btn"
-         onclick="window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'"
-         class="vacan-header-btn" style="display:none;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
-        混雑度
-      </button>
+      <!-- [チャッピー第53回判定後] LINK + 混雑度を横並びに配置(野口さん指示:混雑度の左にLINK)・Fully Kiosk Browserクリック動作対策 -->
+      <div style="display:flex; flex-direction:row; gap:6px; align-items:center; pointer-events:auto; position:relative; z-index:100;">
+        <button id="link-btn"
+           onclick="openCustomLinkSignage()"
+           class="link-header-btn vacan-header-btn" style="display:none; pointer-events:auto;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          LINK
+        </button>
+        <button id="vacan-btn"
+           onclick="window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'"
+           class="vacan-header-btn" style="display:none; pointer-events:auto;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+          混雑度
+        </button>
+      </div>
     </div>
   </div>
 
