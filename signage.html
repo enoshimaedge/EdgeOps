@@ -997,10 +997,22 @@ function buildItemHtml(item) {
     }
   }
 
+  // ── [簡素案・サイネージ画像表示] 画像ありラベル ──
+  // 設計:
+  //   - index.html と同じ判定式: image_mode==='attached' && (image_url || thumbnail_url)
+  //   - 画像本体・サムネは表示せず「📷 画像あり」アイコンのみ
+  //   - サイネージは表示専用(編集UIなし)
+  //   - Edge Function 呼び出しなし・DB変更なし・既存ロジックには触らない
+  //   - メッセージ・引き継ぎノート両方に対応(両者とも buildItemHtml を通るため)
+  let imageLabel = '';
+  if (item.image_mode === 'attached' && (item.image_url || item.thumbnail_url)) {
+    imageLabel = `<span class="message-priority" style="background:rgba(33,150,243,0.15); color:#90caf9; border:1px solid rgba(144,202,249,0.5); margin-left:6px;">📷 画像あり</span>`;
+  }
+
   return `
     <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}</div>
+        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}${imageLabel}</div>
         ${readBadge}
       </div>
       <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(body)}</div>
