@@ -467,13 +467,12 @@
     </div>
     <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
       <div class="last-updated" id="last-updated-display">最終更新：--:--</div>
-      <!-- [チャッピー第53回判定後] LINK + 混雑度を横並びに配置(野口さん指示:混雑度の左にLINK)・Fully Kiosk Browserクリック動作対策 -->
-      <!-- [チャッピー第53回判定後・2回目] button → a タグに変更(Fully Kioskのwindow.location.href制限回避) -->
+      <!-- [チャッピー第53回判定後] LINK + 混雑度を横並びに配置(野口さん指示:混雑度の左にLINK) -->
+      <!-- [チャッピー第54回判定後・修正] target=_blank ではなく window.location.href で同タブ遷移(Fully Kioskポップアップ制限回避) -->
       <div style="display:flex; flex-direction:row; gap:6px; align-items:center; pointer-events:auto; position:relative; z-index:100;">
         <a id="link-btn"
            href="#" onclick="event.preventDefault(); openCustomLinkSignage(); return false;"
-           target="_blank" rel="noopener"
-           class="link-header-btn vacan-header-btn" style="display:none; pointer-events:auto; text-decoration:none;">
+           class="link-header-btn vacan-header-btn" style="display:none; pointer-events:auto; text-decoration:none; cursor:pointer;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -481,9 +480,8 @@
           LINK
         </a>
         <a id="vacan-btn"
-           href="https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima"
-           target="_blank" rel="noopener"
-           class="vacan-header-btn" style="display:none; pointer-events:auto; text-decoration:none;">
+           href="#" onclick="event.preventDefault(); window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'; return false;"
+           class="vacan-header-btn" style="display:none; pointer-events:auto; text-decoration:none; cursor:pointer;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
           混雑度
         </a>
@@ -736,9 +734,10 @@ function openCustomLinkSignage() {
   if (!url || typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
     return; // 念のため(ボタンが表示されていれば通常はここに来ない)
   }
-  // セキュリティ対策: noopener,noreferrer 必須(チャッピー第50回判定 条件6)
-  // 別タブ起動 — Fully Kioskで戻る不安定なら同一タブ遷移に切替判断あり
-  window.open(url.trim(), '_blank', 'noopener,noreferrer');
+  // [チャッピー第54回判定後・修正] Fully Kiosk Browser のポップアップ制限回避のため
+  // window.open(別タブ) から window.location.href(同タブ遷移) に変更
+  // 戻る場合は Fully Kiosk ヘッダーの戻るボタン or ホームボタンを使用
+  window.location.href = url.trim();
 }
 
 // ═══════════════════════════════════════════
