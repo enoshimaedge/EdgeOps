@@ -1737,6 +1737,12 @@ async function sendImageMessage() {
     return;
   }
 
+  // [チャッピー第53回判定 修正] 本文必須(Edge Function側でmetadata.body空NGのため)
+  if (!body) {
+    showToast('本文を入力してください(画像投稿には本文が必要です)');
+    return;
+  }
+
   // context判定(現在のcompose種別)
   const context = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
 
@@ -1782,48 +1788,20 @@ async function sendImageMessage() {
   try {
     showToast('画像を送信中...');
 
-    // FormData作成: upload-image Edge Function v2.4 仕様準拠
-    // (本文+画像を一括INSERT・サーバー側でStorageアップロード+DB INSERTを実行)
+    // [チャッピー第53回判定 修正] Edge Function (upload-image) 仕様準拠
+    // metadata(JSON文字列)+ fullImage(File)+ thumbnail(File) の3フィールドのみ
+    // sender_eo_uid/sender_name/priority/receiver_count等はEdge Function側で取得or不使用
+    const metadata = {
+      body: body,
+      group_session_id: String(currentGroup?.id || ''),
+      context: context, // 'message' | 'handover'
+      image_mode: 'expandable' // ST版デフォルト(タップで全画面拡大)
+    };
+
     const fd = new FormData();
-    fd.append('group_session_id', String(currentGroup?.id || ''));
-    fd.append('context', context); // 'message' | 'handover'
-    fd.append('body', body); // 本文(空可・サーバー側で空文字許容判定)
-    fd.append('sender_eo_uid', String(currentUser?.eo_uid || ''));
-    fd.append('sender_name', String(currentUser?.display_name || ''));
-    fd.append('image_size', String(compressed.fullSize));
-    fd.append('thumbnail_size', String(compressed.thumbSize));
-    fd.append('image_width', String(compressed.width));
-    fd.append('image_height', String(compressed.height));
-
-    if (context === 'message') {
-      // メッセージ: 優先度・受信者数・アンケート
-      fd.append('priority', String(selectedPriority || 'info'));
-      const receiverCountAtSend = members.filter(m =>
-        m && m.status === 'approved' &&
-        m.eo_uid !== currentUser.eo_uid &&
-        !m.is_signage
-      ).length;
-      fd.append('receiver_count', String(receiverCountAtSend));
-
-      // アンケート対応(既存sendMessageと同条件: 管理者かつチェック時のみ)
-      const surveyCb = document.getElementById('survey-checkbox');
-      const isSurvey = !!(surveyCb && surveyCb.checked && isCreator === true);
-      if (isSurvey) {
-        fd.append('is_survey', 'true');
-        const di = document.getElementById('survey-deadline-input');
-        if (di && di.value) {
-          const d = new Date(di.value + 'T23:59:59');
-          if (!isNaN(d.getTime())) fd.append('survey_deadline', d.toISOString());
-        }
-      }
-    } else {
-      // handover: 引き継ぎ優先度
-      fd.append('priority', String(selectedHandoverPriority || 'action'));
-    }
-
-    // 画像Blob本体(フル+サムネ)
-    fd.append('full_image', compressed.fullBlob, 'image_full.jpg');
-    fd.append('thumb_image', compressed.thumbBlob, 'image_thumb.jpg');
+    fd.append('metadata', JSON.stringify(metadata));
+    fd.append('fullImage', compressed.fullBlob, 'image_full.jpg');
+    fd.append('thumbnail', compressed.thumbBlob, 'image_thumb.jpg');
 
     // auth.js の callImageFunction 経由(Authorization自動付与・401自動リトライ)
     const url = `${SUPABASE_URL}/functions/v1/upload-image`;
