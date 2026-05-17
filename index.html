@@ -1731,6 +1731,17 @@ async function sendImageMessage() {
     return;
   }
 
+  // [チャッピー第54回判定 GO] ⑦アンケート画像ガード:アンケート選択時は画像送信不可
+  // context = 'message'(連絡)時のみ survey-checkbox を確認
+  const composeContextType = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+  if (composeContextType === 'message') {
+    const surveyCb = document.getElementById('survey-checkbox');
+    if (surveyCb && surveyCb.checked === true) {
+      showToast('アンケートでは画像を添付できません');
+      return;
+    }
+  }
+
   // ガード: 画像が選択されていない場合は通常フローへ戻す(理論上は呼ばれない)
   if (!window.__pendingImageFile) {
     showToast('画像が選択されていません');
