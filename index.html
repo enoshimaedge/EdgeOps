@@ -1034,12 +1034,19 @@
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
     <!-- ══ [Phase 4-2C] 画像投稿UI(feature_flags=trueの時のみ表示) ══ -->
-    <!-- 隠しfile input(📷ボタン押下時にclick()される) -->
-    <input type="file" id="compose-image-file" accept="image/*" style="display:none;" onchange="onComposeImageFileSelected(event)">
+    <!-- [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] -->
+    <!-- 隠しfile input(2分割: カメラ専用 + ライブラリ専用) -->
+    <input type="file" id="compose-image-file-camera" accept="image/*" capture="environment" style="display:none;" onchange="onComposeImageFileSelected(event)">
+    <input type="file" id="compose-image-file-library" accept="image/*" style="display:none;" onchange="onComposeImageFileSelected(event)">
     <div class="form-group" id="compose-image-area" style="margin-bottom:16px;">
-      <button type="button" id="compose-image-btn" onclick="onComposeImageButtonClick()" style="display:none; align-items:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
-        📷 写真を追加 / Add Photo
-      </button>
+      <div id="compose-image-btn-wrap" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" id="compose-image-btn-camera" onclick="onComposeImageButtonClickCamera()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
+          📷 写真を撮る / Take Photo
+        </button>
+        <button type="button" id="compose-image-btn-library" onclick="onComposeImageButtonClickLibrary()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
+          🖼️ 写真を選ぶ / Choose Photo
+        </button>
+      </div>
       <!-- [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18] 残量表示エリア -->
       <div id="compose-image-quota" style="margin-top:6px; min-height:16px;"></div>
       <!-- ══ [Phase 4-2D] プレビュー領域(画像選択後に表示) ══ -->
@@ -1625,21 +1632,24 @@ window.__pendingImageFile = null;
 let __imageProcessingModalShown = false;
 
 async function applyImageUploadButtonVisibility() {
-  // compose画面の📷ボタン表示制御。feature_flagsの状態 + isCreatorロールにより出し分け。
+  // compose画面の📷/🖼️ボタン表示制御。feature_flagsの状態 + isCreatorロールにより出し分け。
   // [チャッピー第52回判定 修正1] isCreator !== true の場合は無条件で非表示
-  // 一般スタッフには📷ボタンが表示されないことを明示的に保証(仕様書v2.5 第14章 項目7)
-  const btn = document.getElementById('compose-image-btn');
-  if (!btn) return;
-  if (isCreator !== true) { btn.style.display = 'none'; return; }
+  // [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] camera/library 2ボタン対応
+  const btnCamera = document.getElementById('compose-image-btn-camera');
+  const btnLibrary = document.getElementById('compose-image-btn-library');
+  if (!btnCamera || !btnLibrary) return;
+  const hideBoth = () => { btnCamera.style.display = 'none'; btnLibrary.style.display = 'none'; };
+  if (isCreator !== true) { hideBoth(); return; }
   try {
     const flags = await getFeatureFlags(false);
-    if (!flags.image_upload) { btn.style.display = 'none'; return; }
+    if (!flags.image_upload) { hideBoth(); return; }
     const ctx = (typeof selectedComposeType === 'string') ? selectedComposeType : 'msg';
-    if (ctx === 'msg' && !flags.image_upload_message) { btn.style.display = 'none'; return; }
-    if (ctx === 'handover' && !flags.image_upload_handover) { btn.style.display = 'none'; return; }
-    btn.style.display = 'inline-flex';
+    if (ctx === 'msg' && !flags.image_upload_message) { hideBoth(); return; }
+    if (ctx === 'handover' && !flags.image_upload_handover) { hideBoth(); return; }
+    btnCamera.style.display = 'inline-flex';
+    btnLibrary.style.display = 'inline-flex';
   } catch (_) {
-    btn.style.display = 'none';
+    hideBoth();
   }
   // [⑫クォータ表示UI] ボタン表示更新後にクォータUIも更新(非表示時はクリアされる)
   try { updateImageQuotaUI(); } catch (_) {}
@@ -1666,17 +1676,25 @@ function _resetPendingImage() {
     previewImg.src = '';
   }
   if (previewWrap) previewWrap.style.display = 'none';
-  const fileInput = document.getElementById('compose-image-file');
-  if (fileInput) fileInput.value = '';
+  // [②Androidカメラ起動対策・チャッピー第59-2回判定/2026-05-18] 両 file input をリセット
+  const fileInputCamera = document.getElementById('compose-image-file-camera');
+  if (fileInputCamera) fileInputCamera.value = '';
+  const fileInputLibrary = document.getElementById('compose-image-file-library');
+  if (fileInputLibrary) fileInputLibrary.value = '';
 }
 
-function onComposeImageButtonClick() {
-  // [⑫クォータ表示UI・iPhone Safari対策/2026-05-18]
-  // iOS Safari WebView は onclick → await → fileInput.click() の連鎖で
-  // ユーザージェスチャーが切れて fileInput.click() が無視される(Android Chromeは動く)
-  // → 同期処理のみで fileInput.click() を呼ぶ
-  // → 残量チェックは onComposeImageFileSelected 側に移動(ファイル選択後・チャッピー条件7のガード機能維持)
-  const fileInput = document.getElementById('compose-image-file');
+// [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18]
+// カメラ専用ボタン押下:capture="environment" 付き input をトリガー
+// 同期処理のみ・await を挟まない(iOS Safari WebViewのユーザージェスチャー連鎖維持)
+// 残量チェック・isCreator確認・MIMEチェックは onComposeImageFileSelected 側で実施
+function onComposeImageButtonClickCamera() {
+  const fileInput = document.getElementById('compose-image-file-camera');
+  if (fileInput) fileInput.click();
+}
+
+// ライブラリ専用ボタン押下:capture 属性なし input をトリガー(現状挙動継承)
+function onComposeImageButtonClickLibrary() {
+  const fileInput = document.getElementById('compose-image-file-library');
   if (fileInput) fileInput.click();
 }
 
@@ -2143,12 +2161,14 @@ async function getRemainingQuota(context) {
 }
 
 // 画像投稿エリアの残量表示・ボタン状態を更新(context は selectedComposeType から自動判定)
+// [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] camera/library 両ボタン対応 + aria-disabled
 async function updateImageQuotaUI() {
-  const btn = document.getElementById('compose-image-btn');
+  const btnCamera = document.getElementById('compose-image-btn-camera');
+  const btnLibrary = document.getElementById('compose-image-btn-library');
   const quotaEl = document.getElementById('compose-image-quota');
-  if (!btn || !quotaEl) return;
-  // 📷ボタンが非表示なら残量UIも空に(isCreator!==true / feature_flags OFF時)
-  if (btn.style.display === 'none' || isCreator !== true) {
+  if (!btnCamera || !btnLibrary || !quotaEl) return;
+  // 両ボタンとも非表示なら残量UIも空に(isCreator!==true / feature_flags OFF時)
+  if ((btnCamera.style.display === 'none' && btnLibrary.style.display === 'none') || isCreator !== true) {
     quotaEl.innerHTML = '';
     return;
   }
@@ -2157,14 +2177,21 @@ async function updateImageQuotaUI() {
   const { remaining, limit } = await getRemainingQuota(ctx);
   if (remaining > 0) {
     quotaEl.innerHTML = `<span style="font-size:11px; color:var(--text-light);">📊 あと <strong style="color:#06C755;">${remaining}</strong> 回投稿できます</span>`;
-    // [緊急修正/2026-05-18] btn.disabled の操作は撤回(LIFF Safari WebViewでクリックイベント阻害現象あり)
-    // 視覚表示のみ更新・実際のガードは onComposeImageButtonClick 内で残量再取得して判定
-    btn.style.opacity = '1';
-    btn.style.cursor = 'pointer';
+    // [チャッピー第59-2回判定] btn.disabled は使わず opacity/cursor/aria-disabled のみで視覚演出
+    btnCamera.style.opacity = '1';
+    btnCamera.style.cursor = 'pointer';
+    btnCamera.setAttribute('aria-disabled', 'false');
+    btnLibrary.style.opacity = '1';
+    btnLibrary.style.cursor = 'pointer';
+    btnLibrary.setAttribute('aria-disabled', 'false');
   } else {
     quotaEl.innerHTML = `<span style="font-size:11px; color:var(--red);">⛔ 本日の上限(${limit}回)に達しました・明日0時にリセット</span>`;
-    btn.style.opacity = '0.4';
-    btn.style.cursor = 'not-allowed';
+    btnCamera.style.opacity = '0.4';
+    btnCamera.style.cursor = 'not-allowed';
+    btnCamera.setAttribute('aria-disabled', 'true');
+    btnLibrary.style.opacity = '0.4';
+    btnLibrary.style.cursor = 'not-allowed';
+    btnLibrary.setAttribute('aria-disabled', 'true');
   }
 }
 
