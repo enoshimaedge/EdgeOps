@@ -3718,9 +3718,15 @@ async function showHandoverDetail(handoverId) {
     const completedConf = validConfs.find(c => c.action === 'takeover' || c.action === 'done');
 
     // 確認ボタン：投稿者本人・完了済み・自分が確認済みの場合はボタン非表示
+    // [チャッピー第56回判定確定] 送信時点で未参加だった場合もボタン非表示
     const isSender = hw.sender_eo_uid === currentUser.eo_uid;
+    const myMember = allMembers.find(m => m.eo_uid === currentUser.eo_uid);
+    const canWrite = wasMemberAtItemCreated(myMember, hw.created_at);
     if (isSender) {
       confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #66bb6a; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#2e7d32; margin-bottom:10px;">📋 自分が投稿した引き継ぎです</div>`;
+    } else if (!canWrite) {
+      // 送信時点で未参加だった新規参加者
+      confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #90caf9; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#1565c0; margin-bottom:10px;">📋 あなたの参加前の引き継ぎです<br><span style="font-size:11px; color:#1976d2;">内容は確認できますが、確認・対応操作の対象外です。</span></div>`;
     } else if (isCompleted) {
       // 誰かが完了済み→ボタンをロック・完了済みバナーを表示
       const completedLabel = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
@@ -3762,6 +3768,20 @@ async function showHandoverDetail(handoverId) {
 async function confirmHandover(action) {
   if (!currentHandoverId) return;
   try {
+    // ════════════════════════════════════════════════════════════
+    // [送信時点ガード / チャッピー第56回判定確定 / 2026-05-18]
+    // 過去引き継ぎ(自分の参加前のもの)に対する書き込みを止める。
+    // 通常 showHandoverDetail でボタン非表示にしているが、関数の
+    // 直呼び出し・ブラウザ戻る等の経路にも備える二重ガード。
+    // ════════════════════════════════════════════════════════════
+    const hwForGuard = handoverNotes.find(n => n.id === currentHandoverId)
+      || (await supabase.from('handover_notes').select('created_at').eq('id', currentHandoverId).single()).data;
+    const myMember = members.find(m => m.eo_uid === currentUser.eo_uid);
+    if (hwForGuard && !wasMemberAtItemCreated(myMember, hwForGuard.created_at)) {
+      console.log('[confirmHandover] skip: joined after handover created');
+      showToast('あなたの参加前の引き継ぎです');
+      return;
+    }
     const { error } = await supabase.from('handover_confirmations').insert({
       handover_id: currentHandoverId,
       eo_uid: currentUser.eo_uid,
@@ -4051,11 +4071,46 @@ async function submitSurveyNotApplicable() {
 
 let currentDetailMessageId = null; // 削除用に現在表示中のメッセージIDを保持
 
+// ════════════════════════════════════════════════════════════
+// [書き込み可否判定ヘルパー / チャッピー第56回判定確定 / 2026-05-18]
+// 送信時点で在籍していた人間メンバーかを判定する共通関数。
+// recordRead / confirmHandover / showHandoverDetail から呼び出す。
+//
+// 仕様(チャッピー第55-2回・第56回確定):
+//   - サイネージ端末(is_signage=true) → false
+//   - 未承認(status!=='approved')      → false
+//   - created_at が item.created_at より後(送信時点で未参加) → false
+//   - 上記いずれにも該当しない(送信時点で在籍していた人間) → true
+// ※既存DBに created_at が NULL の行があれば「参加済み扱い」(true)
+//   (チャッピー第56回 NULL救済方針)
+// ════════════════════════════════════════════════════════════
+function wasMemberAtItemCreated(member, itemCreatedAt) {
+  if (!member) return false;
+  if (member.is_signage === true) return false;
+  if (member.status !== 'approved') return false;
+  if (!member.created_at) return true; // 既存データ救済
+  if (!itemCreatedAt) return true;     // 未取得時は閉じない側に倒す
+  const joinedMs = new Date(member.created_at).getTime();
+  const itemMs = new Date(itemCreatedAt).getTime();
+  if (isNaN(joinedMs) || isNaN(itemMs)) return true;
+  return joinedMs <= itemMs;
+}
+
 async function recordRead(messageId) {
   try {
     // サイネージ端末は既読記録しない
     const currentMember = members.find(m => m.eo_uid === currentUser.eo_uid);
     if (currentMember && currentMember.is_signage) return;
+    // ════════════════════════════════════════════════════════════
+    // [送信時点ガード / チャッピー第56回判定確定 / 2026-05-18]
+    // 過去メッセージ(自分の参加前のもの)を開いても read_receipts に
+    // 書き込まない。表示はするが書き込みはしない仕様。
+    // ════════════════════════════════════════════════════════════
+    const msgForGuard = messages.find(m => m.id === messageId);
+    if (msgForGuard && !wasMemberAtItemCreated(currentMember, msgForGuard.created_at)) {
+      console.log('[recordRead] skip: joined after message created');
+      return;
+    }
     const { data: existing } = await supabase.from('read_receipts').select('id')
       .eq('message_id', messageId).eq('eo_uid', currentUser.eo_uid).maybeSingle();
     if (existing) return;
