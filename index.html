@@ -1670,21 +1670,12 @@ function _resetPendingImage() {
   if (fileInput) fileInput.value = '';
 }
 
-async function onComposeImageButtonClick() {
-  // [⑫クォータ表示UI・チャッピー第58回判定 条件5・条件7・緊急修正/2026-05-18]
-  // btn.disabled プロパティの使用を撤回(LIFF Safari WebViewでクリックイベント阻害現象)
-  // 押下時に残量を再取得し、0なら関数入口でガード(チャッピー条件7の精神を維持)
-  try {
-    const ctx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
-    const { remaining, limit } = await getRemainingQuota(ctx);
-    if (remaining <= 0) {
-      showToast(`本日の画像投稿上限(${limit}回)に達しました。明日までお待ちください`);
-      // 表示UIも最新に同期
-      try { updateImageQuotaUI(); } catch (_) {}
-      return;
-    }
-  } catch (_) { /* 取得失敗時はサーバ側 QUOTA_EXCEEDED に任せる */ }
-  // 📷ボタン押下: file input をトリガー(スマホはカメラ/ギャラリー選択ダイアログ)
+function onComposeImageButtonClick() {
+  // [⑫クォータ表示UI・iPhone Safari対策/2026-05-18]
+  // iOS Safari WebView は onclick → await → fileInput.click() の連鎖で
+  // ユーザージェスチャーが切れて fileInput.click() が無視される(Android Chromeは動く)
+  // → 同期処理のみで fileInput.click() を呼ぶ
+  // → 残量チェックは onComposeImageFileSelected 側に移動(ファイル選択後・チャッピー条件7のガード機能維持)
   const fileInput = document.getElementById('compose-image-file');
   if (fileInput) fileInput.click();
 }
@@ -1697,6 +1688,19 @@ async function onComposeImageFileSelected(ev) {
     showToast('画像投稿はグループ管理者のみ利用できます');
     return;
   }
+  // [⑫クォータ表示UI・チャッピー第58回判定 条件7・iPhone Safari対策/2026-05-18]
+  // ファイル選択直後に残量再確認(ボタン押下時にチェックすると iOS Safari でジェスチャー連鎖が切れるため)
+  try {
+    const quotaCtx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+    const { remaining, limit } = await getRemainingQuota(quotaCtx);
+    if (remaining <= 0) {
+      showToast(`本日の画像投稿上限(${limit}回)に達しました。明日までお待ちください`);
+      try { updateImageQuotaUI(); } catch (_) {}
+      // ファイル選択をクリア(同じファイルを連続選択できるようにするため)
+      try { ev.target.value = ''; } catch (_) {}
+      return;
+    }
+  } catch (_) { /* 取得失敗時はサーバ側 QUOTA_EXCEEDED に任せる */ }
   // 二重選択防止
   if (__imageProcessingModalShown) return;
   // 圧縮前のバリデーション(MIME・サイズの最低限チェック)
