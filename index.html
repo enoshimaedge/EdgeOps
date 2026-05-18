@@ -2075,6 +2075,28 @@ function renderImageThumbnailHtml(item) {
   </div>`;
 }
 
+// ══════════════════════════════════════════════════════
+// [⑪運用変更・チャッピー第58回判定 条件付きGO / 2026-05-18]
+// 引き継ぎリスト専用の画像ラベル表示(サムネ撤廃・「📷画像あり」テキスト表示)
+// - サイネージ画面(signage.html L1031-1042)と同等仕様
+// - メッセージリストには影響しない(renderImageThumbnailHtml をそのまま使う)
+// - 詳細画面(showHandoverDetail内 _renderDetailImage)は無変更・タップ時に画像表示維持
+// ══════════════════════════════════════════════════════
+function renderHandoverImageLabel(item) {
+  if (!item) return '';
+  if (item.image_mode === 'deleted') {
+    return `<div style="margin-top:6px;">
+      <span style="display:inline-block; padding:3px 8px; background:#f5f5f5; border:1px dashed #bbb; border-radius:4px; color:#888; font-size:11px;">🗑️ 画像は削除されました</span>
+    </div>`;
+  }
+  if (item.image_url || item.thumbnail_url) {
+    return `<div style="margin-top:6px;">
+      <span style="display:inline-block; padding:3px 8px; background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); border-radius:4px; font-size:11px; font-weight:600;">📷 画像あり</span>
+    </div>`;
+  }
+  return '';
+}
+
 // 詳細画面用: メッセージ/引き継ぎオブジェクトから画像エリアを表示・サムネ即時取得
 async function _renderDetailImage(item, wrapId, imgId, statusId) {
   const wrap = document.getElementById(wrapId);
@@ -3638,7 +3660,7 @@ function renderHandoverCardHtml(hw, confs, myConf) {
       <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>
       <div class="msg-title">${getMessageTitle(hw.content||'', 40)}</div>
       <div class="msg-meta">${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}</div>
-      ${renderImageThumbnailHtml(hw)}
+      ${renderHandoverImageLabel(hw)}
       ${statusHtml}
     </div>`;
 }
