@@ -1671,12 +1671,19 @@ function _resetPendingImage() {
 }
 
 async function onComposeImageButtonClick() {
-  // [⑫クォータ表示UI・チャッピー第58回判定 条件7] disabled時は何もしない(UI+関数入口の二重ガード)
-  const btn = document.getElementById('compose-image-btn');
-  if (btn?.disabled) return;
-  // [⑫クォータ表示UI・チャッピー第58回判定 条件5] 押下直前の残量再確認(複数端末・複数タブ対策)
-  try { await updateImageQuotaUI(); } catch (_) {}
-  if (btn?.disabled) return; // 再確認の結果disabledになった場合は中断
+  // [⑫クォータ表示UI・チャッピー第58回判定 条件5・条件7・緊急修正/2026-05-18]
+  // btn.disabled プロパティの使用を撤回(LIFF Safari WebViewでクリックイベント阻害現象)
+  // 押下時に残量を再取得し、0なら関数入口でガード(チャッピー条件7の精神を維持)
+  try {
+    const ctx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+    const { remaining, limit } = await getRemainingQuota(ctx);
+    if (remaining <= 0) {
+      showToast(`本日の画像投稿上限(${limit}回)に達しました。明日までお待ちください`);
+      // 表示UIも最新に同期
+      try { updateImageQuotaUI(); } catch (_) {}
+      return;
+    }
+  } catch (_) { /* 取得失敗時はサーバ側 QUOTA_EXCEEDED に任せる */ }
   // 📷ボタン押下: file input をトリガー(スマホはカメラ/ギャラリー選択ダイアログ)
   const fileInput = document.getElementById('compose-image-file');
   if (fileInput) fileInput.click();
@@ -2146,12 +2153,12 @@ async function updateImageQuotaUI() {
   const { remaining, limit } = await getRemainingQuota(ctx);
   if (remaining > 0) {
     quotaEl.innerHTML = `<span style="font-size:11px; color:var(--text-light);">📊 あと <strong style="color:#06C755;">${remaining}</strong> 回投稿できます</span>`;
-    btn.disabled = false;
+    // [緊急修正/2026-05-18] btn.disabled の操作は撤回(LIFF Safari WebViewでクリックイベント阻害現象あり)
+    // 視覚表示のみ更新・実際のガードは onComposeImageButtonClick 内で残量再取得して判定
     btn.style.opacity = '1';
     btn.style.cursor = 'pointer';
   } else {
     quotaEl.innerHTML = `<span style="font-size:11px; color:var(--red);">⛔ 本日の上限(${limit}回)に達しました・明日0時にリセット</span>`;
-    btn.disabled = true;
     btn.style.opacity = '0.4';
     btn.style.cursor = 'not-allowed';
   }
