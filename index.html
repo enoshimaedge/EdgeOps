@@ -1040,6 +1040,8 @@
       <button type="button" id="compose-image-btn" onclick="onComposeImageButtonClick()" style="display:none; align-items:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
         📷 写真を追加 / Add Photo
       </button>
+      <!-- [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18] 残量表示エリア -->
+      <div id="compose-image-quota" style="margin-top:6px; min-height:16px;"></div>
       <!-- ══ [Phase 4-2D] プレビュー領域(画像選択後に表示) ══ -->
       <div id="compose-image-preview-wrap" style="display:none; margin-top:10px; padding:10px; background:#f8f9fb; border:1px solid var(--border); border-radius:8px;">
         <div style="display:flex; align-items:flex-start; gap:10px;">
@@ -1639,6 +1641,8 @@ async function applyImageUploadButtonVisibility() {
   } catch (_) {
     btn.style.display = 'none';
   }
+  // [⑫クォータ表示UI] ボタン表示更新後にクォータUIも更新(非表示時はクリアされる)
+  try { updateImageQuotaUI(); } catch (_) {}
 }
 
 function _showImageProcessingModal(show) {
@@ -1666,7 +1670,13 @@ function _resetPendingImage() {
   if (fileInput) fileInput.value = '';
 }
 
-function onComposeImageButtonClick() {
+async function onComposeImageButtonClick() {
+  // [⑫クォータ表示UI・チャッピー第58回判定 条件7] disabled時は何もしない(UI+関数入口の二重ガード)
+  const btn = document.getElementById('compose-image-btn');
+  if (btn?.disabled) return;
+  // [⑫クォータ表示UI・チャッピー第58回判定 条件5] 押下直前の残量再確認(複数端末・複数タブ対策)
+  try { await updateImageQuotaUI(); } catch (_) {}
+  if (btn?.disabled) return; // 再確認の結果disabledになった場合は中断
   // 📷ボタン押下: file input をトリガー(スマホはカメラ/ギャラリー選択ダイアログ)
   const fileInput = document.getElementById('compose-image-file');
   if (fileInput) fileInput.click();
@@ -1889,6 +1899,8 @@ async function sendImageMessage() {
     await loadMessages();
     showScreen('screen-home');
     showToast(context === 'handover' ? '引き継ぎを投稿しました！' : '送信しました！');
+    // [⑫クォータ表示UI・チャッピー第58回判定 条件4] 投稿成功後にクォータUI更新(次回compose画面表示時に最新値で表示)
+    try { updateImageQuotaUI(); } catch (_) {}
 
   } catch (e) {
     // ───── [チャッピー条件V] 失敗時は本文・画像プレビューを残す ─────
@@ -2073,6 +2085,76 @@ function renderImageThumbnailHtml(item) {
          style="max-width:160px; max-height:120px; border-radius:6px; background:#e4e8f0; object-fit:cover; display:block; cursor:zoom-in; image-orientation:from-image;"
          onclick="event.stopPropagation(); openFullImageViewer('${fullPath}')">
   </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18]
+// 画像投稿クォータの残量取得・UI表示・上限到達時のボタンガード
+// - JST日付で当日のクォータを取得(toISOString直使用NG・第58回判定条件6)
+// - 取得失敗時は上限値で表示するフォールバック(ST版初期は許容)
+// - 上限到達時は📷ボタンをdisabled + 視覚表示
+// ══════════════════════════════════════════════════════
+
+// JST日付(YYYY-MM-DD)を返す(チャッピー第58回判定 条件6)
+function getJstDateString() {
+  const now = new Date();
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return jst.toISOString().substring(0, 10);
+}
+
+// 当日の残量を取得(context: 'message' | 'handover')
+async function getRemainingQuota(context) {
+  const QUOTA_LIMITS = { message: 10, handover: 5 };
+  const limit = QUOTA_LIMITS[context] || 10;
+  try {
+    if (!currentUser || !currentUser.eo_uid || !currentGroup || !currentGroup.id) {
+      return { used: 0, limit, remaining: limit };
+    }
+    const today = getJstDateString();
+    const { data, error } = await supabase
+      .from('image_upload_quota')
+      .select('upload_count')
+      .eq('eo_uid', currentUser.eo_uid)
+      .eq('group_session_id', currentGroup.id)
+      .eq('upload_date', today)
+      .eq('context', context)
+      .maybeSingle();
+    if (error) {
+      console.warn('クォータ取得失敗・上限値で表示');
+      return { used: 0, limit, remaining: limit };
+    }
+    const used = data?.upload_count || 0;
+    return { used, limit, remaining: Math.max(0, limit - used) };
+  } catch (_) {
+    console.warn('クォータ取得例外・上限値で表示');
+    return { used: 0, limit, remaining: limit };
+  }
+}
+
+// 画像投稿エリアの残量表示・ボタン状態を更新(context は selectedComposeType から自動判定)
+async function updateImageQuotaUI() {
+  const btn = document.getElementById('compose-image-btn');
+  const quotaEl = document.getElementById('compose-image-quota');
+  if (!btn || !quotaEl) return;
+  // 📷ボタンが非表示なら残量UIも空に(isCreator!==true / feature_flags OFF時)
+  if (btn.style.display === 'none' || isCreator !== true) {
+    quotaEl.innerHTML = '';
+    return;
+  }
+  // context判定(selectedComposeType: 'msg' or 'handover' → 'message' or 'handover')
+  const ctx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+  const { remaining, limit } = await getRemainingQuota(ctx);
+  if (remaining > 0) {
+    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--text-light);">📊 あと <strong style="color:#06C755;">${remaining}</strong> 回投稿できます</span>`;
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+  } else {
+    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--red);">⛔ 本日の上限(${limit}回)に達しました・明日0時にリセット</span>`;
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    btn.style.cursor = 'not-allowed';
+  }
 }
 
 // ══════════════════════════════════════════════════════
