@@ -1087,34 +1087,64 @@ async function loadMessage() {
     };
 
     // 既読・確認情報を並列取得
+    // ════════════════════════════════════════════════════════════
+    // [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // A. 分母は送信時点で approved だった人間メンバーのみ
+    // B. サイネージ端末(is_signage=true)は分母・分子から除外
+    // C. 送信者は分母から除外
+    // D. 送信後参加(created_at > item.created_at)は分母から除外
+    // E. 退出済(status='left')は分子から除外
+    // G. created_at が NULL の既存データは「参加済み」として扱う
+    // ※index.html / signage.html の計6箇所で同一仕様を維持
+    // ════════════════════════════════════════════════════════════
     const msgIds = messages.map(m => m.id);
     const handoverIds = handovers.map(h => h.id);
 
-    const [receiptsResult, confirmationsResult, membersResult] = await Promise.allSettled([
+    const [receiptsResult, confirmationsResult, membersResult, allMembersHistResult] = await Promise.allSettled([
       msgIds.length > 0
         ? sbClient.from('read_receipts').select('message_id, eo_uid').in('message_id', msgIds)
         : Promise.resolve({ data: [] }),
       handoverIds.length > 0
         ? sbClient.from('handover_confirmations').select('handover_id,eo_uid,display_name').in('handover_id', handoverIds)
         : Promise.resolve({ data: [] }),
-      sbClient.from('group_members').select('eo_uid,display_name,is_signage')
-        .eq('group_session_id', currentGroupData.id).eq('status', 'approved')
+      sbClient.from('group_members').select('eo_uid,display_name,is_signage,created_at')
+        .eq('group_session_id', currentGroupData.id).eq('status', 'approved'),
+      // ★ 全メンバー(過去含む・left含む)取得 - 参加時刻判定用
+      sbClient.from('group_members').select('eo_uid, created_at, is_signage')
+        .eq('group_session_id', currentGroupData.id)
     ]);
 
     const receipts = receiptsResult.status === 'fulfilled' ? (receiptsResult.value.data || []) : [];
     const confirmations = confirmationsResult.status === 'fulfilled' ? (confirmationsResult.value.data || []) : [];
     const allMembers = membersResult.status === 'fulfilled' ? (membersResult.value.data || []) : [];
+    const allMembersHist = allMembersHistResult.status === 'fulfilled' ? (allMembersHistResult.value.data || []) : [];
     const humanMembers = allMembers.filter(m => !m.is_signage);
     const humanCount = humanMembers.length;
-    const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.eo_uid));
+    const signageUids = new Set(allMembersHist.filter(m => m.is_signage).map(m => m.eo_uid));
+    // 参加時刻マップ(過去含む全メンバー)
+    const memberJoinedAt = new Map();
+    allMembersHist.forEach(m => {
+      memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+    });
+    // 送信時刻・送信者マップ
+    const msgCreatedAtMap = {};
+    messages.forEach(m => { msgCreatedAtMap[m.id] = new Date(m.created_at).getTime(); });
+    const hwCreatedAtMap = {};
+    const hwSenderMap = {};
+    handovers.forEach(h => {
+      hwCreatedAtMap[h.id] = new Date(h.created_at).getTime();
+      hwSenderMap[h.id] = h.sender_eo_uid;
+    });
 
-    // 既読数マップ（サイネージ端末・送信者除外）
+    // 既読数マップ（サイネージ端末・送信者・送信時点未参加を除外）
     const senderMap = {};
     messages.forEach(m => { senderMap[m.id] = m.sender_eo_uid; });
     const readCountMap = {};
     receipts.forEach(r => {
-      if (signageUids.has(r.eo_uid)) return;
-      if (senderMap[r.message_id] === r.eo_uid) return;
+      if (signageUids.has(r.eo_uid)) return;                              // B
+      if (senderMap[r.message_id] === r.eo_uid) return;                   // C
+      const joinedAt = memberJoinedAt.get(r.eo_uid);
+      if (joinedAt !== undefined && joinedAt > msgCreatedAtMap[r.message_id]) return; // D
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
 
@@ -1137,16 +1167,30 @@ async function loadMessage() {
     }
 
     // 確認済マップ（引き継ぎIDごとの確認者リスト）
+    // サイネージ端末・送信者・送信時点未参加を除外
     const confirmedMap = {};
     confirmations.forEach(c => {
+      if (signageUids.has(c.eo_uid)) return;                              // B
+      if (hwSenderMap[c.handover_id] === c.eo_uid) return;                // C
+      const joinedAt = memberJoinedAt.get(c.eo_uid);
+      if (joinedAt !== undefined && joinedAt > hwCreatedAtMap[c.handover_id]) return; // D
       if (!confirmedMap[c.handover_id]) confirmedMap[c.handover_id] = [];
       confirmedMap[c.handover_id].push({ eo_uid: c.eo_uid, display_name: c.display_name });
     });
 
     // 引き継ぎに確認状況を付与
+    // ※eligibleCount は引き継ぎごとに送信時点で在籍していた人間メンバー数を算出
     const handoverItems = handovers.map(h => {
+      const hCreatedAt = hwCreatedAtMap[h.id];
+      const hSender = hwSenderMap[h.id];
+      const eligibleCount = humanMembers.filter(m => {
+        if (m.eo_uid === hSender) return false;                           // C
+        const joinedAt = memberJoinedAt.get(m.eo_uid);
+        if (joinedAt !== undefined && joinedAt > hCreatedAt) return false; // D
+        return true;
+      }).length;
       const confirmed = (confirmedMap[h.id] || []).length;
-      const isFullyConfirmed = humanCount > 0 && confirmed >= humanCount;
+      const isFullyConfirmed = eligibleCount > 0 && confirmed >= eligibleCount;
       return { ...h, body: h.content, _type: 'handover', _confirmed: confirmed, _fullyConfirmed: isFullyConfirmed };
     });
     const messageItems = messages.map(m => ({ ...m, _type: 'message' }));
@@ -1222,10 +1266,10 @@ function openModalByIndex(index) {
   const hh = String(createdAt.getHours()).padStart(2, '0');
   const mm = String(createdAt.getMinutes()).padStart(2, '0');
   const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '');
+  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null);
 }
 
-async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid) {
+async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt) {
   const modal = document.getElementById('modal-msg-detail');
   document.getElementById('modal-priority-badge').innerHTML =
     `<span class="message-priority ${priorityCls}">${priorityLabel}</span>`;
@@ -1237,22 +1281,69 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
   modal.style.display = 'flex';
 
   try {
+    // ════════════════════════════════════════════════════════════
+    // [詳細モーダル集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // A. 分母は送信時点で approved だった人間メンバーのみ
+    // B. サイネージ端末(is_signage=true)は分母・分子から除外
+    // C. 送信者は分母から除外
+    // D. 送信後参加(created_at > itemCreatedAt)は分母から除外
+    // G. created_at が NULL の既存データは「参加済み」として扱う
+    //    itemCreatedAt が null の場合は送信時点フィルタは無効化
+    // ※index.html / signage.html の計6箇所で同一仕様を維持
+    // ════════════════════════════════════════════════════════════
     const { data: members } = await sbClient.from('group_members')
-      .select('eo_uid, display_name, is_signage')
+      .select('eo_uid, display_name, is_signage, created_at')
       .eq('group_session_id', currentGroupData.id)
       .eq('status', 'approved');
 
-    const humanMembers = (members || []).filter(m => !m.is_signage && m.eo_uid !== senderUid);
+    // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
+    const { data: allMembersHist } = await sbClient.from('group_members')
+      .select('eo_uid, created_at, is_signage')
+      .eq('group_session_id', currentGroupData.id);
+
+    const signageUidsModal = new Set((allMembersHist || []).filter(m => m.is_signage).map(m => m.eo_uid));
+    const memberJoinedAtModal = new Map();
+    (allMembersHist || []).forEach(m => {
+      memberJoinedAtModal.set(m.eo_uid, new Date(m.created_at).getTime());
+    });
+    const itemCreatedAtMs = itemCreatedAt ? new Date(itemCreatedAt).getTime() : null;
+
+    // 送信時点で在籍していた人間メンバー = 分母対象
+    const humanMembers = (members || []).filter(m => {
+      if (m.is_signage === true) return false;                            // B
+      if (m.eo_uid === senderUid) return false;                           // C
+      if (itemCreatedAtMs !== null) {
+        const joinedAt = memberJoinedAtModal.get(m.eo_uid);
+        if (joinedAt !== undefined && joinedAt > itemCreatedAtMs) return false; // D
+      }
+      return true;
+    });
 
     let readUids = [];
     if (itemType === 'message') {
       const { data: receipts } = await sbClient.from('read_receipts')
         .select('eo_uid').eq('message_id', itemId);
-      readUids = (receipts || []).map(r => r.eo_uid);
+      readUids = (receipts || [])
+        .filter(r => !signageUidsModal.has(r.eo_uid))                     // B
+        .filter(r => r.eo_uid !== senderUid)                              // C
+        .filter(r => {                                                    // D
+          if (itemCreatedAtMs === null) return true;
+          const j = memberJoinedAtModal.get(r.eo_uid);
+          return j === undefined || j <= itemCreatedAtMs;
+        })
+        .map(r => r.eo_uid);
     } else {
       const { data: confirmations } = await sbClient.from('handover_confirmations')
         .select('eo_uid, display_name, action').eq('handover_id', itemId);
-      readUids = (confirmations || []).map(c => c.eo_uid);
+      readUids = (confirmations || [])
+        .filter(c => !signageUidsModal.has(c.eo_uid))                     // B
+        .filter(c => c.eo_uid !== senderUid)                              // C
+        .filter(c => {                                                    // D
+          if (itemCreatedAtMs === null) return true;
+          const j = memberJoinedAtModal.get(c.eo_uid);
+          return j === undefined || j <= itemCreatedAtMs;
+        })
+        .map(c => c.eo_uid);
     }
 
     const readMembers = humanMembers.filter(m => readUids.includes(m.eo_uid));

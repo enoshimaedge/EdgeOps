@@ -2932,6 +2932,22 @@ async function loadMessages() {
     // （サイネージ端末が参加前にread_countが加算されたズレを防ぐ）
     // ★ EdgeOps受信対象モデル R(M)/K(M) 準拠（v7.17 第18章 / v1.14 第21章）
     //    送信時に未参加だったメンバーの既読は read_count に加算しない
+    // ════════════════════════════════════════════════════════════
+    // [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // A. 分母は送信時点で approved だった人間メンバーのみ
+    // B. サイネージ端末(is_signage=true)は分母・分子から除外
+    // C. 送信者は分母から除外
+    // D. 送信後参加(created_at > item.created_at)は分母から除外
+    // E. 退出済(status='left')は分子から除外
+    // G. created_at が NULL の既存データは「参加済み」として扱う
+    // ※index.html / signage.html の計6箇所で同一仕様を維持
+    //    ① index.html リスト集計(メッセージ)        L2935-2967
+    //    ①' index.html リスト集計(引き継ぎ)         L2970-2982
+    //    ② index.html メッセージ詳細                L3704-3740
+    //    ③ index.html 引き継ぎ詳細                  L3601-3683
+    //    ④ signage.html リスト集計                  L1080-1151
+    //    ⑤ signage.html 詳細モーダル                L1239-1290
+    // ════════════════════════════════════════════════════════════
     if (messages.length > 0) {
       const msgIds = messages.map(m => m.id);
       const { data: receipts } = await supabase.from('read_receipts')
@@ -2968,11 +2984,36 @@ async function loadMessages() {
     }
 
     // ホーム画面でも引き継ぎの確認状態を正しく表示するためconfirmationsを取得
+    // ════════════════════════════════════════════════════════════
+    // [確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // 仕様 A〜E・G を適用(上記コメント参照)
+    // - サイネージ端末・送信者・送信時点未参加者を分子から除外
+    // ════════════════════════════════════════════════════════════
     if (handoverNotes.length > 0) {
       const hwIds = handoverNotes.map(n => n.id);
       const { data: hwConfs } = await supabase.from('handover_confirmations').select('*').in('handover_id', hwIds);
+      // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
+      const { data: allMembersForHw } = await supabase.from('group_members')
+        .select('eo_uid, created_at, is_signage')
+        .eq('group_session_id', currentGroup.id);
+      const signageUidsHw = new Set((allMembersForHw || []).filter(m => m.is_signage).map(m => m.eo_uid));
+      const memberJoinedAtHw = new Map();
+      (allMembersForHw || []).forEach(m => {
+        memberJoinedAtHw.set(m.eo_uid, new Date(m.created_at).getTime());
+      });
+      // 引き継ぎIDごとの送信時刻・送信者マップ
+      const hwCreatedAtMap = {};
+      const hwSenderMap = {};
+      handoverNotes.forEach(h => {
+        hwCreatedAtMap[h.id] = new Date(h.created_at).getTime();
+        hwSenderMap[h.id] = h.sender_eo_uid;
+      });
       const confirmMap = {};
       (hwConfs || []).forEach(c => {
+        if (signageUidsHw.has(c.eo_uid)) return;                          // B: サイネージ除外
+        if (hwSenderMap[c.handover_id] === c.eo_uid) return;              // C: 送信者除外
+        const joinedAt = memberJoinedAtHw.get(c.eo_uid);
+        if (joinedAt !== undefined && joinedAt > hwCreatedAtMap[c.handover_id]) return; // D: 送信時点フィルタ
         if (!confirmMap[c.handover_id]) confirmMap[c.handover_id] = [];
         confirmMap[c.handover_id].push(c);
       });
@@ -3624,8 +3665,35 @@ async function showHandoverDetail(handoverId) {
     })();
 
     // 確認情報を取得
+    // ════════════════════════════════════════════════════════════
+    // [確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // 仕様 A〜E・G を適用(loadHome内コメント参照)
+    // - サイネージ端末・送信者・送信時点未参加者を分子(validConfs)から除外
+    // - 未確認リストも eligibleMembers(送信時点で在籍していた人間メンバー)から算出
+    // ════════════════════════════════════════════════════════════
     const { data: confs } = await supabase.from('handover_confirmations').select('*').eq('handover_id', handoverId);
-    const myConf = (confs || []).find(c => c.eo_uid === currentUser.eo_uid);
+
+    // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
+    const { data: allMembersForHwDetail } = await supabase.from('group_members')
+      .select('eo_uid, created_at, is_signage, status')
+      .eq('group_session_id', currentGroup.id);
+    const signageUidsHwDetail = new Set((allMembersForHwDetail || []).filter(m => m.is_signage).map(m => m.eo_uid));
+    const memberJoinedAtHwDetail = new Map();
+    (allMembersForHwDetail || []).forEach(m => {
+      memberJoinedAtHwDetail.set(m.eo_uid, new Date(m.created_at).getTime());
+    });
+    const hwCreatedAtMs = new Date(hw.created_at).getTime();
+
+    // 確認データをフィルタ適用後の validConfs に変換
+    const validConfs = (confs || []).filter(c => {
+      if (signageUidsHwDetail.has(c.eo_uid)) return false;                // B: サイネージ除外
+      if (c.eo_uid === hw.sender_eo_uid) return false;                    // C: 送信者除外
+      const joinedAt = memberJoinedAtHwDetail.get(c.eo_uid);
+      if (joinedAt !== undefined && joinedAt > hwCreatedAtMs) return false; // D: 送信時点フィルタ
+      return true;
+    });
+
+    const myConf = validConfs.find(c => c.eo_uid === currentUser.eo_uid);
     const confirmedList = document.getElementById('hw-confirmed-list');
     const unconfirmedList = document.getElementById('hw-unconfirmed-list');
     const confirmArea = document.getElementById('hw-confirm-area');
@@ -3635,9 +3703,19 @@ async function showHandoverDetail(handoverId) {
       .eq('group_session_id', currentGroup.id).eq('status', 'approved');
     const allMembers = latestMembers || [];
 
+    // 送信時点で在籍していた人間メンバー = 分母対象
+    const eligibleMembers = allMembers.filter(m => {
+      if (m.is_signage === true) return false;                            // B
+      if (m.eo_uid === hw.sender_eo_uid) return false;                    // C
+      const joinedAt = memberJoinedAtHwDetail.get(m.eo_uid);
+      if (joinedAt !== undefined && joinedAt > hwCreatedAtMs) return false; // D
+      return true;
+    });
+
     // 誰かがすでに「引き継ぎました」または「対応しました」を押していたら完了済み
-    const isCompleted = (confs || []).some(c => c.action === 'takeover' || c.action === 'done');
-    const completedConf = (confs || []).find(c => c.action === 'takeover' || c.action === 'done');
+    // (サイネージZの汚染データは validConfs で除外済)
+    const isCompleted = validConfs.some(c => c.action === 'takeover' || c.action === 'done');
+    const completedConf = validConfs.find(c => c.action === 'takeover' || c.action === 'done');
 
     // 確認ボタン：投稿者本人・完了済み・自分が確認済みの場合はボタン非表示
     const isSender = hw.sender_eo_uid === currentUser.eo_uid;
@@ -3657,20 +3735,18 @@ async function showHandoverDetail(handoverId) {
       `;
     }
 
-    // 確認済みメンバー
-    const confirmedUids = new Set((confs || []).map(c => c.eo_uid));
-    if ((confs || []).length > 0) {
-      confirmedList.innerHTML = (confs || []).map(c =>
+    // 確認済みメンバー(validConfsベース)
+    const confirmedUids = new Set(validConfs.map(c => c.eo_uid));
+    if (validConfs.length > 0) {
+      confirmedList.innerHTML = validConfs.map(c =>
         `<div class="person-row"><div><div class="person-name">${escHtml(c.display_name)}</div><div class="person-time">${c.action === 'takeover' ? '引き継ぎました' : '対応しました'}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(c.confirmed_at)}</div><div class="check-yes">✅</div></div></div>`
       ).join('');
     } else {
       confirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も確認していません</div>';
     }
 
-    // 未確認メンバー：投稿者本人は除外、残りで未確認の人を表示
-    const unconfirmed = allMembers.filter(m =>
-      m.eo_uid !== hw.sender_eo_uid && !confirmedUids.has(m.eo_uid)
-    );
+    // 未確認メンバー：eligibleMembersから確認済を除外
+    const unconfirmed = eligibleMembers.filter(m => !confirmedUids.has(m.eo_uid));
     if (unconfirmed.length > 0) {
       unconfirmedList.innerHTML = unconfirmed.map(m =>
         `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`
@@ -3702,6 +3778,11 @@ async function confirmHandover(action) {
 }
 
 async function showDetail(messageId) {
+  // ════════════════════════════════════════════════════════════
+  // [既読集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+  // 仕様 A〜E・G を適用(loadHome内コメント参照)
+  // ※既存の正解実装が L3727-3733 に存在(joinedAt > msgCreatedAtMs を除外)
+  // ════════════════════════════════════════════════════════════
   const msg = messages.find(m => m.id === messageId);
   if (!msg) return;
   currentDetailMessageId = messageId; // 削除用に保持
