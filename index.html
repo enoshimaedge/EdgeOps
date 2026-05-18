@@ -573,6 +573,34 @@
       padding-right: max(16px, calc((100vw - 900px) / 2 + 16px));
     }
   }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善①-2 大画面portrait対応] チャッピー第57回判定 GO
+   * - 条件: (orientation: portrait) AND (min-width: 600px) のみ適用
+   * - タブレット縦 / MEGAPAD縦など 600px以上の縦画面だけ対象
+   * - スマホ縦画面(<600px)は既存 max-width:430px を維持
+   * - 既存 landscape メディアクエリ(第50回判定)は1文字も変更しない
+   * - 本文エリアは max-width:600px で中央寄せ・縦画面の可読性確保
+   * ══════════════════════════════════════════════════════ */
+  @media (orientation: portrait) and (min-width: 600px) {
+    body {
+      max-width: none;
+    }
+    .screen {
+      max-width: none;
+    }
+    .content {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .header {
+      padding-left: max(16px, calc((100vw - 600px) / 2 + 16px));
+      padding-right: max(16px, calc((100vw - 600px) / 2 + 16px));
+    }
+  }
 </style>
 </head>
 <body>
