@@ -3833,9 +3833,22 @@ async function showDetail(messageId) {
     return true;
   });
   const readUids = new Set(validReads.map(r => r.eo_uid));
-  // 送信者・サイネージ端末を除いた受信者リスト
+  // 送信者・サイネージ端末・送信時点未参加メンバーを除いた受信者リスト
   // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
-  const receivers = members.filter(m => m.eo_uid !== msg.sender_eo_uid && !m.is_signage);
+  // ════════════════════════════════════════════════════════════
+  // [未読リスト分母仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+  // B: サイネージ除外 / C: 送信者除外 / D: 送信時点未参加除外
+  // ※ 数値(totalMembers)は msg.receiver_count を優先利用、
+  //    名前リスト(unreadMembers)は receivers から派生するため
+  //    receivers 自体に送信時点フィルタを適用する必要がある
+  // ════════════════════════════════════════════════════════════
+  const receivers = members.filter(m => {
+    if (m.eo_uid === msg.sender_eo_uid) return false;                          // C
+    if (m.is_signage) return false;                                            // B
+    const joinedAt = detailMemberJoinedAt.get(m.eo_uid);
+    if (joinedAt !== undefined && joinedAt > msgCreatedAtMs) return false;     // D
+    return true;
+  });
   const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
   const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
