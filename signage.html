@@ -940,7 +940,7 @@ function linkifyBody(text) {
 let _buildItemContext = {}; // buildItemHtmlが参照するコンテキスト
 
 function buildItemHtml(item) {
-  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap } = _buildItemContext;
+  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt } = _buildItemContext;
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
     : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
@@ -959,8 +959,32 @@ function buildItemHtml(item) {
   if (humanCount > 0) {
     if (item._type === 'message') {
       const readCount = readCountMap[item.id] || 0;
-      const receiverCount = humanMembers.filter(m => m.eo_uid !== item.sender_eo_uid).length;
-      if (readCount >= receiverCount) {
+      // ════════════════════════════════════════════════════════════
+      // [既読バッジ分母仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+      // 送信時点で確定した受信者数を分母とする(index.html L3153 と同一方式)
+      // 優先順:
+      //   ① item.receiver_count (送信時にDB保存された送信時点の固定値)
+      //   ② 旧データ・NULL の場合は memberJoinedAt で送信時点フィルタして算出
+      // これにより、後から参加したメンバー(例:五郎S)が分母に入らない
+      // ════════════════════════════════════════════════════════════
+      let receiverCount;
+      if (item.receiver_count != null) {
+        receiverCount = item.receiver_count;
+      } else {
+        const itemCreatedAtMs = new Date(item.created_at).getTime();
+        receiverCount = humanMembers.filter(m => {
+          if (m.eo_uid === item.sender_eo_uid) return false;           // C
+          if (memberJoinedAt) {
+            const joinedAt = memberJoinedAt.get(m.eo_uid);
+            if (joinedAt !== undefined && joinedAt > itemCreatedAtMs) return false; // D
+          }
+          return true;
+        }).length;
+      }
+      if (receiverCount === 0) {
+        // 受信者0名(送信時点で送信者以外いない)→ 全員既読扱い
+        readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
+      } else if (readCount >= receiverCount) {
         readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
       } else {
         readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
@@ -1210,6 +1234,7 @@ async function loadMessage() {
       allMembers, humanMembers, humanCount,
       readCountMap, confirmedMap, msgPriorityMap,
       surveyResponseCountMap,
+      memberJoinedAt,  // [チャッピー第55-2回判定確定] buildItemHtml の receiver_count NULL フォールバック用
       allItemsFlat: [...handoverItems, ...messageItems]
     };
 
