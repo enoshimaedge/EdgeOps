@@ -2203,16 +2203,13 @@ async function updateImageQuotaUI() {
 // - 詳細画面(showHandoverDetail内 _renderDetailImage)は無変更・タップ時に画像表示維持
 // ══════════════════════════════════════════════════════
 function renderHandoverImageLabel(item) {
+  // [チャッピー第60-3回判定 解釈β] サイネージと同配置・priority-badge右横にインライン
   if (!item) return '';
   if (item.image_mode === 'deleted') {
-    return `<div style="margin-top:6px;">
-      <span style="display:inline-block; padding:3px 8px; background:#f5f5f5; border:1px dashed #bbb; border-radius:4px; color:#888; font-size:11px;">🗑️ 画像は削除されました</span>
-    </div>`;
+    return `<span class="priority-badge" style="background:#f5f5f5; color:#888; border:1px solid #bbb; margin-left:6px;">🗑️ 削除済</span>`;
   }
   if (item.image_url || item.thumbnail_url) {
-    return `<div style="margin-top:6px;">
-      <span style="display:inline-block; padding:3px 8px; background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); border-radius:4px; font-size:11px; font-weight:600;">📷 画像あり</span>
-    </div>`;
+    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`;
   }
   return '';
 }
@@ -3462,12 +3459,15 @@ function renderMessages() {
       const surveyLabel = isSurvey
         ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>${surveyDeadlineLabel}`
         : '';
+      // [チャッピー第60-3回判定 解釈β] 連絡サムネ廃止・📷画像ありバッジ(priority-badge右横・サイネージと同配置)
+      const imageLabel = (msg.image_url || msg.thumbnail_url)
+        ? `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`
+        : '';
       html += `
         <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
-          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}
+          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}${imageLabel}
           <div class="msg-title">${getMessageTitle(msg.body, 40)}</div>
           <div class="msg-meta">${senderName}　${timeStr}</div>
-          ${renderImageThumbnailHtml(msg)}
           <div class="msg-read-bar">
             <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
             <div class="read-count">${Math.min(msg.read_count || 0, receiverCount)}/${receiverCount}人既読</div>
@@ -3886,12 +3886,12 @@ function renderHandoverCardHtml(hw, confs, myConf) {
   } else {
     statusHtml = `<div class="handover-unconfirmed">⚠️ 未確認${confirmNames ? '（確認済：' + escHtml(confirmNames) + '）' : ''}</div>`;
   }
+  // [チャッピー第60-3回判定 解釈β] 引き継ぎ側も📷画像あり配置をサイネージと統一(priority-badge右横)
   return `
     <div class="handover-card priority-${p}" onclick="showHandoverDetail('${hw.id}')">
-      <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>
+      <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>${renderHandoverImageLabel(hw)}
       <div class="msg-title">${getMessageTitle(hw.content||'', 40)}</div>
       <div class="msg-meta">${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}</div>
-      ${renderHandoverImageLabel(hw)}
       ${statusHtml}
     </div>`;
 }
