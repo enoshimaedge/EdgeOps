@@ -550,8 +550,55 @@ async function auditLog(supabaseClient, params) {
  * @returns {Promise<string|null>} 新しい access_token / 失敗時 null
  */
 async function refreshEdgeOpsAccessToken() {
+  // ═══════════════════════════════════════════════════════════
+  // [チャッピー第61回判定 GO] 案A: Supabase refresh_token 優先
+  // ═══════════════════════════════════════════════════════════
+  // 真因(候補A4)対策:LIFF id_token に依存せず Supabase の
+  // refresh_token で JWT を直接更新する。失敗時は既存 LIFF ロジックへ fallback。
+  // - 既存ロジック(L553-609相当)は温存
+  // - access_token / refresh_token 本体は console 出力しない(条件4)
+  // - 失敗時 throw せず静かに fallback(条件3)
+  try {
+    const refreshToken = sessionStorage.getItem(SS_KEYS.EDGEOPS_REFRESH_TOKEN);
+    // EdgeOps では index.html L2619 で global 変数 supabase に createClient 結果が代入される
+    const sb = (typeof supabase !== 'undefined' && supabase && supabase.auth && supabase.auth.refreshSession)
+      ? supabase
+      : null;
+
+    if (refreshToken && sb) {
+      const { data, error } = await sb.auth.refreshSession({
+        refresh_token: refreshToken
+      });
+
+      if (!error && data && data.session && data.session.access_token) {
+        try {
+          sessionStorage.setItem(SS_KEYS.EDGEOPS_ACCESS_TOKEN, data.session.access_token);
+          if (data.session.refresh_token) {
+            sessionStorage.setItem(SS_KEYS.EDGEOPS_REFRESH_TOKEN, data.session.refresh_token);
+          }
+        } catch (e) {
+          console.warn('[image-auth] sessionStorage save failed (supabase refresh):', e?.message);
+        }
+
+        console.log('[image-auth] refreshed via supabase refresh_token');
+        return data.session.access_token;
+      }
+
+      // refresh失敗(error あり or access_token なし)→ fallback へ
+      console.warn('[image-auth] supabase refresh failed; fallback to LIFF id_token');
+    }
+    // refreshToken なし or supabase 未初期化 → fallback へ(ログなし)
+  } catch (e) {
+    // 例外発生でも throw せず静かに fallback(条件5)
+    console.warn('[image-auth] supabase refresh exception; fallback to LIFF id_token');
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 既存ロジック:LIFF id_token → line-auth(温存)
+  // ═══════════════════════════════════════════════════════════
   // (a) LIFF id_token 取得
   let id_token;
+
   try {
     if (typeof liff === 'undefined' || !liff.getIDToken) {
       console.error('[image-auth] LIFF unavailable');
