@@ -1926,6 +1926,13 @@ async function sendImageMessage() {
     }
 
     await loadMessages();
+    // [チャッピー第60-3回判定 GO] 引き継ぎ投稿後の遷移バグ修正
+    // context に応じて適切なタブをアクティブにする(setHomeFilterは内部でloadMessagesを呼ばないため二重ロードなし)
+    if (context === 'handover') {
+      await setHomeFilter('handover');
+    } else {
+      await setHomeFilter('msg');
+    }
     showScreen('screen-home');
     showToast(context === 'handover' ? '引き継ぎを投稿しました！' : '送信しました！');
     // [⑫クォータ表示UI・チャッピー第58回判定 条件4] 投稿成功後にクォータUI更新(次回compose画面表示時に最新値で表示)
