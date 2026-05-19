@@ -2218,6 +2218,7 @@ function renderHandoverImageLabel(item) {
 }
 
 // 詳細画面用: メッセージ/引き継ぎオブジェクトから画像エリアを表示・サムネ即時取得
+// [チャッピー第60-3回判定] 失敗時に再読み込みボタン+診断表示を持たせる強化版
 async function _renderDetailImage(item, wrapId, imgId, statusId) {
   const wrap = document.getElementById(wrapId);
   const img = document.getElementById(imgId);
@@ -2228,7 +2229,9 @@ async function _renderDetailImage(item, wrapId, imgId, statusId) {
   img.removeAttribute('data-thumbnail-path');
   img.removeAttribute('data-full-path');
   img.onclick = null;
-  if (status) status.textContent = '';
+  img.style.background = '';
+  img.alt = '';
+  if (status) status.innerHTML = '';
   if (!item) {
     wrap.style.display = 'none';
     return;
@@ -2258,24 +2261,132 @@ async function _renderDetailImage(item, wrapId, imgId, statusId) {
   img.onclick = function(ev) { ev.stopPropagation(); openFullImageViewer(fullPath); };
   wrap.style.display = 'block';
   // 詳細画面は1枚のみなので即時取得(IntersectionObserverを使わない)
+  await _attemptLoadDetailImage(item, img, status, thumbPath, false);
+}
+
+// [チャッピー第60-3回判定 案C+] サムネ取得試行(初回・リトライ共通)
+async function _attemptLoadDetailImage(item, img, status, thumbPath, isRetry) {
   try {
     const url = await getSignedThumbUrl(thumbPath);
     if (url) {
       img.src = url;
-      if (status && item.image_size) {
-        const kb = Math.round(item.image_size / 1024);
-        status.textContent = `画像 ${kb}KB ・ タップで拡大`;
+      img.style.background = '';
+      img.alt = '';
+      if (status) {
+        const kb = item.image_size ? Math.round(item.image_size / 1024) : null;
+        const sizeText = kb ? ` ・ ${kb}KB` : '';
+        status.innerHTML = `<span style="color:#666; font-size:13px;">画像${sizeText} ・ タップで拡大</span>`;
       }
     } else {
-      img.alt = '画像を読み込めませんでした';
-      img.style.background = '#fee';
-      if (status) status.textContent = '画像読込失敗';
+      _showImageError(item, img, status, thumbPath, isRetry);
     }
   } catch (e) {
-    img.alt = '画像を読み込めませんでした';
-    img.style.background = '#fee';
-    if (status) status.textContent = '画像読込失敗';
+    _showImageError(item, img, status, thumbPath, isRetry);
   }
+}
+
+// [チャッピー第60-3回判定 案C+] エラー表示+再読み込みボタン
+// 1回目失敗: 再読み込みボタン表示・2回目失敗: ボタン非表示で最終文言
+function _showImageError(item, img, status, thumbPath, isRetry) {
+  img.alt = '画像を表示できません';
+  img.style.background = '#fff3cd';
+  if (!status) return;
+  // 2回目失敗時はボタン非表示・最終文言
+  if (isRetry) {
+    status.innerHTML = `
+      <div style="display:inline-block; padding:8px 12px; background:#fff3cd; border:1px solid #ffe082; border-radius:6px; color:#795548; font-size:13px; line-height:1.5;">
+        画像を表示できません。EdgeOpsを一度閉じて開き直してください。
+      </div>`;
+    return;
+  }
+  // 1回目失敗:再読み込みボタン表示
+  status.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; background:#fff3cd; border:1px solid #ffe082; border-radius:6px;">
+      <span style="color:#795548; font-size:13px;">画像を表示できません</span>
+      <button id="_retry-image-btn" type="button" style="padding:4px 10px; background:#1976d2; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">🔄 再読み込み</button>
+    </div>
+    <div id="_retry-diag" style="margin-top:4px; min-height:0; display:flex; flex-direction:column; gap:2px;"></div>
+  `;
+  const btn = document.getElementById('_retry-image-btn');
+  const diagArea = document.getElementById('_retry-diag');
+  if (btn) {
+    btn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      await _handleRetryImage(item, img, status, thumbPath, btn, diagArea);
+    });
+  }
+}
+
+// [チャッピー第60-3回判定 案C+] 再読み込みボタン押下時の処理
+// JWT 強制更新 + キャッシュバイパス + 再取得 を 1ボタンで実行
+async function _handleRetryImage(item, img, status, thumbPath, btn, diagArea) {
+  // 多重押下防止(チャッピー第60-3回判定 条件)
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  btn.style.cursor = 'wait';
+  btn.textContent = '⏳ 再取得中...';
+  // 5秒タイムアウト(押しっぱなし防止・診断のみ)
+  const timeoutId = setTimeout(() => {
+    _appendDiag(diagArea, '診断: タイムアウト', '#fff3cd', '#795548');
+  }, 5000);
+  // ① JWT 強制更新
+  let refreshOk = false;
+  try {
+    if (typeof window.refreshEdgeOpsAccessToken === 'function') {
+      const newToken = await window.refreshEdgeOpsAccessToken();
+      refreshOk = !!newToken;
+    }
+  } catch (_) { refreshOk = false; }
+  _appendDiag(diagArea, refreshOk ? '診断: token更新 ✅' : '診断: refresh失敗', refreshOk ? '#e8f5e9' : '#ffebee', refreshOk ? '#2e7d32' : '#c62828');
+  // ② キャッシュバイパス
+  try {
+    if (typeof __signedUrlCache !== 'undefined' && __signedUrlCache && __signedUrlCache.delete) {
+      __signedUrlCache.delete(thumbPath);
+      _appendDiag(diagArea, '診断: キャッシュ削除 ✅', '#e8f5e9', '#2e7d32');
+    }
+  } catch (_) { /* cache 失敗は処理を止めない */ }
+  // ③ 再取得
+  try {
+    const url = await getSignedThumbUrl(thumbPath);
+    clearTimeout(timeoutId);
+    if (url) {
+      img.src = url;
+      img.style.background = '';
+      img.alt = '';
+      _appendDiag(diagArea, '診断: 再取得成功 ✅', '#e8f5e9', '#2e7d32');
+      // 成功時はステータス全体を成功表示に置換(3秒後)
+      setTimeout(() => {
+        if (status) {
+          const kb = item.image_size ? Math.round(item.image_size / 1024) : null;
+          const sizeText = kb ? ` ・ ${kb}KB` : '';
+          status.innerHTML = `<span style="color:#666; font-size:13px;">画像${sizeText} ・ タップで拡大</span>`;
+        }
+      }, 3000);
+    } else {
+      _appendDiag(diagArea, '診断: 取得失敗(URL空)', '#ffebee', '#c62828');
+      // 2回目失敗 → 最終文言+ボタン非表示
+      setTimeout(() => _showImageError(item, img, status, thumbPath, true), 1500);
+    }
+  } catch (e) {
+    clearTimeout(timeoutId);
+    _appendDiag(diagArea, '診断: 取得失敗(throw)', '#ffebee', '#c62828');
+    setTimeout(() => _showImageError(item, img, status, thumbPath, true), 1500);
+  }
+}
+
+// [チャッピー第60-3回判定 案C+] 診断ログ表示ヘルパー
+// 5秒後フェードアウト・token・署名URLは出力しない
+function _appendDiag(area, text, bgColor, textColor) {
+  if (!area) return;
+  const div = document.createElement('div');
+  div.style.cssText = `padding:4px 8px; background:${bgColor}; color:${textColor}; border-radius:4px; font-size:11px; display:inline-block; align-self:flex-start;`;
+  div.textContent = text;
+  area.appendChild(div);
+  setTimeout(() => {
+    div.style.transition = 'opacity 0.5s';
+    div.style.opacity = '0';
+    setTimeout(() => { try { div.remove(); } catch (_) {} }, 500);
+  }, 5000);
 }
 
 // ═══════════════════════════════════════════
