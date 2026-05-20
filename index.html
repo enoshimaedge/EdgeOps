@@ -4992,7 +4992,8 @@ async function deleteMessage() {
     showToast('自分のメッセージのみ削除できます'); return;
   }
   // [2026/5/20 野口さん指示] 画像付きメッセージの場合はクォータ警告を追加
-  const hasImage = msg.image_mode === 'attached' && (msg.image_url || msg.thumbnail_url);
+  // [2026/5/20 訂正] image_mode は 'attached' ではなく 'expandable' のため依存をやめる
+  const hasImage = !!(msg.image_url || msg.thumbnail_url);
   const confirmMsg = hasImage
     ? 'このメッセージを削除しますか?\n既読データも削除されます。\n\n⚠️ 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)'
     : 'このメッセージを削除しますか?\n既読データも削除されます。';
