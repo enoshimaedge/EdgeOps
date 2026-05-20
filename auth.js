@@ -657,6 +657,43 @@ async function refreshEdgeOpsAccessToken() {
 }
 
 /**
+ * Phase 2 (チャッピー第63回判定 反映): JWT decode (Base64URL対応 + padding補正)
+ * 既存 atob 直呼びはBase64URL形式で失敗するケースがあるため共通化
+ */
+function decodeJwtPayload(token) {
+  const part = token && token.split('.')[1];
+  if (!part) return null;
+  const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+  return JSON.parse(atob(padded));
+}
+
+/**
+ * Phase 2: JWT事前期限チェック(残り5分未満で先回り refresh)
+ * チャッピー第63回判定 反映: Base64URL対応 + decode失敗時はtoken温存(条件5)
+ *
+ * @returns {Promise<string|null>} 使用可能な access_token / refresh失敗時 null
+ */
+async function ensureFreshToken() {
+  const token = sessionStorage.getItem(SS_KEYS.EDGEOPS_ACCESS_TOKEN);
+  if (!token) return null;
+  try {
+    const payload = decodeJwtPayload(token);
+    if (!payload || !payload.exp) return token;
+    const remainSec = Math.floor((payload.exp * 1000 - Date.now()) / 1000);
+    if (remainSec < 300) { // チャッピー条件3: 残り5分未満で更新
+      console.log('[auth.js] Phase 2: JWT remain ' + remainSec + 's < 300, refreshing');
+      return await refreshEdgeOpsAccessToken();
+    }
+    return token;
+  } catch (e) {
+    // decode 失敗時は触らない(チャッピー条件5「即クラッシュさせない」)
+    console.warn('[auth.js] Phase 2: JWT decode failed, skip pre-check');
+    return token;
+  }
+}
+
+/**
  * 画像系 Edge Function を Authorization 付きで呼び出すヘルパー
  *
  * 動作:
@@ -672,8 +709,8 @@ async function refreshEdgeOpsAccessToken() {
  * @throws {Error} token取得不可 / fetch自体失敗時
  */
 async function callImageFunction(url, options = {}, retry = true) {
-  // (1) token 確保
-  let token = sessionStorage.getItem(SS_KEYS.EDGEOPS_ACCESS_TOKEN);
+  // (1) token 確保 — Phase 2: 残り5分未満なら先回り refresh
+  let token = await ensureFreshToken();
   if (!token) {
     // 起動直後 / token 欠落時は line-auth で取得
     console.log('[image-auth] no token in sessionStorage, fetching via line-auth');
@@ -702,7 +739,9 @@ async function callImageFunction(url, options = {}, retry = true) {
       errBody = {};
     }
     const errCode = errBody?.errorCode || errBody?.error_code || errBody?.code;
-    if (errCode === 'AUTH_TOKEN_EXPIRED' || errCode === 'AUTH_TOKEN_INVALID') {
+    if (errCode === 'AUTH_TOKEN_EXPIRED' ||
+        errCode === 'AUTH_TOKEN_INVALID' ||
+        errCode === 'UNAUTHORIZED_ASYMMETRIC_JWT') {
       console.log('[image-auth] 401', errCode, '→ refresh & retry once');
       const newToken = await refreshEdgeOpsAccessToken();
       if (newToken) {
