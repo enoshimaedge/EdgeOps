@@ -2732,7 +2732,17 @@ async function deleteImageOnly(itemId, context) {
 // ═══════════════════════════════════════════
 async function init() {
   try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // [Phase 6] チャッピー第63回判定 反映: createClient options 明示
+    //   autoRefreshToken: SDK内部の自動refresh(Phase 4の補助)
+    //   persistSession:    LocalStorageへセッション永続化
+    //   detectSessionInUrl: LIFF環境では不要・無効化
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false
+      }
+    });
 
     // [Phase 4-2B] feature_flagsプリロード(fire-and-forget・起動阻害しない)
     // 5分キャッシュを起動時にウォームアップ。失敗時は安全側で全FALSE扱い。
