@@ -652,8 +652,39 @@ async function refreshEdgeOpsAccessToken() {
     return result.access_token;
   } catch (e) {
     console.error('[image-auth] line-auth refresh failed:', e?.message);
-    return null;
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // Phase 5: liff.login() フォールバック(最後の手段)
+  // チャッピー第63回判定 反映:
+  //   - !liff.isLoggedIn() 限定を削除(isLoggedIn=true でも id_token 失効ありうるため)
+  //   - isInClient() && liff.login の AND 判定で発火可能化
+  //   - liff.logout() は呼ばない(影響大のため・チャッピー条件)
+  //   - 5分クールダウンで暴走防止
+  // ═══════════════════════════════════════════════════════════
+  try {
+    const LAST_LOGIN_KEY = 'edgeops_last_liff_login_ms';
+    const lastLogin = parseInt(localStorage.getItem(LAST_LOGIN_KEY) || '0', 10);
+    const elapsed = Date.now() - lastLogin;
+    if (elapsed < 5 * 60 * 1000) {
+      console.error('[image-auth] Phase 5: liff.login cooldown active (last '
+        + Math.floor(elapsed / 1000) + 's ago)');
+      return null;
+    }
+    const canLogin = typeof liff !== 'undefined' &&
+                     liff.isInClient && liff.isInClient() &&
+                     liff.login;
+    if (canLogin) {
+      console.warn('[image-auth] Phase 5: triggering liff.login() as last resort');
+      localStorage.setItem(LAST_LOGIN_KEY, String(Date.now()));
+      liff.login(); // logout は呼ばない(チャッピー条件)
+      return null;
+    }
+    console.error('[image-auth] Phase 5: canLogin=false, giving up');
+  } catch (e) {
+    console.error('[image-auth] Phase 5: exception:', e?.message);
+  }
+  return null;
 }
 
 /**
@@ -755,6 +786,60 @@ async function callImageFunction(url, options = {}, retry = true) {
 
   return res;
 }
+
+
+// ═══════════════════════════════════════════════════════════
+// Phase 4: バックグラウンド定期更新(15分間隔・主防御)
+// チャッピー第63回判定 反映: visibilitychange リスナー重複登録防止
+// 既存 pollTimer(index.html L3178)とは別変数で管理・衝突なし
+// ═══════════════════════════════════════════════════════════
+let _tokenRefreshTimer = null;
+let _tokenVisibilityListenerAttached = false;
+const TOKEN_REFRESH_INTERVAL_MS = 15 * 60 * 1000;
+
+async function _periodicTokenCheck() {
+  if (document.visibilityState !== 'visible') return; // タブ非表示中はスキップ
+  const token = sessionStorage.getItem(SS_KEYS.EDGEOPS_ACCESS_TOKEN);
+  if (!token) return; // 未ログインはスキップ
+  try {
+    const payload = decodeJwtPayload(token); // Phase 2 と共有
+    if (!payload || !payload.exp) return;
+    const remainSec = Math.floor((payload.exp * 1000 - Date.now()) / 1000);
+    if (remainSec < 1200) { // 残り20分未満なら refresh
+      console.log('[auth.js] Phase 4: bg refresh (remain ' + remainSec + 's)');
+      await refreshEdgeOpsAccessToken();
+    }
+  } catch (e) {
+    console.warn('[auth.js] Phase 4: periodic check failed (continue):', e?.message);
+  }
+}
+
+// 外出し関数化(リスナー重複防止のため・チャッピー第63回判定 反映)
+function _onTokenVisibilityChange() {
+  if (document.visibilityState === 'visible') _periodicTokenCheck();
+}
+
+function startTokenRefreshTimer() {
+  if (_tokenRefreshTimer) clearInterval(_tokenRefreshTimer);
+  _tokenRefreshTimer = setInterval(_periodicTokenCheck, TOKEN_REFRESH_INTERVAL_MS);
+  if (!_tokenVisibilityListenerAttached) {
+    document.addEventListener('visibilitychange', _onTokenVisibilityChange);
+    _tokenVisibilityListenerAttached = true;
+  }
+  _periodicTokenCheck(); // 起動直後にも1回(チャッピー第63回判定 追記)
+  console.log('[auth.js] Phase 4: token refresh timer started (15min)');
+}
+
+function stopTokenRefreshTimer() {
+  if (_tokenRefreshTimer) { clearInterval(_tokenRefreshTimer); _tokenRefreshTimer = null; }
+  if (_tokenVisibilityListenerAttached) {
+    document.removeEventListener('visibilitychange', _onTokenVisibilityChange);
+    _tokenVisibilityListenerAttached = false;
+  }
+}
+
+window.startTokenRefreshTimer = startTokenRefreshTimer;
+window.stopTokenRefreshTimer = stopTokenRefreshTimer;
 
 // グローバル公開(index.html / admin.html から呼び出すため)
 // 既存の resolveEoUid / generateEoUid 等の公開方式に合わせる
