@@ -2766,6 +2766,9 @@ async function init() {
     const _auth = await resolveEoUid(supabase);
     currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, line_name: _auth.displayName, picture_url: _auth.pictureUrl || '', display_name: _auth.displayName };
 
+    // [Phase 4] バックグラウンド定期更新タイマー起動(チャッピー第63回判定 反映・15分間隔)
+    if (typeof window.startTokenRefreshTimer === 'function') window.startTokenRefreshTimer();
+
     // ── 友達登録チェック（LINEアプリ内のみ） ──
     if (liff.isInClient()) {
       try {
