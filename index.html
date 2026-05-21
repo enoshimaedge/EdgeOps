@@ -1445,6 +1445,43 @@ const CFG = ENV_CONFIG[CURRENT_ENV];
 // 既存コード互換のため、グローバル定数として展開(Step 4-B以降の変更を最小化)
 const SUPABASE_URL = CFG.SUPABASE_URL;
 const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
+
+    // ════════════════════════════════════════════════════════════
+    // [2026/5/21 P0] LIFF外アクセス遮断ガード(チャッピー第64回判定対応)
+    // ────────────────────────────────────────────────────────────
+    // 目的:Chrome 等から app.edgeops.jp を直接開かれた場合に、
+    //   認証バイパスでDB書き込みが発生するのを防止する。
+    // 二重防御:
+    //   Layer 1 = liff.init() 直後の環境チェック(遮断画面表示)
+    //   Layer 2 = 書き込み系関数の入口で assertLiffEnvironment() を呼ぶ
+    // 注意:signage.html / admin.html には適用しない(別認証経路があるため)
+    // ════════════════════════════════════════════════════════════
+
+    function showLiffOutsideErrorScreen(reason) {
+      // 全画面の上に黒背景の警告を被せ、UI 操作を完全停止する
+      const existing = document.getElementById('liff-outside-error');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.id = 'liff-outside-error';
+      div.style.cssText = 'position:fixed; inset:0; z-index:99999; background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; font-family:sans-serif;';
+      div.innerHTML = '<div style="font-size:48px; margin-bottom:24px;">⚠️</div>' +
+        '<div style="font-size:20px; font-weight:bold; margin-bottom:16px;">この画面はLINEアプリ内でのみ使用できます</div>' +
+        '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#ddd;">LINEアプリのトークルームから「EdgeOpsを開く」をタップしてご利用ください。<br><br>Chrome や Safari などのブラウザから直接 app.edgeops.jp にアクセスすることはセキュリティ上できません。</div>' +
+        '<div style="font-size:12px; margin-top:24px; color:#888;">(理由: ' + (reason || '不明') + ')</div>';
+      document.body.appendChild(div);
+      // body のスクロール禁止
+      document.body.style.overflow = 'hidden';
+    }
+
+    function assertLiffEnvironment() {
+      // 書き込み系関数の冒頭で呼ぶ・二重防御
+      if (typeof liff === 'undefined' || !liff.isInClient || !liff.isInClient()) {
+        console.error('[LIFF Guard] Write operation blocked: not in LINE client');
+        showLiffOutsideErrorScreen('LIFF外からの書き込み操作はブロックされました');
+        throw new Error('LIFF_OUTSIDE_ACCESS_BLOCKED');
+      }
+    }
+
 const LIFF_ID = CFG.LIFF_ID;
 const LINE_AUTH_URL = CFG.LINE_AUTH_URL;
 const POLL_INTERVAL = 30000; // [チャッピー第53回判定後] 5秒→30秒(サムネ画像のチカチカ防止・LIFFは即時性不要)
@@ -1794,6 +1831,7 @@ function onComposeImageCancel() {
 // upload-image Edge Function (auth.js window.callImageFunction 経由・Authorization自動付与)
 // ═══════════════════════════════════════════
 async function sendImageMessage() {
+  await assertLiffEnvironment();
   const body = document.getElementById('compose-body').value.trim();
 
   // [チャッピー第52回判定 修正2] isCreator !== true なら送信拒否(送信入口の二重防御)
@@ -2750,20 +2788,30 @@ async function init() {
     try {
       await Promise.race([liffInitPromise, timeoutPromise]);
     } catch (liffError) {
-      // [Phase 0 5-3] LIFFタイムアウト時はdev eo_uid生成
-      const dev = generateDevEoUid();
-      currentUser = { eo_uid: dev.eoUid, provider: 'dev', provider_uid: dev.providerUid, line_name: 'テストユーザー', picture_url: '', display_name: 'テストユーザー' };
-      hideLoading(); showScreen('screen-start'); return;
+      // [2026/5/21 P0] LIFF初期化失敗 = LIFF外アクセス・dev生成は廃止し遮断画面表示
+      console.warn('[LIFF Guard] LIFF init failed:', liffError);
+      hideLoading();
+      showLiffOutsideErrorScreen('LIFFの初期化に失敗しました');
+      return;
     }
 
     if (!liff.isLoggedIn()) {
       if (!liff.isInClient()) {
-        // [Phase 0 5-3] ブラウザテスト時はdev eo_uid生成
-        const dev = generateDevEoUid();
-        currentUser = { eo_uid: dev.eoUid, provider: 'dev', provider_uid: dev.providerUid, line_name: 'ブラウザテスト', picture_url: '', display_name: 'ブラウザテスト' };
-        hideLoading(); showScreen('screen-start'); return;
+        // [2026/5/21 P0] LIFF外Chromeアクセス = dev生成廃止・遮断画面表示
+        console.warn('[LIFF Guard] Not in LINE client. Blocking access.');
+        hideLoading();
+        showLiffOutsideErrorScreen('LINEアプリ内でのみ動作します');
+        return;
       }
       liff.login(); return;
+    }
+
+    // [2026/5/21 P0] ログイン済でも LIFF外なら遮断(二重チェック)
+    if (!liff.isInClient()) {
+      console.warn('[LIFF Guard] Logged in but not in LINE client. Blocking access.');
+      hideLoading();
+      showLiffOutsideErrorScreen('LINEアプリ内でのみ動作します');
+      return;
     }
 
     // [Phase 0 5-3] auth.js の resolveEoUid を使用してeo_uidを解決
@@ -2937,6 +2985,7 @@ async function recheckFriendship() {
 // グループ作成・参加
 // ═══════════════════════════════════════════
 async function createGroup() {
+  await assertLiffEnvironment();
   const displayName = document.getElementById('input-display-name').value.trim();
   const industryVal = document.getElementById('input-industry').value;
   const groupNameVal = document.getElementById('input-group-name').value.trim();
@@ -2967,6 +3016,7 @@ async function createGroup() {
 }
 
 async function joinGroup() {
+  await assertLiffEnvironment();
   const displayName = document.getElementById('input-display-name').value.trim();
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
   if (!displayName) { showToast('表示名を入力してください'); return; }
@@ -3684,6 +3734,7 @@ function selectPriority(p) {
 }
 
 async function sendMessage() {
+  await assertLiffEnvironment();
   const body = document.getElementById('compose-body').value.trim();
   if (!body) { showToast('内容を入力してください'); return; }
 
@@ -4059,6 +4110,7 @@ async function showHandoverDetail(handoverId) {
 }
 
 async function confirmHandover(action) {
+  await assertLiffEnvironment();
   if (!currentHandoverId) return;
   try {
     // ════════════════════════════════════════════════════════════
@@ -4403,6 +4455,7 @@ function wasMemberAtItemCreated(member, itemCreatedAt) {
 }
 
 async function recordRead(messageId) {
+  await assertLiffEnvironment();
   try {
     // サイネージ端末は既読記録しない
     const currentMember = members.find(m => m.eo_uid === currentUser.eo_uid);
@@ -4904,6 +4957,7 @@ async function updateIndustry() {
 
 // ── カスタムLINK URLを保存(管理者のみ・httpsのみ・空文字はNULL正規化) ──
 async function updateLinkUrl() {
+  await assertLiffEnvironment();
   if (!isCreator) { showToast('管理者のみ変更できます'); return; }
   const inputEl = document.getElementById('profile-link-url');
   if (!inputEl) return;
@@ -4942,6 +4996,7 @@ async function updateLinkUrl() {
 
 // ── カスタムLINK URLを削除(管理者のみ・NULL正規化) ──
 async function removeLinkUrl() {
+  await assertLiffEnvironment();
   if (!isCreator) { showToast('管理者のみ変更できます'); return; }
   if (!currentGroup?.link_url) {
     showToast('削除対象のLINKがありません');
