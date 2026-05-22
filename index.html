@@ -1473,13 +1473,107 @@ const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
       document.body.style.overflow = 'hidden';
     }
 
-    function assertLiffEnvironment() {
-      // 書き込み系関数の冒頭で呼ぶ・二重防御
-      if (typeof liff === 'undefined' || !liff.isInClient || !liff.isInClient()) {
-        console.error('[LIFF Guard] Write operation blocked: not in LINE client');
-        showLiffOutsideErrorScreen('LIFF外からの書き込み操作はブロックされました');
-        throw new Error('LIFF_OUTSIDE_ACCESS_BLOCKED');
+    // [2026/5/23 案D] LIFF SDK 初期化直後の誤判定対策で 500ms リトライ1回入れる(チャッピー第72回判定GO)
+    //   背景:liff.isInClient() が SDK 初期化直後・状態遷移直後に false を返すことがあり、
+    //         書き込み操作時に誤って遮断画面が出るバグ(超管理者ボタン誤遮断・5/22箱根新規グループ作成失敗の一要因)
+    async function assertLiffEnvironment() {
+      function check() {
+        return (typeof liff !== 'undefined'
+                && liff.isInClient
+                && liff.isInClient());
       }
+      if (check()) return;
+      // 500ms 待って 1回再試行
+      console.warn('[LIFF Guard] First check failed. Retrying after 500ms.');
+      await new Promise(r => setTimeout(r, 500));
+      if (check()) {
+        console.log('[LIFF Guard] Retry succeeded.');
+        return;
+      }
+      console.error('[LIFF Guard] Write operation blocked: not in LINE client');
+      showLiffOutsideErrorScreen('LIFF外からの書き込み操作はブロックされました');
+      throw new Error('LIFF_OUTSIDE_ACCESS_BLOCKED');
+    }
+
+    // ═══════════════════════════════════════════
+    // [2026/5/23 案B] currentUser リロード耐性ガード(チャッピー第72回判定GO)
+    //   背景:画面リロードでJavaScript全変数リセット → currentUser null になる現象あり
+    //         書き込み系関数の入口で currentUser を必ず構築済にする
+    //   設計:
+    //     (1) currentUser が既に正常なら即return(高速)
+    //     (2) JWT から eo_uid を取得して currentUser を再構築
+    //     (3) JWT も無ければ resolveEoUid で完全再認証
+    //     (4) 完全失敗なら null を返す(呼び出し側でトースト表示)
+    //   注意(チャッピー第72回判定):
+    //     - JWT sub は Supabase auth.users の UUID であり、LINE provider_uid とは別物
+    //     - provider_uid は JWT sub から作らない(復元不能なら空文字)
+    // ═══════════════════════════════════════════
+    async function ensureCurrentUser() {
+      // (1) すでに正しく設定されているなら何もしない(高速return)
+      if (currentUser && currentUser.eo_uid) {
+        return currentUser;
+      }
+      console.warn('[ensureCurrentUser] currentUser is null. Attempting recovery.');
+
+      // (2) Supabase session があれば JWT から eo_uid を取得して再構築
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const part = token.split('.')[1];
+          const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+          const payload = JSON.parse(atob(padded));
+          const eoUidFromJwt = payload?.eo_uid;
+          if (eoUidFromJwt) {
+            // localStorage から表示名等を復元(2819行直後で保存している)
+            const lineName = localStorage.getItem('sl_line_name') || '';
+            const pictureUrl = localStorage.getItem('sl_picture_url') || '';
+            const displayName = localStorage.getItem('sl_display_name') || lineName;
+            currentUser = {
+              eo_uid: eoUidFromJwt,
+              provider: 'line',
+              provider_uid: '', // JWT sub は LINE provider_uid と別物のため復元しない
+              line_name: lineName,
+              picture_url: pictureUrl,
+              display_name: displayName
+            };
+            console.log('[ensureCurrentUser] Rebuilt from JWT.');
+            return currentUser;
+          }
+        }
+      } catch (e) {
+        console.warn('[ensureCurrentUser] JWT rebuild failed:', e?.message);
+      }
+
+      // (3) JWT が無ければ resolveEoUid() で完全再認証
+      try {
+        const _auth = await resolveEoUid(supabase);
+        if (_auth?.eoUid) {
+          currentUser = {
+            eo_uid: _auth.eoUid,
+            provider: 'line',
+            provider_uid: _auth.providerUid,
+            line_name: _auth.displayName,
+            picture_url: _auth.pictureUrl || '',
+            display_name: _auth.displayName
+          };
+          // localStorage にも保存
+          try {
+            localStorage.setItem('sl_line_name', _auth.displayName || '');
+            localStorage.setItem('sl_picture_url', _auth.pictureUrl || '');
+            localStorage.setItem('sl_display_name', _auth.displayName || '');
+          } catch (_) {}
+          console.log('[ensureCurrentUser] Rebuilt via resolveEoUid.');
+          return currentUser;
+        }
+      } catch (e) {
+        console.error('[ensureCurrentUser] resolveEoUid failed:', e?.message);
+      }
+
+      // (4) 完全失敗
+      console.error('[ensureCurrentUser] Recovery failed. currentUser remains null.');
+      return null;
     }
 
 const LIFF_ID = CFG.LIFF_ID;
@@ -1832,6 +1926,9 @@ function onComposeImageCancel() {
 // ═══════════════════════════════════════════
 async function sendImageMessage() {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   const body = document.getElementById('compose-body').value.trim();
 
   // [チャッピー第52回判定 修正2] isCreator !== true なら送信拒否(送信入口の二重防御)
@@ -2818,6 +2915,16 @@ async function init() {
     const _auth = await resolveEoUid(supabase);
     currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, line_name: _auth.displayName, picture_url: _auth.pictureUrl || '', display_name: _auth.displayName };
 
+    // [2026/5/23 案B] リロード耐性のため localStorage に保存(チャッピー第72回判定GO)
+    //   ensureCurrentUser() が JWT 再構築時に参照する
+    try {
+      localStorage.setItem('sl_line_name', _auth.displayName || '');
+      localStorage.setItem('sl_picture_url', _auth.pictureUrl || '');
+      localStorage.setItem('sl_display_name', _auth.displayName || '');
+    } catch (e) {
+      console.warn('[init] localStorage save failed (continue):', e?.message);
+    }
+
     // ── 友達登録チェック（LINEアプリ内のみ） ──
     if (liff.isInClient()) {
       try {
@@ -2986,6 +3093,12 @@ async function recheckFriendship() {
 // ═══════════════════════════════════════════
 async function createGroup() {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) {
+    showToast('認証エラーです。アプリを再起動してください。');
+    return;
+  }
   const displayName = document.getElementById('input-display-name').value.trim();
   const industryVal = document.getElementById('input-industry').value;
   const groupNameVal = document.getElementById('input-group-name').value.trim();
@@ -2994,46 +3107,6 @@ async function createGroup() {
   // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(孤児グループ作成防止)
   const restored = await restoreExistingMembershipIfAny();
   if (restored) return;
-
-  // ═══════════════════════════════════════════
-  // ★★★ 2026/5/22 夜 緊急診断コード(チャッピー第70回判定追加調査1)★★★
-  // 箱根ユーザー新規グループ作成失敗インシデント究明用
-  // session/JWT/Hook claim 診断
-  // ═══════════════════════════════════════════
-  try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const ssAccessToken = sessionStorage.getItem('edgeops_access_token');
-    const supabaseAccessToken = sessionData?.session?.access_token || null;
-    const accessToken = supabaseAccessToken || ssAccessToken;
-    let jwtPayload = null;
-    try {
-      if (accessToken) {
-        const part = accessToken.split('.')[1];
-        const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
-        const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-        jwtPayload = JSON.parse(atob(padded));
-      }
-    } catch (e) { jwtPayload = { _parse_error: e.message }; }
-    const diagnostic = {
-      session_exists: !!sessionData?.session,
-      ss_access_token_exists: !!ssAccessToken,
-      supabase_access_token_exists: !!supabaseAccessToken,
-      jwt_role: jwtPayload?.role || null,
-      jwt_eo_uid: jwtPayload?.eo_uid || null,
-      jwt_sub_tail: jwtPayload?.sub ? jwtPayload.sub.slice(-12) : null,
-      jwt_exp: jwtPayload?.exp ? new Date(jwtPayload.exp * 1000).toISOString() : null,
-      jwt_aud: jwtPayload?.aud || null,
-      currentUser_eo_uid: currentUser?.eo_uid || null,
-      currentUser_provider: currentUser?.provider || null,
-      match_jwt_currentUser: jwtPayload?.eo_uid === currentUser?.eo_uid
-    };
-    alert('【診断1】createGroup直前の認証状態\n' + JSON.stringify(diagnostic, null, 2));
-  } catch (diagErr) {
-    alert('【診断1エラー】' + diagErr.message);
-  }
-  // ═══════════════════════════════════════════
-  // ★★★ 緊急診断コード ここまで(原因究明完了後、必ず削除すること)★★★
-  // ═══════════════════════════════════════════
 
   try {
     showToast('グループを作成中...');
@@ -3044,48 +3117,27 @@ async function createGroup() {
     if (groupNameVal) insertData.group_name = groupNameVal;
     if (regionVal) insertData.region = regionVal;
 
-    // ═══════════════════════════════════════════
-    // ★★★ 診断2: group_sessions INSERT 試行 ★★★
-    // ═══════════════════════════════════════════
     const { data: group, error: groupError } = await supabase
       .from('group_sessions').insert(insertData).select().single();
-    if (groupError) {
-      alert('【診断2失敗】group_sessions INSERT 失敗\n' + JSON.stringify({
-        code: groupError.code,
-        message: groupError.message,
-        details: groupError.details,
-        hint: groupError.hint
-      }, null, 2));
-      throw groupError;
-    }
-    alert('【診断2成功】group_sessions INSERT 成功\ngroup.id=' + group.id);
+    if (groupError) throw groupError;
 
-    // ═══════════════════════════════════════════
-    // ★★★ 診断3: group_members INSERT 試行 ★★★
-    // ═══════════════════════════════════════════
     const { data: member, error: memberError } = await supabase
       .from('group_members').insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
-    if (memberError) {
-      alert('【診断3失敗】group_members INSERT 失敗\n' + JSON.stringify({
-        code: memberError.code,
-        message: memberError.message,
-        details: memberError.details,
-        hint: memberError.hint,
-        eo_uid_used: currentUser.eo_uid,
-        group_session_id_used: group.id
-      }, null, 2));
-      throw memberError;
-    }
-    alert('【診断3成功】group_members INSERT 成功');
+    if (memberError) throw memberError;
 
     localStorage.setItem('sl_member_id', member.id);
     localStorage.setItem('sl_group_id', groupId);
     currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id; isCreator = true;
+    // [2026/5/23 案B 追加] 作成成功時にも sl_display_name 更新(チャッピー第72回判定GO)
+    try { localStorage.setItem('sl_display_name', displayName || ''); } catch (_) {}
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
   } catch (e) { console.error(e); showToast('エラーが発生しました。再試行してください。'); }
 }
 async function joinGroup() {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   const displayName = document.getElementById('input-display-name').value.trim();
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
   if (!displayName) { showToast('表示名を入力してください'); return; }
@@ -3804,6 +3856,9 @@ function selectPriority(p) {
 
 async function sendMessage() {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   const body = document.getElementById('compose-body').value.trim();
   if (!body) { showToast('内容を入力してください'); return; }
 
@@ -4180,6 +4235,9 @@ async function showHandoverDetail(handoverId) {
 
 async function confirmHandover(action) {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   if (!currentHandoverId) return;
   try {
     // ════════════════════════════════════════════════════════════
@@ -4525,6 +4583,10 @@ function wasMemberAtItemCreated(member, itemCreatedAt) {
 
 async function recordRead(messageId) {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  // recordRead は頻繁に呼ばれるが、ensureCurrentUser は currentUser 正常時は即returnする高速設計
+  const u = await ensureCurrentUser();
+  if (!u) return; // recordRead は静かに失敗(トースト出さない・既読は再表示時に再記録される)
   try {
     // サイネージ端末は既読記録しない
     const currentMember = members.find(m => m.eo_uid === currentUser.eo_uid);
@@ -5027,6 +5089,9 @@ async function updateIndustry() {
 // ── カスタムLINK URLを保存(管理者のみ・httpsのみ・空文字はNULL正規化) ──
 async function updateLinkUrl() {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   if (!isCreator) { showToast('管理者のみ変更できます'); return; }
   const inputEl = document.getElementById('profile-link-url');
   if (!inputEl) return;
@@ -5066,6 +5131,9 @@ async function updateLinkUrl() {
 // ── カスタムLINK URLを削除(管理者のみ・NULL正規化) ──
 async function removeLinkUrl() {
   await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   if (!isCreator) { showToast('管理者のみ変更できます'); return; }
   if (!currentGroup?.link_url) {
     showToast('削除対象のLINKがありません');
