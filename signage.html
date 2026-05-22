@@ -564,6 +564,11 @@
 const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
 
+// ─── signage-fetch Edge Function 経由化 (チャッピー第68回判定 v2 反映) ───
+// 全 DB アクセスは signage-fetch Edge Function 経由で行う
+// (anon キー経由の DB 直接アクセスを完全に廃止 = L3 認可基盤層との両立)
+const SIGNAGE_FETCH_URL = SUPABASE_URL + '/functions/v1/signage-fetch';
+
 // 地域→座標マッピング
 const REGION_COORDS = {
   // 北海道・東北
@@ -689,6 +694,11 @@ let sbClient = null;
 let currentGroupData = null;
 let updateTimer = null;
 
+// ─── signage-fetch 経由データキャッシュ ───────────────
+// 全 DB データを Edge Function 1回呼び出しで取得し、ここにキャッシュする
+// (authenticate / loadMessage / openModal / startPolling から共通参照)
+let _globalSignageData = null;
+
 // ═══════════════════════════════════════════
 // ユーティリティ
 // ═══════════════════════════════════════════
@@ -810,6 +820,35 @@ function toDateStr(date) {
 }
 
 // ═══════════════════════════════════════════
+// signage-fetch Edge Function 経由データ取得
+// ═══════════════════════════════════════════
+// チャッピー第68回判定 v2 反映:全 DB アクセスを Edge Function 経由に統一
+// service_role キーで認証バイパスし、L3 RLS 完遂後も動作する設計
+async function fetchSignageData() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  if (!token) {
+    return { ok: false, error_code: 'NO_TOKEN' };
+  }
+  try {
+    const res = await fetch(SIGNAGE_FETCH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    console.warn('[fetchSignageData] network error:', e?.message);
+    return { ok: false, error_code: 'NETWORK_ERROR' };
+  }
+}
+
+// ═══════════════════════════════════════════
 // 認証チェック（3段階）
 // ═══════════════════════════════════════════
 async function authenticate() {
@@ -825,16 +864,22 @@ async function authenticate() {
     return false;
   }
 
-  // ② DBでトークン照合（tokenだけでグループを自動特定）
+  // ② signage-fetch Edge Function 経由でデータ取得 (チャッピー第68回判定 v2)
   try {
-    const { data: group, error } = await sbClient
-      .from('group_sessions')
-      .select('*')
-      .eq('signage_token', token)
-      .eq('signage_enabled', true)
-      .single();
+    const data = await fetchSignageData();
 
-    if (error || !group) {
+    // ─── NETWORK_ERROR は「接続エラー」として別表示 (チャッピー最終確認 修正必須) ───
+    // 一時的な通信エラーで「サイネージ無効」と誤認させない
+    if (data?.error_code === 'NETWORK_ERROR') {
+      showError(
+        '接続エラー',
+        'サーバーへの接続に失敗しました。\nネットワークをご確認ください。'
+      );
+      return false;
+    }
+
+    if (!data || !data.ok || !data.group) {
+      // INVALID_TOKEN / EXPIRED すべて統一文言で表示
       showError(
         'サイネージが無効です',
         'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。'
@@ -842,19 +887,9 @@ async function authenticate() {
       return false;
     }
 
-    // ST版(SL-)の期限切れチェック
-    if (group.group_id?.startsWith('SL-') && group.expires_at) {
-      if (new Date(group.expires_at) <= new Date()) {
-        showError(
-          'グループの有効期限切れ',
-          'このグループは有効期限を過ぎています。\n管理者にお問い合わせください。'
-        );
-        return false;
-      }
-    }
-
-    // ③ 認証成功
-    currentGroupData = group;
+    // ③ 認証成功 - グループデータ + 全データをキャッシュ
+    currentGroupData = data.group;
+    _globalSignageData = data;
     return true;
   } catch (e) {
     showError(
@@ -1084,24 +1119,19 @@ function getHandoverLabel(item) {
 // ═══════════════════════════════════════════
 async function loadMessage() {
   try {
-    // 連絡は過去60日分のみ取得（DBには残るが表示しない）
-    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    // ★ バグ③ 修正: 引き継ぎノートは過去72時間分のみ取得（index.htmlと整合・v7.17準拠）
-    const cutoff72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    // 連絡とhandover_notesを並列取得
-    const [msgResult, handoverResult] = await Promise.allSettled([
-      sbClient.from('messages').select('*')
-        .eq('group_session_id', currentGroupData.id)
-        .gte('created_at', cutoff60d)
-        .order('created_at', { ascending: false }),
-      sbClient.from('handover_notes').select('*')
-        .eq('group_session_id', currentGroupData.id)
-        .gte('created_at', cutoff72h)
-        .order('created_at', { ascending: false })
-    ]);
+    // ─── signage-fetch 経由化 (チャッピー第68回判定 v2 反映) ───
+    // 5分ごとのポーリングで startPolling から _globalSignageData が更新される
+    // 初回呼び出し (init から) では authenticate で取得済みのデータを使う
+    // 連絡は過去60日分のみ取得（DBには残るが表示しない）/ 引き継ぎは過去72時間
+    // → cutoff は signage-fetch Edge Function 内で適用済み
 
-    const messages = msgResult.status === 'fulfilled' ? (msgResult.value.data || []) : [];
-    const handovers = handoverResult.status === 'fulfilled' ? (handoverResult.value.data || []) : [];
+    if (!_globalSignageData || !_globalSignageData.ok) {
+      // 異常時: 何も表示しない (showError は startPolling から呼ばれる)
+      return;
+    }
+
+    const messages = _globalSignageData.messages || [];
+    const handovers = _globalSignageData.handover_notes || [];
 
     // 連絡のpriorityMap
     const msgPriorityMap = {
@@ -1110,7 +1140,7 @@ async function loadMessage() {
       info:   { label: '🟢 連絡', cls: 'priority-info',   itemCls: 'info',   order: 2 },
     };
 
-    // 既読・確認情報を並列取得
+    // 既読・確認情報・メンバー情報はすべて _globalSignageData から取得
     // ════════════════════════════════════════════════════════════
     // [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
     // A. 分母は送信時点で approved だった人間メンバーのみ
@@ -1124,24 +1154,10 @@ async function loadMessage() {
     const msgIds = messages.map(m => m.id);
     const handoverIds = handovers.map(h => h.id);
 
-    const [receiptsResult, confirmationsResult, membersResult, allMembersHistResult] = await Promise.allSettled([
-      msgIds.length > 0
-        ? sbClient.from('read_receipts').select('message_id, eo_uid').in('message_id', msgIds)
-        : Promise.resolve({ data: [] }),
-      handoverIds.length > 0
-        ? sbClient.from('handover_confirmations').select('handover_id,eo_uid,display_name').in('handover_id', handoverIds)
-        : Promise.resolve({ data: [] }),
-      sbClient.from('group_members').select('eo_uid,display_name,is_signage,created_at')
-        .eq('group_session_id', currentGroupData.id).eq('status', 'approved'),
-      // ★ 全メンバー(過去含む・left含む)取得 - 参加時刻判定用
-      sbClient.from('group_members').select('eo_uid, created_at, is_signage')
-        .eq('group_session_id', currentGroupData.id)
-    ]);
-
-    const receipts = receiptsResult.status === 'fulfilled' ? (receiptsResult.value.data || []) : [];
-    const confirmations = confirmationsResult.status === 'fulfilled' ? (confirmationsResult.value.data || []) : [];
-    const allMembers = membersResult.status === 'fulfilled' ? (membersResult.value.data || []) : [];
-    const allMembersHist = allMembersHistResult.status === 'fulfilled' ? (allMembersHistResult.value.data || []) : [];
+    const receipts = _globalSignageData.read_receipts || [];
+    const confirmations = _globalSignageData.handover_confirmations || [];
+    const allMembers = _globalSignageData.members || [];
+    const allMembersHist = _globalSignageData.all_members_hist || [];
     const humanMembers = allMembers.filter(m => !m.is_signage);
     const humanCount = humanMembers.length;
     const signageUids = new Set(allMembersHist.filter(m => m.is_signage).map(m => m.eo_uid));
@@ -1173,14 +1189,15 @@ async function loadMessage() {
     });
 
     // ── アンケート回答カウントマップを取得（is_survey=true のメッセージのみ対象）──
+    // ─── signage-fetch 経由化: アンケート回答もキャッシュから取得 (チャッピー第68回判定 v2) ───
     const surveyResponseCountMap = {};
     try {
       const surveyMsgIds = messages.filter(m => m.is_survey === true).map(m => m.id);
       if (surveyMsgIds.length > 0) {
-        const { data: resps } = await sbClient.from('message_responses')
-          .select('message_id, status')
-          .in('message_id', surveyMsgIds);
-        (resps || []).forEach(r => {
+        const surveyMsgIdSet = new Set(surveyMsgIds);
+        const allSurveyResps = _globalSignageData ? (_globalSignageData.survey_responses || []) : [];
+        const resps = allSurveyResps.filter(r => surveyMsgIdSet.has(r.message_id));
+        resps.forEach(r => {
           if (r.status === 'answered') {
             surveyResponseCountMap[r.message_id] = (surveyResponseCountMap[r.message_id] || 0) + 1;
           }
@@ -1316,15 +1333,12 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
     //    itemCreatedAt が null の場合は送信時点フィルタは無効化
     // ※index.html / signage.html の計6箇所で同一仕様を維持
     // ════════════════════════════════════════════════════════════
-    const { data: members } = await sbClient.from('group_members')
-      .select('eo_uid, display_name, is_signage, created_at')
-      .eq('group_session_id', currentGroupData.id)
-      .eq('status', 'approved');
+    // ─── signage-fetch 経由化 (チャッピー第68回判定 v2) ───
+    // _globalSignageData から取得する (DB 直接アクセスを廃止)
+    const members = _globalSignageData ? (_globalSignageData.members || []) : [];
 
     // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
-    const { data: allMembersHist } = await sbClient.from('group_members')
-      .select('eo_uid, created_at, is_signage')
-      .eq('group_session_id', currentGroupData.id);
+    const allMembersHist = _globalSignageData ? (_globalSignageData.all_members_hist || []) : [];
 
     const signageUidsModal = new Set((allMembersHist || []).filter(m => m.is_signage).map(m => m.eo_uid));
     const memberJoinedAtModal = new Map();
@@ -1346,8 +1360,9 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
 
     let readUids = [];
     if (itemType === 'message') {
-      const { data: receipts } = await sbClient.from('read_receipts')
-        .select('eo_uid').eq('message_id', itemId);
+      // ─── signage-fetch 経由化: read_receipts はキャッシュから単一メッセージ分を抽出 ───
+      const allReceipts = _globalSignageData ? (_globalSignageData.read_receipts || []) : [];
+      const receipts = allReceipts.filter(r => r.message_id === itemId);
       readUids = (receipts || [])
         .filter(r => !signageUidsModal.has(r.eo_uid))                     // B
         .filter(r => r.eo_uid !== senderUid)                              // C
@@ -1358,8 +1373,10 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
         })
         .map(r => r.eo_uid);
     } else {
-      const { data: confirmations } = await sbClient.from('handover_confirmations')
-        .select('eo_uid, display_name, action').eq('handover_id', itemId);
+      // ─── signage-fetch 経由化: handover_confirmations はキャッシュから単一引き継ぎ分を抽出 ───
+      // 注: Edge Function 側で action カラムも含めて返却している
+      const allConfirmations = _globalSignageData ? (_globalSignageData.handover_confirmations || []) : [];
+      const confirmations = allConfirmations.filter(c => c.handover_id === itemId);
       readUids = (confirmations || [])
         .filter(c => !signageUidsModal.has(c.eo_uid))                     // B
         .filter(c => c.eo_uid !== senderUid)                              // C
@@ -1613,22 +1630,26 @@ function startPolling() {
       // オフラインバナーで通知済み・データ更新も意味がないのでスキップ
       return;
     }
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    // ─── signage-fetch 経由化 (チャッピー第68回判定 v2 反映) ───
+    // signage-fetch 1回呼び出しで「トークン再検証」と「全データ更新」を同時実施
     try {
-      const { data: group } = await sbClient
-        .from('group_sessions')
-        .select('*')
-        .eq('signage_token', token)
-        .eq('signage_enabled', true)
-        .single();
-      if (!group) {
-        // トークン無効化されたら即エラー画面へ
+      const data = await fetchSignageData();
+
+      // ─── NETWORK_ERROR は表示を維持 (チャッピー最終確認 修正必須) ───
+      // 5分ポーリング中の一時的な通信エラーで「サイネージ無効」画面に落とさない
+      if (!data || data.error_code === 'NETWORK_ERROR') {
+        console.warn('[startPolling] network error; keep current display');
+        return;
+      }
+
+      if (!data.ok || !data.group) {
+        // トークン無効化されたら即エラー画面へ (INVALID_TOKEN / EXPIRED)
         showError('サイネージが無効になりました', 'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。');
         clearInterval(updateTimer);
         return;
       }
-      currentGroupData = group;
+      currentGroupData = data.group;
+      _globalSignageData = data;
     } catch (e) {
       // ネットワークエラーはスキップ（オフラインバナーで通知済み）
     }
@@ -1672,10 +1693,14 @@ function updateExpiryWarningBar() {
 
 // ═══════════════════════════════════════════
 async function init() {
-  // Supabase初期化
+  // ─── Supabase client 生成 (将来用に維持・現状は DB アクセスせず) ───
+  // チャッピー第68回判定 v2 反映:
+  // 全 DB アクセスは signage-fetch Edge Function 経由に統一されたため、
+  // sbClient は実質的に未使用となる。ただし削除はせず変数定義のみ残す
+  // (将来の機能追加や緊急のフォールバック用として安全側に倒す)
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // 認証（3段階）
+  // 認証（3段階）- signage-fetch Edge Function 経由
   const ok = await authenticate();
   if (!ok) return;
 
