@@ -2994,6 +2994,47 @@ async function createGroup() {
   // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(孤児グループ作成防止)
   const restored = await restoreExistingMembershipIfAny();
   if (restored) return;
+
+  // ═══════════════════════════════════════════
+  // ★★★ 2026/5/22 夜 緊急診断コード(チャッピー第70回判定追加調査1)★★★
+  // 箱根ユーザー新規グループ作成失敗インシデント究明用
+  // session/JWT/Hook claim 診断
+  // ═══════════════════════════════════════════
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const ssAccessToken = sessionStorage.getItem('edgeops_access_token');
+    const supabaseAccessToken = sessionData?.session?.access_token || null;
+    const accessToken = supabaseAccessToken || ssAccessToken;
+    let jwtPayload = null;
+    try {
+      if (accessToken) {
+        const part = accessToken.split('.')[1];
+        const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+        jwtPayload = JSON.parse(atob(padded));
+      }
+    } catch (e) { jwtPayload = { _parse_error: e.message }; }
+    const diagnostic = {
+      session_exists: !!sessionData?.session,
+      ss_access_token_exists: !!ssAccessToken,
+      supabase_access_token_exists: !!supabaseAccessToken,
+      jwt_role: jwtPayload?.role || null,
+      jwt_eo_uid: jwtPayload?.eo_uid || null,
+      jwt_sub_tail: jwtPayload?.sub ? jwtPayload.sub.slice(-12) : null,
+      jwt_exp: jwtPayload?.exp ? new Date(jwtPayload.exp * 1000).toISOString() : null,
+      jwt_aud: jwtPayload?.aud || null,
+      currentUser_eo_uid: currentUser?.eo_uid || null,
+      currentUser_provider: currentUser?.provider || null,
+      match_jwt_currentUser: jwtPayload?.eo_uid === currentUser?.eo_uid
+    };
+    alert('【診断1】createGroup直前の認証状態\n' + JSON.stringify(diagnostic, null, 2));
+  } catch (diagErr) {
+    alert('【診断1エラー】' + diagErr.message);
+  }
+  // ═══════════════════════════════════════════
+  // ★★★ 緊急診断コード ここまで(原因究明完了後、必ず削除すること)★★★
+  // ═══════════════════════════════════════════
+
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
@@ -3002,19 +3043,47 @@ async function createGroup() {
     const insertData = { group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50, industry: industryVal };
     if (groupNameVal) insertData.group_name = groupNameVal;
     if (regionVal) insertData.region = regionVal;
+
+    // ═══════════════════════════════════════════
+    // ★★★ 診断2: group_sessions INSERT 試行 ★★★
+    // ═══════════════════════════════════════════
     const { data: group, error: groupError } = await supabase
       .from('group_sessions').insert(insertData).select().single();
-    if (groupError) throw groupError;
+    if (groupError) {
+      alert('【診断2失敗】group_sessions INSERT 失敗\n' + JSON.stringify({
+        code: groupError.code,
+        message: groupError.message,
+        details: groupError.details,
+        hint: groupError.hint
+      }, null, 2));
+      throw groupError;
+    }
+    alert('【診断2成功】group_sessions INSERT 成功\ngroup.id=' + group.id);
+
+    // ═══════════════════════════════════════════
+    // ★★★ 診断3: group_members INSERT 試行 ★★★
+    // ═══════════════════════════════════════════
     const { data: member, error: memberError } = await supabase
       .from('group_members').insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
-    if (memberError) throw memberError;
+    if (memberError) {
+      alert('【診断3失敗】group_members INSERT 失敗\n' + JSON.stringify({
+        code: memberError.code,
+        message: memberError.message,
+        details: memberError.details,
+        hint: memberError.hint,
+        eo_uid_used: currentUser.eo_uid,
+        group_session_id_used: group.id
+      }, null, 2));
+      throw memberError;
+    }
+    alert('【診断3成功】group_members INSERT 成功');
+
     localStorage.setItem('sl_member_id', member.id);
     localStorage.setItem('sl_group_id', groupId);
     currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id; isCreator = true;
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
   } catch (e) { console.error(e); showToast('エラーが発生しました。再試行してください。'); }
 }
-
 async function joinGroup() {
   await assertLiffEnvironment();
   const displayName = document.getElementById('input-display-name').value.trim();
