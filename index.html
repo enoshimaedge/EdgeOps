@@ -1285,8 +1285,10 @@
             <input class="form-input" id="profile-link-url" type="url" placeholder="https://example.com/" maxlength="2048" inputmode="url">
           </div>
           <div style="display:flex; gap:8px;">
+            <!-- [2026/5/23 修正] 保存ボタンと削除ボタンを同サイズに(flex:1 で半々)
+                 過剰 padding を削除して .btn のデフォルト padding を継承させる -->
             <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">💾 保存 / Save</button>
-            <button class="btn" onclick="removeLinkUrl()" style="background:#fff; color:#e53935; border:1.5px solid #e53935; padding:12px 16px;">🗑️ 削除</button>
+            <button class="btn" onclick="removeLinkUrl()" style="flex:1; background:#fff; color:#e53935; border:1.5px solid #e53935;">🗑️ 削除</button>
           </div>
         </div>
         <!-- サイネージトークン管理 -->
