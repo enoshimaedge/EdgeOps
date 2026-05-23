@@ -3108,30 +3108,68 @@ async function createGroup() {
   const restored = await restoreExistingMembershipIfAny();
   if (restored) return;
 
+  // ═══════════════════════════════════════════
+  // [2026/5/23 案あ] RPC化でgroup_sessions + group_members を同一トランザクション化
+  //   (チャッピー第74回判定GO)
+  //   背景:第73回判定後にhas_creator(_gid uuid)の実装が「メンバー存在判定」と判明し、
+  //         単純なRLS Policy修正では .insert().select().single() の SELECT 0行問題を
+  //         解決できないため、SECURITY DEFINER RPC関数で同一トランザクション化
+  //   設計:
+  //     - 関数内で current_eo_uid() を取得・他人になりすませない
+  //     - public.users 存在確認 / group_id 重複確認 / 入力バリデーション込
+  //     - 戻り値はjsonbで group_session_id・member_id 等を返却
+  // ═══════════════════════════════════════════
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
     const expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);
     const regionVal = document.getElementById('input-region').value;
-    const insertData = { group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50, industry: industryVal };
-    if (groupNameVal) insertData.group_name = groupNameVal;
-    if (regionVal) insertData.region = regionVal;
 
-    const { data: group, error: groupError } = await supabase
-      .from('group_sessions').insert(insertData).select().single();
-    if (groupError) throw groupError;
+    const { data: result, error: rpcError } = await supabase.rpc(
+      'create_group_with_creator',
+      {
+        p_display_name: displayName,
+        p_industry: industryVal,
+        p_group_id: groupId,
+        p_group_name: groupNameVal || null,
+        p_region: regionVal || null,
+        p_expires_at: expiresAt.toISOString(),
+        p_max_members: 50
+      }
+    );
+    if (rpcError) {
+      console.error('[createGroup] RPC error:', rpcError.code, rpcError.message);
+      throw rpcError;
+    }
+    if (!result) {
+      console.error('[createGroup] RPC returned null');
+      throw new Error('RPC returned null');
+    }
 
-    const { data: member, error: memberError } = await supabase
-      .from('group_members').insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
-    if (memberError) throw memberError;
-
-    localStorage.setItem('sl_member_id', member.id);
-    localStorage.setItem('sl_group_id', groupId);
-    currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id; isCreator = true;
+    // RPC戻り値(jsonb):
+    //   { group_session_id (uuid), group_id (SL-形式), group_name, industry, region,
+    //     member_id (uuid), display_name, eo_uid, is_creator, status }
+    localStorage.setItem('sl_member_id', result.member_id);
+    localStorage.setItem('sl_group_id', result.group_id);
+    currentUser.display_name = displayName;
+    currentGroup = {
+      id: result.group_session_id,
+      group_id: result.group_id,
+      group_name: result.group_name,
+      industry: result.industry,
+      region: result.region,
+      expires_at: expiresAt.toISOString(),
+      max_members: 50
+    };
+    currentMemberId = result.member_id;
+    isCreator = true;
     // [2026/5/23 案B 追加] 作成成功時にも sl_display_name 更新(チャッピー第72回判定GO)
     try { localStorage.setItem('sl_display_name', displayName || ''); } catch (_) {}
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
-  } catch (e) { console.error(e); showToast('エラーが発生しました。再試行してください。'); }
+  } catch (e) {
+    console.error(e);
+    showToast('エラーが発生しました。再試行してください。');
+  }
 }
 async function joinGroup() {
   await assertLiffEnvironment();
