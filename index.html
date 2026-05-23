@@ -5386,10 +5386,23 @@ async function checkSuperAdmin() {
 
 function openAdminPanel() {
   // ?uid=パラメータは廃止(admin.html側でliff.getProfile()のみで認証・adminsテーブルで権限確認)
+  //
   // [2026/5/14 修正] 学び13 / 課題① 対応・チャッピー第24回判定承認済み
   // 真因:external: true で Chrome 外部ブラウザ起動するとLINEのJWTセッション喪失 → アクセス拒否
   // 対策:external: true 削除して LINE 内ブラウザで開く → JWT継続 → 認証成功
-  liff.openWindow({ url: "https://app.edgeops.jp/admin.html" });
+  // ↓
+  // [2026/5/23 修正] 第77回判定 案(A)前倒し実装(野口判断・本日中対応)
+  // 経緯:第76回判定の init() 内 500msリトライ修正が効かず、二郎で再現テストにて
+  //       「LINE 内ブラウザ(URL バー+ナビゲーション付き普通の WebView)で開かれて
+  //        LIFF コンテキストが保持されない」事実が判明。
+  //       つまり 5/14 第24回判定の前提(LINE 内ブラウザでも LIFF 文脈維持)が崩れた。
+  // 真因:liff.openWindow は LINE 内ブラウザの「新規モーダル」として URL を開くため、
+  //       LIFF コンテキストが保持されない構造。
+  // 対策:window.location.href で同一ウィンドウ内遷移にする。
+  //       LIFF SDK が読み込まれた同じウィンドウ内で admin.html を読むため、
+  //       LIFF コンテキストが保持される可能性が高い。
+  // ロールバック:この行を liff.openWindow({ url: "https://app.edgeops.jp/admin.html" }); に戻すだけ。
+  window.location.href = "https://app.edgeops.jp/admin.html";
 }
 
 // ── サイネージURL管理 ──
