@@ -3180,82 +3180,110 @@ async function joinGroup() {
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!groupIdInput) { showToast('グループIDを入力してください'); return; }
-  // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(二重所属防止)
-  const restored = await restoreExistingMembershipIfAny();
-  if (restored) return;
-  // ★ v1.3 Step 6: 20グループ上限チェック(チャッピーレビュー反映)
-  // status は 'approved' と 'pending' の両方をカウント(申請大量化攻撃を防ぐ)
+
+  // ═══════════════════════════════════════════
+  // [2026/5/23 案(B)] joinGroup を RPC化(チャッピー第75回判定GO)
+  //   背景:
+  //     ・restoreExistingMembershipIfAny()(学び13対策A)を joinGroup から削除
+  //       → joinGroup は新規グループ作成しないため孤児リスクなし・複数グループまたぎ対応
+  //     ・group_members.insert().select().single() のSELECT 0行問題を構造的に解決
+  //     ・全ロジック(20件上限・既存所属分岐・left再参加・新規pending INSERT)を
+  //       join_group_with_member RPC関数に集約・同一トランザクション化
+  //   チャッピー第75回判定の修正条件3点を反映:
+  //     ・20件上限チェックは既存所属確認の後(新規参加時のみ評価)
+  //     ・p_is_signage=true は SIGNAGE_JOIN_NOT_SUPPORTED 例外で拒否
+  //     ・全 action 戻り値に industry/region 含む → 再SELECT 不要
+  // ═══════════════════════════════════════════
+
   try {
-    const { count: myGroupCount, error: countError } = await supabase
-      .from('group_members')
-      .select('id', { count: 'exact', head: true })
-      .eq('eo_uid', currentUser.eo_uid)
-      .in('status', ['approved', 'pending']);
-    if (countError) {
-      showToast('参加可能グループ数の確認に失敗しました');
+    showToast('参加申請中...');
+
+    const { data: result, error: rpcError } = await supabase.rpc(
+      'join_group_with_member',
+      {
+        p_group_id: groupIdInput,
+        p_display_name: displayName,
+        p_is_signage: false  // サイネージは別経路のため常に false
+      }
+    );
+
+    if (rpcError) {
+      console.error('[joinGroup] RPC error:', rpcError.code, rpcError.message);
+      const msg = rpcError.message || '';
+      if (msg.includes('GROUP_NOT_FOUND_OR_EXPIRED')) {
+        showToast('グループが見つかりません。IDを確認してください。');
+      } else if (msg.includes('TOO_MANY_GROUPS')) {
+        alert('所属しすぎですね!\n参加できるグループは最大20までです。\n(申請中のグループも含む)\nプロフィール画面で不要なグループから退出してから再度お試しください。');
+      } else if (msg.includes('GROUP_FULL')) {
+        showToast('このグループは満員です（最大50名）');
+      } else if (msg.includes('USER_NOT_FOUND')) {
+        showToast('ユーザー情報が見つかりません。アプリを再起動してください。');
+      } else if (msg.includes('AUTH_REQUIRED')) {
+        showToast('認証エラーです。アプリを再起動してください。');
+      } else {
+        showToast('エラーが発生しました。再試行してください。');
+      }
       return;
     }
-    if (myGroupCount >= 20) {
-      alert('所属しすぎですね!\n参加できるグループは最大20までです。\n(申請中のグループも含む)\nプロフィール画面で不要なグループから退出してから再度お試しください。');
+
+    if (!result) {
+      console.error('[joinGroup] RPC returned null');
+      showToast('エラーが発生しました。再試行してください。');
       return;
     }
+
+    // RPC戻り値(jsonb)の action による分岐
+    const currentGroupObj = {
+      id: result.group_session_id,
+      group_id: result.group_id,
+      group_name: result.group_name,
+      industry: result.industry,
+      region: result.region
+    };
+
+    if (result.action === 'already_approved') {
+      // 既に承認済 → そのグループに切替・screen-home 表示
+      localStorage.setItem('sl_member_id', result.member_id);
+      localStorage.setItem('sl_group_id', result.group_id);
+      currentUser.display_name = result.display_name;
+      currentGroup = currentGroupObj;
+      currentMemberId = result.member_id;
+      isCreator = result.is_creator === true;
+      await loadHome();
+      showScreen('screen-home');
+      showToast('既に参加しているグループです');
+      return;
+    }
+
+    if (result.action === 'already_pending') {
+      // 既に申請中 → screen-pending 表示
+      localStorage.setItem('sl_member_id', result.member_id);
+      localStorage.setItem('sl_group_id', result.group_id);
+      currentMemberId = result.member_id;
+      document.getElementById('pending-group-id').textContent = result.group_id;
+      showScreen('screen-pending');
+      showToast('既に参加申請中です。承認をお待ちください。');
+      return;
+    }
+
+    if (result.action === 'rejoined' || result.action === 'new_request') {
+      // 再参加 または 新規参加申請 → screen-pending 表示
+      localStorage.setItem('sl_member_id', result.member_id);
+      localStorage.setItem('sl_group_id', result.group_id);
+      currentMemberId = result.member_id;
+      document.getElementById('pending-group-id').textContent = result.group_id;
+      showScreen('screen-pending');
+      showToast('参加申請を送りました。承認をお待ちください。');
+      return;
+    }
+
+    // 想定外の action
+    console.warn('[joinGroup] unexpected action:', result.action);
+    showToast('予期せぬ応答です。再試行してください。');
   } catch (e) {
-    console.error('20グループ上限チェック失敗:', e);
-    showToast('参加可能グループ数の確認に失敗しました');
-    return;
+    console.error(e);
+    showToast('エラーが発生しました。再試行してください。');
   }
-  try {
-    showToast('グループを検索中...');
-    const { data: group, error } = await supabase
-      .from('group_sessions').select('*').eq('group_id', groupIdInput).gt('expires_at', new Date().toISOString()).single();
-    if (error || !group) { showToast('グループが見つかりません。IDを確認してください。'); return; }
-    const { count } = await supabase.from('group_members').select('*', { count: 'exact', head: true })
-      .eq('group_session_id', group.id).eq('status', 'approved');
-    if (count >= group.max_members) { showToast('このグループは満員です（最大50名）'); return; }
-    const { data: existing } = await supabase.from('group_members').select('*')
-      .eq('group_session_id', group.id).eq('eo_uid', currentUser.eo_uid).maybeSingle();
-    if (existing) {
-      if (existing.status === 'approved') {
-        localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
-        currentUser.display_name = existing.display_name; currentGroup = group; currentMemberId = existing.id;
-        isCreator = await resolveIsCreator(group.id, existing.id);
-        await loadHome(); showScreen('screen-home'); return;
-      }
-      if (existing.status === 'pending') {
-        localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
-        document.getElementById('pending-group-id').textContent = groupIdInput;
-        showScreen('screen-pending'); return;
-      }
-      // [Phase 0 後 追加] 退出済みメンバーの再参加処理(チャッピー承認済み)
-      if (existing.status === 'left') {
-        const isSignage = document.getElementById('join-is-signage')?.checked || false;
-        const { error: rejoinError } = await supabase.from('group_members')
-          .update({
-            status: 'pending',
-            display_name: displayName,
-            is_signage: isSignage,
-            approved_at: null
-          })
-          .eq('id', existing.id);
-        if (rejoinError) throw rejoinError;
-        localStorage.setItem('sl_member_id', existing.id);
-        localStorage.setItem('sl_group_id', groupIdInput);
-        currentMemberId = existing.id;
-        document.getElementById('pending-group-id').textContent = groupIdInput;
-        showScreen('screen-pending');
-        showToast('参加申請を送りました。承認をお待ちください。');
-        return;
-      }
-    }
-    const isSignage = document.getElementById('join-is-signage')?.checked || false;
-    const { data: member, error: memberError } = await supabase.from('group_members')
-      .insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'pending', is_signage: isSignage }).select().single();
-    if (memberError) throw memberError;
-    localStorage.setItem('sl_member_id', member.id); localStorage.setItem('sl_group_id', groupIdInput);
-    currentMemberId = member.id;
-    document.getElementById('pending-group-id').textContent = groupIdInput;
-    showScreen('screen-pending'); showToast('参加申請を送りました。承認をお待ちください。');
-  } catch (e) { console.error(e); showToast('エラーが発生しました。'); }
 }
 
 async function checkApproval() {
