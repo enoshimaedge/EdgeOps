@@ -67,15 +67,21 @@
     flex-shrink: 0;
   }
   .signage-logo {
-    font-size: 24px;
-    font-weight: 900;
-    color: white;
+    /* [UI改善 2026/5/23] サイネージでもグループ名を主役に。EdgeOps を 24px→16px に縮小・font-weight 900→700 */
+    /* 理由:大画面サイネージ表示で「いまどのグループか」を一目で視認させる */
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
     letter-spacing: 1px;
   }
   .signage-group-name {
-    font-size: 16px;
-    color: rgba(255,255,255,0.9);
+    /* [UI改善 2026/5/23] グループ名を 16px→32px に拡大・font-weight 700 維持 */
+    /* index.html の screen-home ヘッダー(EdgeOps小・グループ名大)と統一思想 */
+    font-size: 32px;
+    color: white;
     font-weight: 700;
+    line-height: 1.2;
+    margin-top: 2px;
   }
   .last-updated {
     font-size: 14px;
