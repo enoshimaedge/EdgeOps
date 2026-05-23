@@ -1496,6 +1496,21 @@ const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
     }
 
     // ═══════════════════════════════════════════
+    // [2026/5/23 案D拡張] LIFF SDK 初期化直後の isInClient 誤判定対策(チャッピー第76回判定GO)
+    //   背景:超管理者ボタン押下時に「LIFF外アクセス遮断画面」が一瞬出るバグ
+    //         真因:admin.html を新ウィンドウで開いた瞬間、元の index.html の init() が再評価され、
+    //              直後に liff.isInClient() が一瞬 false を返してしまう
+    //   設計:第72回判定の assertLiffEnvironment と同じパターンを init() 内のチェックにも適用
+    //   注意(チャッピー第76回判定):呼び出しは必ず await liff.init() 後に限定
+    // ═══════════════════════════════════════════
+    async function isInClientWithRetry() {
+      if (liff.isInClient()) return true;
+      console.warn('[LIFF Guard init] isInClient=false. Retrying once.');
+      await new Promise(r => setTimeout(r, 500));
+      return liff.isInClient();
+    }
+
+    // ═══════════════════════════════════════════
     // [2026/5/23 案B] currentUser リロード耐性ガード(チャッピー第72回判定GO)
     //   背景:画面リロードでJavaScript全変数リセット → currentUser null になる現象あり
     //         書き込み系関数の入口で currentUser を必ず構築済にする
@@ -2893,9 +2908,9 @@ async function init() {
     }
 
     if (!liff.isLoggedIn()) {
-      if (!liff.isInClient()) {
-        // [2026/5/21 P0] LIFF外Chromeアクセス = dev生成廃止・遮断画面表示
-        console.warn('[LIFF Guard] Not in LINE client. Blocking access.');
+      if (!(await isInClientWithRetry())) {
+        // [2026/5/21 P0 + 2026/5/23 第76回判定] LIFF外Chromeアクセス遮断(500msリトライ付)
+        console.warn('[LIFF Guard] Not in LINE client (after retry). Blocking access.');
         hideLoading();
         showLiffOutsideErrorScreen('LINEアプリ内でのみ動作します');
         return;
@@ -2903,9 +2918,9 @@ async function init() {
       liff.login(); return;
     }
 
-    // [2026/5/21 P0] ログイン済でも LIFF外なら遮断(二重チェック)
-    if (!liff.isInClient()) {
-      console.warn('[LIFF Guard] Logged in but not in LINE client. Blocking access.');
+    // [2026/5/21 P0 + 2026/5/23 第76回判定] ログイン済でも LIFF外なら遮断(二重チェック・500msリトライ付)
+    if (!(await isInClientWithRetry())) {
+      console.warn('[LIFF Guard] Logged in but not in LINE client (after retry). Blocking access.');
       hideLoading();
       showLiffOutsideErrorScreen('LINEアプリ内でのみ動作します');
       return;
