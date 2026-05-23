@@ -889,8 +889,11 @@
 <div class="screen" id="screen-home">
   <div class="header">
     <div style="flex:1;">
-      <div class="header-title">EdgeOps</div>
-      <div class="header-sub" id="home-group-id-display"></div>
+      <!-- [UI改善 2026/5/23] EdgeOpsロゴを小さく上に・グループ名を大きく下に・グループIDは削除 -->
+      <!--   理由:グループまたぎ時にどのグループにいるかが視認しやすいよう、グループ名を主役にする -->
+      <!--   グループID はプロフィール画面で確認可能なので、ヘッダーからは削除 -->
+      <div style="color:rgba(255,255,255,0.75); font-size:11px; line-height:1.2;">EdgeOps</div>
+      <div id="home-group-id-display" style="color:white; font-size:18px; font-weight:700; line-height:1.3; margin-top:2px;"></div>
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
       <!-- エリア混雑度ボタン（藤沢グループのみ表示） -->
@@ -3365,10 +3368,10 @@ function updateExpiryWarningBar() {
 }
 
 async function loadHome() {
-  // グループ名があればヘッダーに表示、なければグループIDを表示
-  const groupLabel = currentGroup.group_name
-    ? currentGroup.group_name + '　(' + currentGroup.group_id + ')'
-    : currentGroup.group_id;
+  // [UI改善 2026/5/23] グループ名のみヘッダーに表示・グループIDは削除
+  //   理由:グループまたぎ時の視認性向上・グループID はプロフィール画面で確認可能
+  //   group_name が未設定(NULL/空)の場合は「(グループ名未設定)」と表示
+  const groupLabel = currentGroup.group_name || '(グループ名未設定)';
   document.getElementById('home-group-id-display').textContent = groupLabel;
   document.getElementById('profile-group-id').textContent = currentGroup.group_id;
   document.getElementById('profile-name').textContent = currentUser.display_name;
@@ -5136,8 +5139,8 @@ async function updateGroupName() {
       .update({ group_name: newName }).eq('id', currentGroup.id);
     if (error) throw error;
     currentGroup.group_name = newName;
-    const groupLabel = newName + '　(' + currentGroup.group_id + ')';
-    document.getElementById('home-group-id-display').textContent = groupLabel;
+    // [UI改善 2026/5/23] グループ名のみ表示・グループID連結を削除(loadHome と整合)
+    document.getElementById('home-group-id-display').textContent = newName;
     showToast('グループ名を更新しました');
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
