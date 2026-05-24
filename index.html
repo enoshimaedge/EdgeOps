@@ -3056,6 +3056,44 @@ async function restoreSession(memberId, groupId) {
       showScreen('screen-start');
       return;
     }
+    // ═══════════════════════════════════════════
+    // [チャッピー第86回判定 案(a) GO・2026-05-25]
+    // 却下された本人の LIFF 起動時挙動(サイレント却下・通知なし)
+    // - 他に approved グループあれば → 最新1件に自動切替 + 柔らかいトースト
+    // - 他になければ → screen-start(localStorage クリア)
+    // - 「却下されました」とは絶対に表示しない(人間関係摩擦回避)
+    // - 現状の脱退時動作(L5587-L5618)と一貫したロジック
+    // ═══════════════════════════════════════════
+    if (member.status === 'rejected') {
+      try {
+        const { data: remainingMemberships } = await supabase
+          .from('group_members').select('id, group_session_id, group_sessions(*)')
+          .eq('eo_uid', currentUser.eo_uid).eq('status', 'approved')
+          .order('created_at', { ascending: false }).limit(1);
+        if (remainingMemberships && remainingMemberships.length > 0) {
+          const next = remainingMemberships[0];
+          currentMemberId = next.id;
+          currentGroup = next.group_sessions;
+          localStorage.setItem('sl_member_id', next.id);
+          localStorage.setItem('sl_group_id', next.group_sessions.group_id);
+          const [creatorResult] = await Promise.all([
+            resolveIsCreator(next.group_session_id, next.id),
+            loadHome()
+          ]);
+          isCreator = creatorResult;
+          hideLoading();
+          showScreen('screen-home');
+          showToast(`参加中のグループに切り替えました`);
+          return;
+        }
+      } catch (err) {
+        console.warn('rejected 後の他グループ取得失敗・screen-start にフォールバック:', err);
+      }
+      localStorage.clear();
+      hideLoading();
+      showScreen('screen-start');
+      return;
+    }
     if (member.status === 'pending') {
       currentMemberId = member.id; hideLoading();
       document.getElementById('pending-group-id').textContent = groupId;
@@ -4787,7 +4825,10 @@ async function loadApprovals() {
     container.innerHTML = pending.map(p => `
       <div class="approval-item">
         <div><div class="approval-name">${escHtml(p.display_name)}</div><div class="approval-time">${formatTime(p.created_at)}</div></div>
-        <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認 / Approve</button>
+        <div style="display:flex; gap:8px; flex-shrink:0;">
+          <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認 / Approve</button>
+          <button class="reject-btn" onclick="rejectMember('${p.id}', '${escHtml(p.display_name)}')" style="background:#9e9e9e; color:white; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">却下 / Reject</button>
+        </div>
       </div>
     `).join('');
   } catch (e) { console.error(e); }
@@ -4797,6 +4838,26 @@ async function approveMember(memberId, displayName) {
   try {
     await supabase.from('group_members').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', memberId);
     showToast(`${displayName}さんを承認しました`);
+    await loadApprovals(); await loadMessages();
+  } catch (e) { showToast('エラーが発生しました。'); }
+}
+
+// ═══════════════════════════════════════════
+// [チャッピー第86回判定 案(a) GO・2026-05-25]
+// 参加申請の却下機能(サイレント却下・履歴残す)
+// - status='rejected' に変更(履歴残す・DELETE しない)
+// - UPDATE 条件に status='pending' 付加(二重押し・先承認対策・チャッピー指示)
+// - 申請者本人には通知しない(野口さん人間関係摩擦回避方針)
+// - 却下された本人は次回 LIFF 起動時に restoreSession() で他グループ自動切替 or screen-start
+// ═══════════════════════════════════════════
+async function rejectMember(memberId, displayName) {
+  if (!confirm(`${displayName}さんの参加申請を却下しますか?\n本人には通知されません。`)) return;
+  try {
+    await supabase.from('group_members')
+      .update({ status: 'rejected' })
+      .eq('id', memberId)
+      .eq('status', 'pending');
+    showToast(`${displayName}さんを却下しました`);
     await loadApprovals(); await loadMessages();
   } catch (e) { showToast('エラーが発生しました。'); }
 }
