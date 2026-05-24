@@ -358,13 +358,32 @@ async function clearAuthCache(supabaseClient) {
 }
 
 // ─────────────────────────────────────────────
-// 7. 開発モード用 eo_uid 生成(LIFFが使えないブラウザテスト時)
+// 7. 【廃止】開発モード用 eo_uid 生成(LIFFが使えないブラウザテスト時)
 // ─────────────────────────────────────────────
+// @deprecated 2026-05-21 廃止(B-1・2026-05-24 完全コメントアウト)
+//
+// 廃止理由:
+//   5/21夜の LIFF外アクセス遮断ガード(assertLiffEnvironment)実装により
+//   呼び出し0件化。完全に死んだコード(デッドコード)となった。
+//
+// ★★★ 絶対に復活させないこと ★★★
+//   この関数を復活させると、LINE ユーザーID と紐付かない
+//   ランダムな eo_uid が生成され、以下の重大障害を引き起こす:
+//     - 同じ人が再ログインしても別の eo_uid になる(履歴分断)
+//     - 既読・引き継ぎ確認・グループメンバー管理が壊れる
+//     - DB の eo_uid 大規模クリーンアップが必要になる
+//
+// 新規認証経路を作る場合は、必ず line-auth Edge Function 経由で
+// providerUid → generateEoUid(providerUid) の流れを使うこと
+// (salt='edgeops_v1_2026' 絶対不変)
+//
+/*
 function generateDevEoUid() {
   const devProviderUid = 'dev_' + Math.random().toString(36).substr(2, 9);
   const eoUid = generateEoUid(devProviderUid);
   return { eoUid, providerUid: devProviderUid };
 }
+*/
 
 // ─────────────────────────────────────────────
 // 8. 現在のユーザーの所属施設取得(Phase 0 Step 4 追加・2026/5/5)
