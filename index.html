@@ -575,6 +575,23 @@
   }
 
   /* ══════════════════════════════════════════════════════
+   * [UI改善③ Androidスマホ縦画面 横幅余白対応] チャッピー第85回判定 GO
+   * - 条件: (orientation: portrait) AND (min-width: 431px) AND (max-width: 599px)
+   * - 既存 portrait ≥600px(第57回判定)とは重複しない範囲だけ対象
+   * - 既存 landscape ≥768px(第50回判定)とは重複しない範囲だけ対象
+   * - iPhone(~430px以下)は既存 max-width:430px を維持
+   * - Androidタブレット横画面(landscape ≥768px)は第50回判定で対応・本クエリは無影響
+   * ══════════════════════════════════════════════════════ */
+  @media (orientation: portrait) and (min-width: 431px) and (max-width: 599px) {
+    body {
+      max-width: none;
+    }
+    .screen {
+      max-width: none;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════
    * [UI改善①-2 大画面portrait対応] チャッピー第57回判定 GO
    * - 条件: (orientation: portrait) AND (min-width: 600px) のみ適用
    * - タブレット縦 / MEGAPAD縦など 600px以上の縦画面だけ対象
