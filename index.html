@@ -2252,6 +2252,28 @@ function observeImageThumbnails(container) {
   });
 }
 
+// ═══════════════════════════════════════════
+// 画像署名URLプリロード(チャッピー第79回判定 案(a) 2026-05-24)
+// メッセージ一覧・引き継ぎ一覧表示後に、画像付きアイテムの
+// 署名URLだけバックグラウンドで先取得して __signedUrlCache に格納する。
+// 画像本体は先読みしない(通信量配慮)。
+// 既存の __signedUrlCache(55分TTL)・SIGNED_URL_MAX_CONCURRENT=5 を流用。
+// awaitしない・失敗握りつぶし・上限20件。
+// ═══════════════════════════════════════════
+function preloadMessageImageUrls(items, limit = 20) {
+  try {
+    const targets = (items || [])
+      .map(item => item && (item.thumbnail_url || item.image_url))
+      .filter(path => !!path)
+      .slice(0, limit);
+    for (const path of targets) {
+      getSignedThumbUrl(path).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('[preloadMessageImageUrls] skipped:', e && e.message ? e.message : e);
+  }
+}
+
 // メッセージ/引き継ぎ用のサムネHTML生成(共通化)
 // data-thumbnail-path に storage_path を持たせ、IntersectionObserverで遅延読込
 // 戻り値: '' (画像なし) または '<div class="msg-thumb-wrap">...</div>'
@@ -3590,6 +3612,7 @@ async function loadMessages() {
     }
 
     renderMessages();
+    preloadMessageImageUrls(messages); // ★ 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
     const badge = document.getElementById('approval-badge');
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
     else { badge.style.display = 'none'; }
@@ -4128,6 +4151,7 @@ async function loadHandoverNotes() {
     });
     html += '</div>';
     container.innerHTML = html;
+    preloadMessageImageUrls(handoverNotes); // ★ 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
   } catch(e) { console.error(e); }
 }
 
