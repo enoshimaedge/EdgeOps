@@ -3434,6 +3434,39 @@ async function cancelRequest() {
   try {
     await supabase.from('group_members').delete().eq('id', currentMemberId);
     currentMemberId = null;
+
+    // ═══════════════════════════════════════════
+    // [2026-05-25 バグ修正] 申請取消後の他グループ自動切替
+    // - 脱退時動作(L5587-L5618)と同型のロジック
+    // - 他に approved グループあれば最新1件に自動切替
+    // - なければ screen-start
+    // ═══════════════════════════════════════════
+    try {
+      const { data: remainingMemberships } = await supabase
+        .from('group_members').select('id, group_session_id, group_sessions(*)')
+        .eq('eo_uid', currentUser.eo_uid).eq('status', 'approved')
+        .order('created_at', { ascending: false }).limit(1);
+      if (remainingMemberships && remainingMemberships.length > 0) {
+        const next = remainingMemberships[0];
+        currentMemberId = next.id;
+        currentGroup = next.group_sessions;
+        localStorage.setItem('sl_member_id', next.id);
+        localStorage.setItem('sl_group_id', next.group_sessions.group_id);
+        const [creatorResult] = await Promise.all([
+          resolveIsCreator(next.group_session_id, next.id),
+          loadHome()
+        ]);
+        isCreator = creatorResult;
+        showScreen('screen-home');
+        showToast('参加中のグループに切り替えました');
+        return;
+      }
+    } catch (err) {
+      console.warn('申請取消後の他グループ取得失敗・screen-start にフォールバック:', err);
+    }
+
+    localStorage.clear();
+    currentGroup = null;
     showToast('申請を取り消しました / Request cancelled');
     showScreen('screen-start');
   } catch (e) { showToast('取り消し中にエラーが発生しました。'); }
