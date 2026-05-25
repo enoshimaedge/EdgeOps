@@ -1023,8 +1023,9 @@ function buildItemHtml(item) {
         }).length;
       }
       if (receiverCount === 0) {
-        // 受信者0名(送信時点で送信者以外いない)→ 全員既読扱い
-        readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
+        // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
+        // 受信者0名(送信時点で送信者以外いない)→ 既読対象なし表示
+        readBadge = `<span style="font-size:10px; color:#94a3b8; font-weight:700;">📋 対象者なし</span>`;
       } else if (readCount >= receiverCount) {
         readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
       } else {
@@ -1411,7 +1412,7 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
             <div>
               <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:6px; font-weight:700;">❌ 未読 ${unreadMembers.length}名</div>
               ${unreadMembers.length === 0
-                ? `<div style="font-size:12px; color:rgba(255,255,255,0.3);">全員既読</div>`
+                ? `<div style="font-size:12px; color:rgba(255,255,255,0.3);">未読のメンバーはいません</div>`
                 : unreadMembers.map(m => `<div style="font-size:13px; color:rgba(255,255,255,0.5); margin-bottom:4px;">⬜ ${m.display_name}</div>`).join('')}
             </div>
           </div>

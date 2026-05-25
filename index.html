@@ -4467,7 +4467,8 @@ async function showHandoverDetail(handoverId) {
         `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`
       ).join('');
     } else {
-      unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">全員が確認しました ✅</div>';
+      // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
+      unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未確認メンバーはいません</div>';
     }
 
     showScreen('screen-handover-detail');
@@ -4601,10 +4602,15 @@ async function showDetail(messageId) {
     readListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も読んでいません</div>';
   }
   const unreadListEl = document.getElementById('detail-unread-list');
-  if (unreadMembers.length > 0) {
+  if (receivers.length === 0) {
+    // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
+    // 未読対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
+    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">未読対象のメンバーがいません</div>';
+  } else if (unreadMembers.length > 0) {
     unreadListEl.innerHTML = unreadMembers.map(m => `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`).join('');
   } else {
-    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">全員が読みました ✅</div>';
+    // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
+    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未読のメンバーはいません</div>';
   }
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
