@@ -4195,7 +4195,14 @@ async function updateHandoverBadge() {
       targetNotes = notes;
     } else {
       // スタッフ：自分が投稿した未確認のみ表示
-      targetNotes = notes.filter(n => n.sender_eo_uid === currentUser.eo_uid);
+      // [2026/5/25 1人グループ論理破綻対応 / チャッピー第86回判定GO]
+      // 自分以外の人間メンバーが0人の場合、確認依頼先が存在しないためバナー対象なし
+      const otherHumanMembers = members.filter(m =>
+        !m.is_signage && m.eo_uid !== currentUser.eo_uid
+      );
+      targetNotes = otherHumanMembers.length === 0
+        ? []
+        : notes.filter(n => n.sender_eo_uid === currentUser.eo_uid);
     }
 
     if (targetNotes.length === 0) {
@@ -4451,7 +4458,11 @@ async function showHandoverDetail(handoverId) {
 
     // 未確認メンバー：eligibleMembersから確認済を除外
     const unconfirmed = eligibleMembers.filter(m => !confirmedUids.has(m.eo_uid));
-    if (unconfirmed.length > 0) {
+    if (eligibleMembers.length === 0) {
+      // [2026/5/25 1人グループ論理破綻対応 / チャッピー第86回判定GO]
+      // 確認対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
+      unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">確認対象のメンバーがいません</div>';
+    } else if (unconfirmed.length > 0) {
       unconfirmedList.innerHTML = unconfirmed.map(m =>
         `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`
       ).join('');
