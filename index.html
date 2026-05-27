@@ -3246,6 +3246,14 @@ async function recheckFriendship() {
 // ═══════════════════════════════════════════
 async function createGroup() {
   await assertLiffEnvironment();
+  // [2026/5/27 β6対処] 「サイネージとして利用する」チェックON時は新規グループ作成を阻害
+  //   サイネージ端末はグループ作成者になるべきではない(設計書 §15-5 準拠)
+  //   ユーザーが誤ってチェックONのまま「新規グループを作る」を押した場合に阻害
+  const isSignageChecked = document.getElementById('join-is-signage')?.checked || false;
+  if (isSignageChecked) {
+    showToast('サイネージとして新規グループは作成できません。チェックを外してください。');
+    return;
+  }
   // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
   const u = await ensureCurrentUser();
   if (!u) {
