@@ -3310,18 +3310,25 @@ async function joinGroup() {
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!groupIdInput) { showToast('グループIDを入力してください'); return; }
 
+  // [2026/5/27 チャッピー第88回判定 案(a) GO]
+  //   「📺 サイネージ端末として参加する」チェックボックス値を取得
+  //   設計書 v27.7 §11-6 ステップ6 通りに RPC へ反映する
+  //   第75回判定の「p_is_signage=true 拒否」条件は撤回・改訂(2026/5/27)
+  const isSignage = document.getElementById('join-is-signage')?.checked || false;
+
   // ═══════════════════════════════════════════
-  // [2026/5/23 案(B)] joinGroup を RPC化(チャッピー第75回判定GO)
+  // [2026/5/23 案(B)] joinGroup を RPC化(チャッピー第75回判定GO・第88回判定で条件2撤回)
   //   背景:
   //     ・restoreExistingMembershipIfAny()(学び13対策A)を joinGroup から削除
   //       → joinGroup は新規グループ作成しないため孤児リスクなし・複数グループまたぎ対応
   //     ・group_members.insert().select().single() のSELECT 0行問題を構造的に解決
   //     ・全ロジック(20件上限・既存所属分岐・left再参加・新規pending INSERT)を
   //       join_group_with_member RPC関数に集約・同一トランザクション化
-  //   チャッピー第75回判定の修正条件3点を反映:
-  //     ・20件上限チェックは既存所属確認の後(新規参加時のみ評価)
+  //   チャッピー第75回判定の修正条件:
+  //     ・20件上限チェックは既存所属確認の後(新規参加時のみ評価)→維持
   //     ・p_is_signage=true は SIGNAGE_JOIN_NOT_SUPPORTED 例外で拒否
-  //     ・全 action 戻り値に industry/region 含む → 再SELECT 不要
+  //       → ★第88回判定で撤回(2026/5/27)・設計書 v27.7 §11-6 ステップ6 を正本として復活
+  //     ・全 action 戻り値に industry/region 含む → 再SELECT 不要→維持
   // ═══════════════════════════════════════════
 
   try {
@@ -3332,7 +3339,7 @@ async function joinGroup() {
       {
         p_group_id: groupIdInput,
         p_display_name: displayName,
-        p_is_signage: false  // サイネージは別経路のため常に false
+        p_is_signage: isSignage  // チェックボックス値(第88回判定・設計書 v27.7 §11-6 ステップ6)
       }
     );
 
