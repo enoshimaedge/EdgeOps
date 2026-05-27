@@ -854,7 +854,7 @@
         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:10px 12px; background:#f8fff9; border-radius:10px; border:1.5px solid var(--border);">
           <input type="checkbox" id="join-is-signage"
             style="width:18px; height:18px; accent-color:var(--green); cursor:pointer; flex-shrink:0;">
-          <span style="font-size:14px; color:var(--text);">📺 サイネージ端末として参加する / Join as Signage</span>
+          <span style="font-size:14px; color:var(--text);">📺 サイネージとして利用する / Use as Signage</span>
         </label>
       </div>
       <button class="btn btn-secondary" onclick="joinGroup()">
@@ -3357,7 +3357,10 @@ async function joinGroup() {
       } else if (msg.includes('AUTH_REQUIRED')) {
         showToast('認証エラーです。アプリを再起動してください。');
       } else {
-        showToast('エラーが発生しました。再試行してください。');
+        // [2026/5/27 課題① 真因究明用エラー詳細表示・チャッピー第89回判定 Q2 GO]
+        // console には詳細・トーストには短めに(α2 統合究明用の観測点)
+        console.error('[joinGroup] UNCAUGHT RPC error - code:', rpcError.code, 'message:', rpcError.message, 'details:', rpcError.details, 'hint:', rpcError.hint, 'full:', JSON.stringify(rpcError));
+        showToast(`参加処理でエラーが発生しました: ${rpcError.code || rpcError.message || 'UNKNOWN'}`);
       }
       return;
     }
@@ -4894,7 +4897,53 @@ async function loadApprovals() {
 async function approveMember(memberId, displayName) {
   try {
     await supabase.from('group_members').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', memberId);
-    showToast(`${displayName}さんを承認しました`);
+
+    // [2026/5/27 課題② 設計書 §11-6 の盲点解消・チャッピー第89回判定 案(b) GO]
+    // 承認対象が is_signage=true の場合、DB から最新 signage_token を SELECT してから判定
+    // (currentGroup キャッシュが古い場合に新トークン上書きする懸念を回避)
+    // UPDATE 時も .is('signage_token', null) を付けて二重発行防止
+    // この自動発行は「初回発行補助」であり、generateSignageToken の再生成フローとは別扱い
+    const { data: approvedMember } = await supabase
+      .from('group_members')
+      .select('is_signage')
+      .eq('id', memberId)
+      .single();
+    if (approvedMember?.is_signage) {
+      const { data: latestGroup, error: groupFetchError } = await supabase
+        .from('group_sessions')
+        .select('id, signage_token, signage_enabled')
+        .eq('id', currentGroup.id)
+        .single();
+      if (groupFetchError) {
+        console.error('[approveMember] group fetch failed:', groupFetchError);
+        showToast(`${displayName}さんを承認しました(URL確認に失敗)`);
+      } else if (!latestGroup?.signage_token) {
+        // 初回 signage_token 自動発行(DBが NULL の時のみ・二重発行防止)
+        const newToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+        const { error: tokenError } = await supabase
+          .from('group_sessions')
+          .update({ signage_token: newToken, signage_enabled: true })
+          .eq('id', currentGroup.id)
+          .is('signage_token', null);
+        if (!tokenError) {
+          currentGroup.signage_token = newToken;
+          currentGroup.signage_enabled = true;
+          updateSignageUrlDisplay();
+          showToast(`${displayName}さんを承認し、サイネージURLを自動発行しました`);
+        } else {
+          console.error('[approveMember] signage_token auto-issue failed:', tokenError);
+          showToast(`${displayName}さんを承認しました(URL発行は管理者操作が必要です)`);
+        }
+      } else {
+        // 既に signage_token 発行済 → currentGroup を最新化のみ・上書きしない(★第89回判定 Q3 重点)
+        currentGroup.signage_token = latestGroup.signage_token;
+        currentGroup.signage_enabled = latestGroup.signage_enabled;
+        showToast(`${displayName}さんを承認しました`);
+      }
+    } else {
+      showToast(`${displayName}さんを承認しました`);
+    }
     await loadApprovals(); await loadMessages();
   } catch (e) { showToast('エラーが発生しました。'); }
 }
@@ -5695,7 +5744,7 @@ async function leaveGroup() {
           .eq('id', remainingMembers[0].id);
       }
     }
-    await supabase.from('group_members').update({ status: 'left', is_creator: false }).eq('id', currentMemberId);
+    await supabase.from('group_members').update({ status: 'left', is_creator: false, is_signage: false }).eq('id', currentMemberId);
     // ── 設計書 16-A-6 に準拠：メンバー脱退時に当該UIDのアンケート回答を削除（集計から完全に消す） ──
     // [2026/5/16 課題⑨修正・チャッピー第40回判定GO] group_session_id 限定削除
     // message_responses に group_session_id カラムが存在しないため messages 経由で2クエリに分割
