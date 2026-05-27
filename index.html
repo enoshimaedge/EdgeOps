@@ -1645,6 +1645,24 @@ const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
       return null;
     }
 
+// [2026/5/27 チャッピー第90回判定 案(a) GO]
+// localStorage の EdgeOps 独自キーのみ削除するヘルパー
+// 旧 localStorage.clear() は Supabase JS SDK の sb-*-auth-token も消去するため、
+// 退出後の RPC が anonロールで実行され 42501 insufficient_privilege エラーになる
+// 真因問題があった(B5・α2-1)。本ヘルパーは EdgeOps 独自キーのみ削除し、
+// Supabase セッションを保持する。signOut() は呼ばない(同じLINEアカウント継続前提)。
+function clearEdgeOpsLocalStorage() {
+  const keys = [
+    // auth.js LS_KEYS 準拠(edgeops_* プレフィックス)
+    'edgeops_eo_uid', 'edgeops_provider', 'edgeops_provider_uid',
+    'edgeops_group_session_id', 'edgeops_current_group_id',
+    'edgeops_facility_id', 'edgeops_language', 'edgeops_signage_token',
+    // 旧プレフィックス sl_*(表示名等の補助情報)
+    'sl_member_id', 'sl_group_id', 'sl_display_name', 'sl_line_name', 'sl_picture_url'
+  ];
+  keys.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+}
+
 const LIFF_ID = CFG.LIFF_ID;
 const LINE_AUTH_URL = CFG.LINE_AUTH_URL;
 const POLL_INTERVAL = 30000; // [チャッピー第53回判定後] 5秒→30秒(サムネ画像のチカチカ防止・LIFFは即時性不要)
@@ -3048,10 +3066,11 @@ async function restoreSession(memberId, groupId) {
   try {
     const { data: member } = await supabase
       .from('group_members').select('*, group_sessions(*)').eq('id', memberId).single();
-    if (!member) { localStorage.clear(); hideLoading(); showScreen('screen-start'); return; }
+    if (!member) { clearEdgeOpsLocalStorage(); hideLoading(); showScreen('screen-start'); return; }
     // [Phase 0 後 追加] 退出済みメンバー(left)は localStorage クリアして起動画面へ(チャッピー承認済み)
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
     if (member.status === 'left') {
-      localStorage.clear();
+      clearEdgeOpsLocalStorage();
       hideLoading();
       showScreen('screen-start');
       return;
@@ -3089,7 +3108,8 @@ async function restoreSession(memberId, groupId) {
       } catch (err) {
         console.warn('rejected 後の他グループ取得失敗・screen-start にフォールバック:', err);
       }
-      localStorage.clear();
+      // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+      clearEdgeOpsLocalStorage();
       hideLoading();
       showScreen('screen-start');
       return;
@@ -3105,7 +3125,8 @@ async function restoreSession(memberId, groupId) {
       // ST版(SL-)の期限切れチェック
       if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
         if (new Date(currentGroup.expires_at) <= new Date()) {
-          localStorage.clear();
+          // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+          clearEdgeOpsLocalStorage();
           hideLoading();
           const notice = document.getElementById('start-expiry-notice');
           if (notice) notice.style.display = 'block';
@@ -3122,7 +3143,10 @@ async function restoreSession(memberId, groupId) {
       hideLoading();
       showScreen('screen-home'); return;
     }
-  } catch (e) { localStorage.clear(); hideLoading(); showScreen('screen-start'); }
+  } catch (e) {
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+    clearEdgeOpsLocalStorage(); hideLoading(); showScreen('screen-start');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -3475,7 +3499,8 @@ async function cancelRequest() {
       console.warn('申請取消後の他グループ取得失敗・screen-start にフォールバック:', err);
     }
 
-    localStorage.clear();
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+    clearEdgeOpsLocalStorage();
     currentGroup = null;
     showToast('申請を取り消しました / Request cancelled');
     showScreen('screen-start');
@@ -5797,8 +5822,11 @@ async function leaveGroup() {
       console.warn('残りグループ取得失敗・従来動作にフォールバック:', err);
     }
 
-    // 残りグループなし or 取得失敗 → 従来動作(localStorage 全消去 + screen-start)
-    localStorage.clear(); currentGroup = null; currentMemberId = null;
+    // 残りグループなし or 取得失敗 → 従来動作(EdgeOps独自キャッシュのみ消去 + screen-start)
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+    // 旧 localStorage.clear() は Supabase JS SDK の sb-*-auth-token も消し、
+    // 退出後の RPC が anonロールで実行され 42501 エラーになる致命的バグがあった
+    clearEdgeOpsLocalStorage(); currentGroup = null; currentMemberId = null;
     showScreen('screen-start'); showToast('グループを退出しました');
   } catch (e) { showToast('エラーが発生しました。'); }
 }
