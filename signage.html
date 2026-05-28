@@ -334,14 +334,26 @@
     font-weight: 700;
     flex-shrink: 0;
     text-align: center;
-    line-height: 1.25;
+    line-height: 1.3;
+    display: block;
+    margin: 6px 0;
+  }
+  /* タイトル行: 何の情報か明示 */
+  .heatstroke-bar-full .hs-title {
+    font-size: 10px;
+    font-weight: 700;
+    opacity: 0.7;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  /* 値表示行: 今 + 値 ／ 今日の最大 + 値 */
+  .heatstroke-bar-full .hs-values {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 12px;
     flex-wrap: wrap;
-    row-gap: 2px;
-    margin: 6px 0;
+    row-gap: 0;
   }
   .heatstroke-bar-full.hs-caution {
     background: rgba(255, 235, 59, 0.18);
@@ -383,18 +395,17 @@
     font-weight: 400;
   }
   .heatstroke-bar-full .hs-advice {
-    width: 100%;
     font-size: 11px;
     font-weight: 600;
     opacity: 0.95;
-    margin-top: 0;
+    margin-top: 1px;
   }
-  .heatstroke-bar-full .hs-note {
-    width: 100%;
+  /* 行動指針と同じ行に並ぶ注釈(画面幅が足りなければ自然に折り返す) */
+  .heatstroke-bar-full .hs-note-inline {
     font-size: 9px;
     font-weight: 400;
-    opacity: 0.6;
-    margin-top: 0;
+    opacity: 0.55;
+    white-space: normal;
   }
 
   /* ── QRカード ── */
@@ -1609,11 +1620,16 @@ function renderHeatstroke(badge) {
     ? `${lvMax.icon} <span class="hs-section-value">${lvMax.label}</span>（${maxWBGT.toFixed(1)}）`
     : `<span class="hs-section-value" style="opacity:0.7;">ほぼ安全</span>（${maxWBGT.toFixed(1)}）`;
 
-  el.innerHTML = `<div class="hs-section"><span class="hs-section-label">今</span>${nowHtml}</div>`
-               + `<span class="hs-divider">／</span>`
-               + `<div class="hs-section"><span class="hs-section-label">今日の最大</span>${maxHtml}</div>`
-               + `<div class="hs-advice">${getHeatstrokeAdvice(higher.rank)}</div>`
-               + `<div class="hs-note">※気温・湿度からの推定の目安です（暑さ指数 WBGT）</div>`;
+  // 1行目: タイトル「熱中症情報（暑さ指数 WBGT）」
+  // 2行目: 今 ＋ 値 ／ 今日の最大 ＋ 値
+  // 3行目: 行動指針 ＋ 注釈(目安)を1行統合(大画面なら1行・小画面なら自動折り返し)
+  el.innerHTML = `<div class="hs-title">🌡 熱中症情報（暑さ指数 WBGT）</div>`
+               + `<div class="hs-values">`
+               +   `<div class="hs-section"><span class="hs-section-label">今</span>${nowHtml}</div>`
+               +   `<span class="hs-divider">／</span>`
+               +   `<div class="hs-section"><span class="hs-section-label">今日の最大</span>${maxHtml}</div>`
+               + `</div>`
+               + `<div class="hs-advice">${getHeatstrokeAdvice(higher.rank)}<span class="hs-note-inline">　※気温・湿度からの推定の目安です</span></div>`;
   el.style.display = 'flex';
 }
 
