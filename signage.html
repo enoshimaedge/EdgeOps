@@ -323,6 +323,80 @@
     text-align: center;
   }
 
+  /* ─── [熱中症予防情報 2026/5/28 案B] 全幅バッジ・メッセージエリア直下 ─── */
+  /* 配置: signage-grid 直下・signage-bottom より上・折りたたみ対象外
+     表示条件: 5〜9月かつ WBGT 21(注意)以上で表示
+     2値表示: 現在値(リアルタイム) と 今日の最大予測値(1日固定)
+     色: 2つのうち高い方のレベルで決定 */
+  .heatstroke-bar-full {
+    border-radius: 10px;
+    padding: 6px 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    text-align: center;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    row-gap: 2px;
+    margin: 6px 0;
+  }
+  .heatstroke-bar-full.hs-caution {
+    background: rgba(255, 235, 59, 0.18);
+    border: 1px solid rgba(255, 235, 59, 0.4);
+    color: #FFF59D;
+  }
+  .heatstroke-bar-full.hs-warning {
+    background: rgba(255, 152, 0, 0.20);
+    border: 1px solid rgba(255, 152, 0, 0.5);
+    color: #FFCC80;
+  }
+  .heatstroke-bar-full.hs-severe {
+    background: rgba(255, 87, 34, 0.22);
+    border: 1px solid rgba(255, 87, 34, 0.55);
+    color: #FFAB91;
+  }
+  .heatstroke-bar-full.hs-danger {
+    background: rgba(244, 67, 54, 0.28);
+    border: 1px solid rgba(244, 67, 54, 0.7);
+    color: #FF8A80;
+  }
+  .heatstroke-bar-full .hs-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+  }
+  .heatstroke-bar-full .hs-section-label {
+    font-size: 10px;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+  .heatstroke-bar-full .hs-section-value {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .heatstroke-bar-full .hs-divider {
+    opacity: 0.4;
+    font-weight: 400;
+  }
+  .heatstroke-bar-full .hs-advice {
+    width: 100%;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.95;
+    margin-top: 0;
+  }
+  .heatstroke-bar-full .hs-note {
+    width: 100%;
+    font-size: 9px;
+    font-weight: 400;
+    opacity: 0.6;
+    margin-top: 0;
+  }
+
   /* ── QRカード ── */
   #card-qr {
     grid-column: 2 / 3;
@@ -520,6 +594,10 @@
       </div>
     </div>
 
+    <!-- [熱中症予防情報 2026/5/28 案B] 全幅バッジ・メッセージエリア直下・折りたたみ対象外
+         5〜9月のみ表示・WBGT 21(注意)以上で表示・両方20以下なら非表示 -->
+    <div id="heatstroke-display" class="heatstroke-bar-full" style="display:none;"></div>
+
     <!-- [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
          トグルボタン押下で signage-bottom 全体(天気+QR)を折りたたむ
          localStorage 'signage_bottom_collapsed' で状態保持 -->
@@ -713,6 +791,8 @@ let _globalSignageData = null;
 let _lastWeatherHtml = null;        // 直近成功時の天気行HTML
 let _lastHolidayText = null;        // 直近成功時の祝日テキスト(null=非表示)
 let _weatherEverSucceeded = false;  // 一度でも取得成功したか
+// ─── [熱中症予防情報 2026/5/28] 前回値保持 ───
+let _lastHeatstroke = null;         // 直近成功時の熱中症バッジ情報 {nowWBGT, maxWBGT} (null=非表示・夏季外)
 
 // ═══════════════════════════════════════════
 // ユーティリティ
@@ -1449,6 +1529,95 @@ function closeModal() {
 }
 
 // ═══════════════════════════════════════════
+// [熱中症予防情報 2026/5/28 案B] 簡易WBGT(暑さ指数)近似・2値表示
+// ═══════════════════════════════════════════
+// 環境省 熱中症予防情報サイト採用の推定式(小野ら2014)を使用:
+//   WBGT = 0.735*Ta + 0.0374*RH + 0.00292*Ta*RH
+//          + 7.619*SR - 4.557*SR^2 - 0.0572*WS - 4.064
+//   Ta:気温(℃) RH:相対湿度(%) SR:全天日射量(kW/m2) WS:平均風速(m/s)
+// ※ Open-Meteo から取得した値で算出する「推定値」であり、
+//   環境省公式の実測WBGTや現場の実環境(輻射熱源・局所条件)とは異なる。
+//   表示は必ず「目安」と明示する。
+//
+// 表示仕様(案B):
+//   ・配置: メッセージエリア直下・全幅・折りたたみ対象外
+//   ・期間: 5月〜9月のみ表示
+//   ・閾値: 現在値・最大予測値のどちらかが WBGT 21(注意)以上で表示
+//          両方とも20以下なら完全非表示
+//   ・色: 2つのうち高いレベルに合わせる
+//   ・最大予測値: 今日1日の hourly 予測の最大値・日が変わるまで固定
+function calcWBGT(Ta, RH, SR, WS) {
+  // SR(全天日射量 kW/m2)・WS(風速 m/s)が無い場合は屋外夏季の代表値で補完
+  const sr = (typeof SR === 'number' && !isNaN(SR)) ? SR : 0.2;  // 屋外夏季 概ね0.2
+  const ws = (typeof WS === 'number' && !isNaN(WS)) ? WS : 1.0;  // 微風 1.0m/s
+  const wbgt = 0.735 * Ta
+             + 0.0374 * RH
+             + 0.00292 * Ta * RH
+             + 7.619 * sr
+             - 4.557 * sr * sr
+             - 0.0572 * ws
+             - 4.064;
+  return wbgt;
+}
+
+// WBGT値 → レベル情報(CSSクラス・アイコン・ラベル・ランク)に変換
+// 注意未満は null を返す(=「ほぼ安全」相当・バッジでは控えめに表示)
+function getHeatstrokeLevel(wbgt) {
+  if (wbgt >= 31) return { cls: 'hs-danger',  icon: '🔥', label: '危険',     rank: 5 };
+  if (wbgt >= 28) return { cls: 'hs-severe',  icon: '🥵', label: '厳重警戒', rank: 4 };
+  if (wbgt >= 25) return { cls: 'hs-warning', icon: '⚠️', label: '警戒',     rank: 3 };
+  if (wbgt >= 21) return { cls: 'hs-caution', icon: '💧', label: '注意',     rank: 2 };
+  return null;
+}
+
+// 高い方のランクに応じた行動指針
+function getHeatstrokeAdvice(rank) {
+  if (rank >= 5) return '運動・屋外作業は原則中止。涼しい室内へ';
+  if (rank >= 4) return '炎天下を避け、室内も室温に注意';
+  if (rank >= 3) return 'こまめに休憩・水分補給を';
+  return '運動・作業の合間に水分補給を';
+}
+
+// 2値バッジを描画する共通関数(成功時・失敗時の前回値再表示で共用)
+// badge: { nowWBGT, maxWBGT } または null(非表示)
+function renderHeatstroke(badge) {
+  const el = document.getElementById('heatstroke-display');
+  if (!el) return;
+  if (!badge) {
+    el.style.display = 'none';
+    return;
+  }
+  const { nowWBGT, maxWBGT } = badge;
+  const lvNow = getHeatstrokeLevel(nowWBGT);
+  const lvMax = getHeatstrokeLevel(maxWBGT);
+
+  // どちらも注意未満なら非表示
+  if (!lvNow && !lvMax) {
+    el.style.display = 'none';
+    return;
+  }
+
+  // 色は高い方のランクに合わせる(両方ある場合は値の高い方)
+  const higher = (lvMax && (!lvNow || lvMax.rank >= lvNow.rank)) ? lvMax : lvNow;
+  el.className = 'heatstroke-bar-full ' + higher.cls;
+
+  // 現在値・最大予測値の表示HTML(注意未満なら「ほぼ安全」と控えめに表示)
+  const nowHtml = lvNow
+    ? `${lvNow.icon} <span class="hs-section-value">${lvNow.label}</span>（${nowWBGT.toFixed(1)}）`
+    : `<span class="hs-section-value" style="opacity:0.7;">ほぼ安全</span>（${nowWBGT.toFixed(1)}）`;
+  const maxHtml = lvMax
+    ? `${lvMax.icon} <span class="hs-section-value">${lvMax.label}</span>（${maxWBGT.toFixed(1)}）`
+    : `<span class="hs-section-value" style="opacity:0.7;">ほぼ安全</span>（${maxWBGT.toFixed(1)}）`;
+
+  el.innerHTML = `<div class="hs-section"><span class="hs-section-label">今</span>${nowHtml}</div>`
+               + `<span class="hs-divider">／</span>`
+               + `<div class="hs-section"><span class="hs-section-label">今日の最大</span>${maxHtml}</div>`
+               + `<div class="hs-advice">${getHeatstrokeAdvice(higher.rank)}</div>`
+               + `<div class="hs-note">※気温・湿度からの推定の目安です（暑さ指数 WBGT）</div>`;
+  el.style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════
 // 天気・気温を取得・表示（Open-Meteo・APIキー不要）
 // ═══════════════════════════════════════════
 async function loadWeather() {
@@ -1458,7 +1627,9 @@ async function loadWeather() {
   // Open-Meteo を fetch する内部関数。失敗時は例外を投げる。
   // 毎時00分ちょうどの一時失敗対策として、1回だけ短いリトライを行う。
   async function fetchOpenMeteo(coords) {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
+    // [熱中症予防情報 2026/5/28 案B] current=現在値・hourly=今日の最大予測値算出用
+    // hourly に気温・湿度・日射・風速を1時間刻みで取得し、今日0〜23時の最大WBGTを算出
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('天気API応答エラー: ' + res.status);
     return await res.json();
@@ -1530,9 +1701,55 @@ async function loadWeather() {
       holidayDisplay.style.display = 'none';
     }
 
+    // ─── [熱中症予防情報 2026/5/28 案B] 2値WBGT算出(現在値+今日の最大予測値) ───
+    // 夏季(5〜9月)のみ算出・バッジ表示
+    let heatstrokeBadge = null;
+    const month = today.getMonth() + 1; // 1〜12
+    if (month >= 5 && month <= 9 && data.current) {
+      // (1) 現在値WBGT
+      const Ta = data.current.temperature_2m;
+      const RH = data.current.relative_humidity_2m;
+      const SR = (typeof data.current.shortwave_radiation === 'number')
+                 ? data.current.shortwave_radiation / 1000 : undefined;
+      const WS = (typeof data.current.wind_speed_10m === 'number')
+                 ? data.current.wind_speed_10m / 3.6 : undefined;
+
+      // (2) 今日の最大予測WBGT(hourly配列から今日の日付に該当する0〜23時を抽出して最大値)
+      let maxWBGT = null;
+      if (data.hourly && Array.isArray(data.hourly.time)) {
+        const todayPrefix = toDateStr(today); // 'YYYY-MM-DD'
+        const times = data.hourly.time;
+        const temps = data.hourly.temperature_2m || [];
+        const rhs = data.hourly.relative_humidity_2m || [];
+        const srs = data.hourly.shortwave_radiation || [];
+        const wss = data.hourly.wind_speed_10m || [];
+        for (let i = 0; i < times.length; i++) {
+          if (typeof times[i] !== 'string' || !times[i].startsWith(todayPrefix)) continue;
+          const hTa = temps[i];
+          const hRH = rhs[i];
+          if (typeof hTa !== 'number' || typeof hRH !== 'number') continue;
+          const hSR = (typeof srs[i] === 'number') ? srs[i] / 1000 : undefined;
+          const hWS = (typeof wss[i] === 'number') ? wss[i] / 3.6 : undefined;
+          const w = calcWBGT(hTa, hRH, hSR, hWS);
+          if (maxWBGT === null || w > maxWBGT) maxWBGT = w;
+        }
+      }
+
+      // (3) 両方の値が揃ったらバッジ情報として渡す(renderHeatstroke内で閾値判定)
+      if (typeof Ta === 'number' && typeof RH === 'number') {
+        const nowWBGT = calcWBGT(Ta, RH, SR, WS);
+        heatstrokeBadge = {
+          nowWBGT: nowWBGT,
+          maxWBGT: (maxWBGT !== null) ? maxWBGT : nowWBGT  // hourlyが取れなければ現在値で代用
+        };
+      }
+    }
+    renderHeatstroke(heatstrokeBadge);
+
     // ─── [天気フェイルセーフ強化 2026/5/28] 成功時に前回値として保持 ───
     _lastWeatherHtml = html;
     _lastHolidayText = holidayText;
+    _lastHeatstroke = heatstrokeBadge;
     _weatherEverSucceeded = true;
 
     updateLastUpdated();
@@ -1553,6 +1770,8 @@ async function loadWeather() {
       } else {
         holidayDisplay.style.display = 'none';
       }
+      // [熱中症予防情報 2026/5/28] 前回の熱中症バッジも維持
+      renderHeatstroke(_lastHeatstroke);
       // ※ updateLastUpdated() は呼ばない＝最終更新時刻は前回成功時のまま維持
     } else {
       weatherRow.innerHTML = '<div class="weather-error">天気情報を取得できませんでした</div>';
