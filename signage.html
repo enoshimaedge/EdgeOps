@@ -705,6 +705,15 @@ let updateTimer = null;
 // (authenticate / loadMessage / openModal / startPolling から共通参照)
 let _globalSignageData = null;
 
+// ─── [天気フェイルセーフ強化 2026/5/28] ───────────────
+// 毎時00分ちょうど等のタイミングで Open-Meteo API が一時的に応答しないと
+// 天気欄が「取得できませんでした」で上書きされ、5分後の再取得まで消える事象への対策。
+// 直近で取得に成功した天気HTMLと祝日表示を保持し、取得失敗時は前回値を維持する。
+// 一度も成功していない初回失敗時のみ「取得できませんでした」を表示する。
+let _lastWeatherHtml = null;        // 直近成功時の天気行HTML
+let _lastHolidayText = null;        // 直近成功時の祝日テキスト(null=非表示)
+let _weatherEverSucceeded = false;  // 一度でも取得成功したか
+
 // ═══════════════════════════════════════════
 // ユーティリティ
 // ═══════════════════════════════════════════
@@ -1444,6 +1453,17 @@ function closeModal() {
 // ═══════════════════════════════════════════
 async function loadWeather() {
   const weatherRow = document.getElementById('weather-row');
+
+  // ─── [天気フェイルセーフ強化 2026/5/28] ───
+  // Open-Meteo を fetch する内部関数。失敗時は例外を投げる。
+  // 毎時00分ちょうどの一時失敗対策として、1回だけ短いリトライを行う。
+  async function fetchOpenMeteo(coords) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('天気API応答エラー: ' + res.status);
+    return await res.json();
+  }
+
   try {
     const region = currentGroupData.region || 'other';
     const coords = REGION_COORDS[region] || REGION_COORDS.other;
@@ -1453,11 +1473,17 @@ async function loadWeather() {
       regionNameEl.textContent = '📍 ' + coords.name;
     }
 
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('天気API応答エラー');
-    const data = await res.json();
+    // ─── [天気フェイルセーフ強化 2026/5/28] 1回だけ自動リトライ ───
+    // 毎時00分ジャストはアクセス集中等で一時的に失敗しやすいため、
+    // 1回目が失敗したら4秒待って即リトライ（5分後の定期更新を待たない）。
+    let data;
+    try {
+      data = await fetchOpenMeteo(coords);
+    } catch (firstErr) {
+      console.warn('[loadWeather] 1回目失敗、4秒後にリトライ:', firstErr?.message);
+      await new Promise(r => setTimeout(r, 4000));
+      data = await fetchOpenMeteo(coords); // 2回目も失敗したら catch へ
+    }
 
     const daily = data.daily;
     const currentTemp = data.current ? Math.round(data.current.temperature_2m) : null;
@@ -1491,21 +1517,46 @@ async function loadWeather() {
     const tomorrowStr = toDateStr(tomorrow);
     const holidayDisplay = document.getElementById('holiday-display');
 
+    let holidayText = null;
     if (ALL_HOLIDAYS[todayStr]) {
-      holidayDisplay.textContent = '🎌 今日は ' + ALL_HOLIDAYS[todayStr] + ' です';
-      holidayDisplay.style.display = 'block';
+      holidayText = '🎌 今日は ' + ALL_HOLIDAYS[todayStr] + ' です';
     } else if (ALL_HOLIDAYS[tomorrowStr]) {
-      holidayDisplay.textContent = '🎌 明日は ' + ALL_HOLIDAYS[tomorrowStr] + ' です';
+      holidayText = '🎌 明日は ' + ALL_HOLIDAYS[tomorrowStr] + ' です';
+    }
+    if (holidayText) {
+      holidayDisplay.textContent = holidayText;
       holidayDisplay.style.display = 'block';
     } else {
       holidayDisplay.style.display = 'none';
     }
 
+    // ─── [天気フェイルセーフ強化 2026/5/28] 成功時に前回値として保持 ───
+    _lastWeatherHtml = html;
+    _lastHolidayText = holidayText;
+    _weatherEverSucceeded = true;
+
     updateLastUpdated();
   } catch (e) {
     // ⚠️ 天気取得失敗でも全体停止しない（設計書事故ポイント③）
     console.error('天気取得エラー:', e);
-    weatherRow.innerHTML = '<div class="weather-error">天気情報を取得できませんでした</div>';
+
+    // ─── [天気フェイルセーフ強化 2026/5/28] 前回データ保持 ───
+    // 取得に一度でも成功していれば、前回の天気・祝日表示を維持する。
+    // (古いデータでも「最終更新時刻」表示で鮮度が判別できるため誤認しない)
+    // 一度も成功していない初回失敗時のみ「取得できませんでした」を表示する。
+    if (_weatherEverSucceeded && _lastWeatherHtml) {
+      weatherRow.innerHTML = _lastWeatherHtml;
+      const holidayDisplay = document.getElementById('holiday-display');
+      if (_lastHolidayText) {
+        holidayDisplay.textContent = _lastHolidayText;
+        holidayDisplay.style.display = 'block';
+      } else {
+        holidayDisplay.style.display = 'none';
+      }
+      // ※ updateLastUpdated() は呼ばない＝最終更新時刻は前回成功時のまま維持
+    } else {
+      weatherRow.innerHTML = '<div class="weather-error">天気情報を取得できませんでした</div>';
+    }
   }
 }
 
