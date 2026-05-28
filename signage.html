@@ -411,15 +411,15 @@
     font-weight: 600;
     opacity: 0.95;
     line-height: 1.3;
+    white-space: nowrap;        /* サイネージ大画面では1行に収める(改行禁止) */
+    overflow: hidden;            /* 万一はみ出しても下に押し出さない */
+    text-overflow: ellipsis;     /* はみ出した場合は…で省略 */
   }
-  /* 注釈: 行動指針とは別段に分けて表示(野口さん要望 2026/5/29) */
-  #heatstroke-display.heatstroke-bar-full .hs-note-block {
-    width: 100%;
-    text-align: center;
+  /* 注釈: 行動指針と同じ行にインライン表示(改行しない) */
+  #heatstroke-display.heatstroke-bar-full .hs-note-inline {
     font-size: 9px;
     font-weight: 400;
     opacity: 0.55;
-    line-height: 1.2;
   }
 
   /* ── QRカード ── */
@@ -1637,15 +1637,14 @@ function renderHeatstroke(badge) {
   // 1行目: タイトル「熱中症情報（暑さ指数 WBGT）」
   // 2行目: 今 ＋ 値 ／ 今日の最大 ＋ 値
   // 3行目: 行動指針 ＋ 注釈(目安)を1行統合(大画面なら1行・小画面なら自動折り返し)
-  // 4段構成: タイトル / 値 / 行動指針 / 注釈(別段)
+  // 3行構成: タイトル / 値 / 行動指針+注釈(1行統合・改行禁止)
   el.innerHTML = `<div class="hs-title">🌡 熱中症情報（暑さ指数 WBGT）</div>`
                + `<div class="hs-values">`
                +   `<div class="hs-section"><span class="hs-section-label">今</span>${nowHtml}</div>`
                +   `<span class="hs-divider">／</span>`
                +   `<div class="hs-section"><span class="hs-section-label">今日の最大</span>${maxHtml}</div>`
                + `</div>`
-               + `<div class="hs-advice">${getHeatstrokeAdvice(higher.rank)}</div>`
-               + `<div class="hs-note-block">※気温・湿度からの推定の目安です</div>`;
+               + `<div class="hs-advice">${getHeatstrokeAdvice(higher.rank)}<span class="hs-note-inline">　※気温・湿度からの推定の目安です</span></div>`;
   el.style.display = 'flex';
 }
 
