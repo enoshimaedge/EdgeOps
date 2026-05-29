@@ -67,15 +67,21 @@
     flex-shrink: 0;
   }
   .signage-logo {
-    font-size: 24px;
-    font-weight: 900;
-    color: white;
+    /* [UI改善 2026/5/23] サイネージでもグループ名を主役に。EdgeOps を 24px→16px に縮小・font-weight 900→700 */
+    /* 理由:大画面サイネージ表示で「いまどのグループか」を一目で視認させる */
+    font-size: 16px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
     letter-spacing: 1px;
   }
   .signage-group-name {
-    font-size: 16px;
-    color: rgba(255,255,255,0.9);
+    /* [UI改善 2026/5/23] グループ名を 16px→32px に拡大・font-weight 700 維持 */
+    /* index.html の screen-home ヘッダー(EdgeOps小・グループ名大)と統一思想 */
+    font-size: 32px;
+    color: white;
     font-weight: 700;
+    line-height: 1.2;
+    margin-top: 2px;
   }
   .last-updated {
     font-size: 14px;
@@ -317,6 +323,105 @@
     text-align: center;
   }
 
+  /* ─── [熱中症予防情報 2026/5/28 案B] 全幅バッジ・メッセージエリア直下 ─── */
+  /* 配置: signage-grid 直下・signage-bottom より上・折りたたみ対象外
+     表示条件: 5〜9月かつ WBGT 21(注意)以上で表示
+     2値表示: 現在値(リアルタイム) と 今日の最大予測値(1日固定)
+     色: 2つのうち高い方のレベルで決定 */
+  /* 親要素自体を縦並びFlexにすることで子要素が確実に縦積みになる */
+  #heatstroke-display.heatstroke-bar-full {
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+    text-align: center;
+    line-height: 1.3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 6px 0;
+    gap: 2px;
+  }
+  /* タイトル行: 何の情報か明示 */
+  #heatstroke-display.heatstroke-bar-full .hs-title {
+    width: 100%;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    opacity: 0.7;
+    letter-spacing: 0.5px;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  /* 値表示行: 今 + 値 ／ 今日の最大 + 値 */
+  #heatstroke-display.heatstroke-bar-full .hs-values {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .heatstroke-bar-full.hs-caution {
+    background: rgba(255, 235, 59, 0.18);
+    border: 1px solid rgba(255, 235, 59, 0.4);
+    color: #FFF59D;
+  }
+  .heatstroke-bar-full.hs-warning {
+    background: rgba(255, 152, 0, 0.20);
+    border: 1px solid rgba(255, 152, 0, 0.5);
+    color: #FFCC80;
+  }
+  .heatstroke-bar-full.hs-severe {
+    background: rgba(255, 87, 34, 0.22);
+    border: 1px solid rgba(255, 87, 34, 0.55);
+    color: #FFAB91;
+  }
+  .heatstroke-bar-full.hs-danger {
+    background: rgba(244, 67, 54, 0.28);
+    border: 1px solid rgba(244, 67, 54, 0.7);
+    color: #FF8A80;
+  }
+  .heatstroke-bar-full .hs-section {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+  }
+  .heatstroke-bar-full .hs-section-label {
+    font-size: 10px;
+    font-weight: 400;
+    opacity: 0.7;
+  }
+  .heatstroke-bar-full .hs-section-value {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .heatstroke-bar-full .hs-divider {
+    opacity: 0.4;
+    font-weight: 400;
+  }
+  #heatstroke-display.heatstroke-bar-full .hs-advice {
+    width: 100%;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.95;
+    line-height: 1.3;
+    white-space: nowrap;        /* サイネージ大画面では1行に収める(改行禁止) */
+    overflow: hidden;            /* 万一はみ出しても下に押し出さない */
+    text-overflow: ellipsis;     /* はみ出した場合は…で省略 */
+  }
+  /* 注釈: 行動指針と同じ行にインライン表示(改行しない) */
+  #heatstroke-display.heatstroke-bar-full .hs-note-inline {
+    font-size: 9px;
+    font-weight: 400;
+    opacity: 0.55;
+  }
+
   /* ── QRカード ── */
   #card-qr {
     grid-column: 2 / 3;
@@ -374,6 +479,69 @@
     flex-shrink: 0;
   }
   #offline-banner.show { display: block; }
+  /* ══════════════════════════════════════════════════════
+   * [UI改善② LINKボタン] チャッピー第50回判定準拠
+   * - グループ管理者が index.html で設定したカスタムURLを表示
+   * - link_url 未設定時は非表示
+   * - 既存 vacan-header-btn と同寸法・並んで表示
+   * ══════════════════════════════════════════════════════ */
+  .link-header-btn {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid rgba(255,255,255,0.6);
+    border-radius: 20px;
+    padding: 5px 10px;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .link-header-btn:hover { background: rgba(255,255,255,0.3); }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
+   * - signage-bottom 全体(天気カード+QRカード)をアコーディオン化
+   * - 初期状態は展開・localStorage で状態保持
+   * - 天気取得・QR生成・ポーリング・認証には触らない(条件8)
+   * ══════════════════════════════════════════════════════ */
+  .signage-bottom {
+    transition: max-height 0.35s ease, opacity 0.25s ease, margin-top 0.25s ease, padding 0.25s ease;
+    overflow: hidden;
+    opacity: 1;
+  }
+  .signage-bottom.collapsed {
+    max-height: 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    opacity: 0;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .bottom-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    color: rgba(255,255,255,0.85);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+    margin-top: 8px;
+  }
+  .bottom-toggle-btn:hover { background: rgba(255,255,255,0.15); }
 </style>
 </head>
 <body>
@@ -404,12 +572,25 @@
     </div>
     <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
       <div class="last-updated" id="last-updated-display">最終更新：--:--</div>
-      <button id="vacan-btn"
-         onclick="window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'"
-         class="vacan-header-btn" style="display:none;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
-        混雑度
-      </button>
+      <!-- [チャッピー第53回判定後] LINK + 混雑度を横並びに配置(野口さん指示:混雑度の左にLINK) -->
+      <!-- [チャッピー第54回判定後・最終修正] 5/14以前の動いていた button タグ形式に完全復帰(a タグ・event.preventDefault は外す) -->
+      <div style="display:flex; flex-direction:row; gap:6px; align-items:center;">
+        <button id="link-btn"
+           onclick="openCustomLinkSignage()"
+           class="link-header-btn vacan-header-btn" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          LINK
+        </button>
+        <button id="vacan-btn"
+           onclick="window.location.href='https://vacan.com/map/35.299694,139.480194,13?isOpendata=false&areaName=enoshima'"
+           class="vacan-header-btn" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>
+          混雑度
+        </button>
+      </div>
     </div>
   </div>
 
@@ -438,8 +619,20 @@
       </div>
     </div>
 
+    <!-- [熱中症予防情報 2026/5/28 案B] 全幅バッジ・メッセージエリア直下・折りたたみ対象外
+         5〜9月のみ表示・WBGT 21(注意)以上で表示・両方20以下なら非表示 -->
+    <div id="heatstroke-display" class="heatstroke-bar-full" style="display:none;"></div>
+
+    <!-- [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
+         トグルボタン押下で signage-bottom 全体(天気+QR)を折りたたむ
+         localStorage 'signage_bottom_collapsed' で状態保持 -->
+    <button id="bottom-toggle-btn" class="bottom-toggle-btn" onclick="toggleBottomAccordion()">
+      <span id="bottom-toggle-icon">▼</span>
+      <span id="bottom-toggle-label">折りたたむ</span>
+    </button>
+
     <!-- 天気・祝日 + QRコード（下部固定） -->
-    <div class="signage-bottom">
+    <div class="signage-bottom" id="signage-bottom">
       <div class="s-card" id="card-weather">
         <div class="s-card-title">🌤 天気・気温　<span id="weather-region-name" style="font-size:10px; color:rgba(255,255,255,0.4); font-weight:400; letter-spacing:0;"></span></div>
         <div class="weather-row" id="weather-row">
@@ -479,6 +672,11 @@
 // ═══════════════════════════════════════════
 const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
+
+// ─── signage-fetch Edge Function 経由化 (チャッピー第68回判定 v2 反映) ───
+// 全 DB アクセスは signage-fetch Edge Function 経由で行う
+// (anon キー経由の DB 直接アクセスを完全に廃止 = L3 認可基盤層との両立)
+const SIGNAGE_FETCH_URL = SUPABASE_URL + '/functions/v1/signage-fetch';
 
 // 地域→座標マッピング
 const REGION_COORDS = {
@@ -605,6 +803,22 @@ let sbClient = null;
 let currentGroupData = null;
 let updateTimer = null;
 
+// ─── signage-fetch 経由データキャッシュ ───────────────
+// 全 DB データを Edge Function 1回呼び出しで取得し、ここにキャッシュする
+// (authenticate / loadMessage / openModal / startPolling から共通参照)
+let _globalSignageData = null;
+
+// ─── [天気フェイルセーフ強化 2026/5/28] ───────────────
+// 毎時00分ちょうど等のタイミングで Open-Meteo API が一時的に応答しないと
+// 天気欄が「取得できませんでした」で上書きされ、5分後の再取得まで消える事象への対策。
+// 直近で取得に成功した天気HTMLと祝日表示を保持し、取得失敗時は前回値を維持する。
+// 一度も成功していない初回失敗時のみ「取得できませんでした」を表示する。
+let _lastWeatherHtml = null;        // 直近成功時の天気行HTML
+let _lastHolidayText = null;        // 直近成功時の祝日テキスト(null=非表示)
+let _weatherEverSucceeded = false;  // 一度でも取得成功したか
+// ─── [熱中症予防情報 2026/5/28] 前回値保持 ───
+let _lastHeatstroke = null;         // 直近成功時の熱中症バッジ情報 {nowWBGT, maxWBGT} (null=非表示・夏季外)
+
 // ═══════════════════════════════════════════
 // ユーティリティ
 // ═══════════════════════════════════════════
@@ -621,6 +835,89 @@ function showMain() {
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('error-screen').classList.remove('active');
   document.getElementById('main-screen').classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+// [UI改善② LINKボタン] チャッピー第50回判定準拠
+// ═══════════════════════════════════════════
+// 設計原則(index.htmlと同等):
+//   - currentGroupData.link_url が https://〜 で設定されていればボタン表示
+//   - 未設定・空・不正値は非表示
+//   - 押下時は window.open に noopener,noreferrer で別タブ起動
+//   - サイネージ管理者編集UIは index.html 側のみ・signage.htmlは表示専用
+
+function updateLinkButtonSignage() {
+  const btn = document.getElementById('link-btn');
+  if (!btn) return;
+  const url = (currentGroupData && typeof currentGroupData.link_url === 'string')
+              ? currentGroupData.link_url.trim() : '';
+  if (url && /^https:\/\//.test(url)) {
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function openCustomLinkSignage() {
+  const url = currentGroupData?.link_url;
+  if (!url || typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
+    return; // 念のため(ボタンが表示されていれば通常はここに来ない)
+  }
+  // [チャッピー第54回判定後・修正] Fully Kiosk Browser のポップアップ制限回避のため
+  // window.open(別タブ) から window.location.href(同タブ遷移) に変更
+  // 戻る場合は Fully Kiosk ヘッダーの戻るボタン or ホームボタンを使用
+  window.location.href = url.trim();
+}
+
+// ═══════════════════════════════════════════
+// [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
+// ═══════════════════════════════════════════
+// 設計原則:
+//   - signage-bottom 全体(天気カード+QRカード)を1つのアコーディオン領域として扱う
+//   - 初期状態は展開
+//   - localStorage 'signage_bottom_collapsed' で状態保持(true/false 文字列)
+//   - 天気取得・QR生成・ポーリング・認証・signage_token処理には触らない(条件8)
+
+const SIGNAGE_BOTTOM_STORAGE_KEY = 'signage_bottom_collapsed';
+
+function toggleBottomAccordion() {
+  const bottom = document.getElementById('signage-bottom');
+  const icon = document.getElementById('bottom-toggle-icon');
+  const label = document.getElementById('bottom-toggle-label');
+  if (!bottom || !icon || !label) return;
+  const isCollapsed = bottom.classList.toggle('collapsed');
+  if (isCollapsed) {
+    icon.textContent = '▲';
+    label.textContent = '表示する';
+  } else {
+    icon.textContent = '▼';
+    label.textContent = '折りたたむ';
+  }
+  try {
+    localStorage.setItem(SIGNAGE_BOTTOM_STORAGE_KEY, isCollapsed ? 'true' : 'false');
+  } catch (e) {
+    // localStorage 不可環境(プライベートモード等)でも動作継続
+    console.warn('[toggleBottomAccordion] localStorage write failed:', e);
+  }
+}
+
+function restoreBottomAccordionState() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(SIGNAGE_BOTTOM_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[restoreBottomAccordionState] localStorage read failed:', e);
+  }
+  // 保存値が 'true' のときのみ折りたたみ状態で起動・それ以外は展開(初期状態)
+  if (saved === 'true') {
+    const bottom = document.getElementById('signage-bottom');
+    const icon = document.getElementById('bottom-toggle-icon');
+    const label = document.getElementById('bottom-toggle-label');
+    if (bottom) bottom.classList.add('collapsed');
+    if (icon) icon.textContent = '▲';
+    if (label) label.textContent = '表示する';
+  }
 }
 
 function updateLastUpdated() {
@@ -643,6 +940,35 @@ function toDateStr(date) {
 }
 
 // ═══════════════════════════════════════════
+// signage-fetch Edge Function 経由データ取得
+// ═══════════════════════════════════════════
+// チャッピー第68回判定 v2 反映:全 DB アクセスを Edge Function 経由に統一
+// service_role キーで認証バイパスし、L3 RLS 完遂後も動作する設計
+async function fetchSignageData() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  if (!token) {
+    return { ok: false, error_code: 'NO_TOKEN' };
+  }
+  try {
+    const res = await fetch(SIGNAGE_FETCH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    console.warn('[fetchSignageData] network error:', e?.message);
+    return { ok: false, error_code: 'NETWORK_ERROR' };
+  }
+}
+
+// ═══════════════════════════════════════════
 // 認証チェック（3段階）
 // ═══════════════════════════════════════════
 async function authenticate() {
@@ -658,16 +984,22 @@ async function authenticate() {
     return false;
   }
 
-  // ② DBでトークン照合（tokenだけでグループを自動特定）
+  // ② signage-fetch Edge Function 経由でデータ取得 (チャッピー第68回判定 v2)
   try {
-    const { data: group, error } = await sbClient
-      .from('group_sessions')
-      .select('*')
-      .eq('signage_token', token)
-      .eq('signage_enabled', true)
-      .single();
+    const data = await fetchSignageData();
 
-    if (error || !group) {
+    // ─── NETWORK_ERROR は「接続エラー」として別表示 (チャッピー最終確認 修正必須) ───
+    // 一時的な通信エラーで「サイネージ無効」と誤認させない
+    if (data?.error_code === 'NETWORK_ERROR') {
+      showError(
+        '接続エラー',
+        'サーバーへの接続に失敗しました。\nネットワークをご確認ください。'
+      );
+      return false;
+    }
+
+    if (!data || !data.ok || !data.group) {
+      // INVALID_TOKEN / EXPIRED すべて統一文言で表示
       showError(
         'サイネージが無効です',
         'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。'
@@ -675,19 +1007,9 @@ async function authenticate() {
       return false;
     }
 
-    // ST版(SL-)の期限切れチェック
-    if (group.group_id?.startsWith('SL-') && group.expires_at) {
-      if (new Date(group.expires_at) <= new Date()) {
-        showError(
-          'グループの有効期限切れ',
-          'このグループは有効期限を過ぎています。\n管理者にお問い合わせください。'
-        );
-        return false;
-      }
-    }
-
-    // ③ 認証成功
-    currentGroupData = group;
+    // ③ 認証成功 - グループデータ + 全データをキャッシュ
+    currentGroupData = data.group;
+    _globalSignageData = data;
     return true;
   } catch (e) {
     showError(
@@ -773,7 +1095,7 @@ function linkifyBody(text) {
 let _buildItemContext = {}; // buildItemHtmlが参照するコンテキスト
 
 function buildItemHtml(item) {
-  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap } = _buildItemContext;
+  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt } = _buildItemContext;
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
     : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
@@ -792,8 +1114,33 @@ function buildItemHtml(item) {
   if (humanCount > 0) {
     if (item._type === 'message') {
       const readCount = readCountMap[item.id] || 0;
-      const receiverCount = humanMembers.filter(m => m.eo_uid !== item.sender_eo_uid).length;
-      if (readCount >= receiverCount) {
+      // ════════════════════════════════════════════════════════════
+      // [既読バッジ分母仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+      // 送信時点で確定した受信者数を分母とする(index.html L3153 と同一方式)
+      // 優先順:
+      //   ① item.receiver_count (送信時にDB保存された送信時点の固定値)
+      //   ② 旧データ・NULL の場合は memberJoinedAt で送信時点フィルタして算出
+      // これにより、後から参加したメンバー(例:五郎S)が分母に入らない
+      // ════════════════════════════════════════════════════════════
+      let receiverCount;
+      if (item.receiver_count != null) {
+        receiverCount = item.receiver_count;
+      } else {
+        const itemCreatedAtMs = new Date(item.created_at).getTime();
+        receiverCount = humanMembers.filter(m => {
+          if (m.eo_uid === item.sender_eo_uid) return false;           // C
+          if (memberJoinedAt) {
+            const joinedAt = memberJoinedAt.get(m.eo_uid);
+            if (joinedAt !== undefined && joinedAt > itemCreatedAtMs) return false; // D
+          }
+          return true;
+        }).length;
+      }
+      if (receiverCount === 0) {
+        // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
+        // 受信者0名(送信時点で送信者以外いない)→ 既読対象なし表示
+        readBadge = `<span style="font-size:10px; color:#94a3b8; font-weight:700;">📋 対象者なし</span>`;
+      } else if (readCount >= receiverCount) {
         readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
       } else {
         readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
@@ -837,10 +1184,23 @@ function buildItemHtml(item) {
     }
   }
 
+  // ── [簡素案・サイネージ画像表示] 画像ありラベル ──
+  // 設計:
+  //   - 判定式: image_url または thumbnail_url が存在するか
+  //   - 画像本体・サムネは表示せず「📷 画像あり」アイコンのみ
+  //   - サイネージは表示専用(編集UIなし)
+  //   - Edge Function 呼び出しなし・DB変更なし・既存ロジックには触らない
+  //   - メッセージ・引き継ぎノート両方に対応(両者とも buildItemHtml を通るため)
+  //   [チャッピー第53回判定後] image_mode 依存を撤廃(値の不整合対策)
+  let imageLabel = '';
+  if (item.image_url || item.thumbnail_url) {
+    imageLabel = `<span class="message-priority" style="background:rgba(33,150,243,0.15); color:#90caf9; border:1px solid rgba(144,202,249,0.5); margin-left:6px;">📷 画像あり</span>`;
+  }
+
   return `
     <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}</div>
+        <div style="display:flex; align-items:center; flex-wrap:wrap;"><span class="message-priority ${p.cls}">${p.label}</span>${surveyLabel}${surveyDeadlineLabel}${imageLabel}</div>
         ${readBadge}
       </div>
       <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(body)}</div>
@@ -880,24 +1240,19 @@ function getHandoverLabel(item) {
 // ═══════════════════════════════════════════
 async function loadMessage() {
   try {
-    // 連絡は過去60日分のみ取得（DBには残るが表示しない）
-    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-    // ★ バグ③ 修正: 引き継ぎノートは過去72時間分のみ取得（index.htmlと整合・v7.17準拠）
-    const cutoff72h = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    // 連絡とhandover_notesを並列取得
-    const [msgResult, handoverResult] = await Promise.allSettled([
-      sbClient.from('messages').select('*')
-        .eq('group_session_id', currentGroupData.id)
-        .gte('created_at', cutoff60d)
-        .order('created_at', { ascending: false }),
-      sbClient.from('handover_notes').select('*')
-        .eq('group_session_id', currentGroupData.id)
-        .gte('created_at', cutoff72h)
-        .order('created_at', { ascending: false })
-    ]);
+    // ─── signage-fetch 経由化 (チャッピー第68回判定 v2 反映) ───
+    // 5分ごとのポーリングで startPolling から _globalSignageData が更新される
+    // 初回呼び出し (init から) では authenticate で取得済みのデータを使う
+    // 連絡は過去60日分のみ取得（DBには残るが表示しない）/ 引き継ぎは過去72時間
+    // → cutoff は signage-fetch Edge Function 内で適用済み
 
-    const messages = msgResult.status === 'fulfilled' ? (msgResult.value.data || []) : [];
-    const handovers = handoverResult.status === 'fulfilled' ? (handoverResult.value.data || []) : [];
+    if (!_globalSignageData || !_globalSignageData.ok) {
+      // 異常時: 何も表示しない (showError は startPolling から呼ばれる)
+      return;
+    }
+
+    const messages = _globalSignageData.messages || [];
+    const handovers = _globalSignageData.handover_notes || [];
 
     // 連絡のpriorityMap
     const msgPriorityMap = {
@@ -906,47 +1261,64 @@ async function loadMessage() {
       info:   { label: '🟢 連絡', cls: 'priority-info',   itemCls: 'info',   order: 2 },
     };
 
-    // 既読・確認情報を並列取得
+    // 既読・確認情報・メンバー情報はすべて _globalSignageData から取得
+    // ════════════════════════════════════════════════════════════
+    // [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // A. 分母は送信時点で approved だった人間メンバーのみ
+    // B. サイネージ端末(is_signage=true)は分母・分子から除外
+    // C. 送信者は分母から除外
+    // D. 送信後参加(created_at > item.created_at)は分母から除外
+    // E. 退出済(status='left')は分子から除外
+    // G. created_at が NULL の既存データは「参加済み」として扱う
+    // ※index.html / signage.html の計6箇所で同一仕様を維持
+    // ════════════════════════════════════════════════════════════
     const msgIds = messages.map(m => m.id);
     const handoverIds = handovers.map(h => h.id);
 
-    const [receiptsResult, confirmationsResult, membersResult] = await Promise.allSettled([
-      msgIds.length > 0
-        ? sbClient.from('read_receipts').select('message_id, eo_uid').in('message_id', msgIds)
-        : Promise.resolve({ data: [] }),
-      handoverIds.length > 0
-        ? sbClient.from('handover_confirmations').select('handover_id,eo_uid,display_name').in('handover_id', handoverIds)
-        : Promise.resolve({ data: [] }),
-      sbClient.from('group_members').select('eo_uid,display_name,is_signage')
-        .eq('group_session_id', currentGroupData.id).eq('status', 'approved')
-    ]);
-
-    const receipts = receiptsResult.status === 'fulfilled' ? (receiptsResult.value.data || []) : [];
-    const confirmations = confirmationsResult.status === 'fulfilled' ? (confirmationsResult.value.data || []) : [];
-    const allMembers = membersResult.status === 'fulfilled' ? (membersResult.value.data || []) : [];
+    const receipts = _globalSignageData.read_receipts || [];
+    const confirmations = _globalSignageData.handover_confirmations || [];
+    const allMembers = _globalSignageData.members || [];
+    const allMembersHist = _globalSignageData.all_members_hist || [];
     const humanMembers = allMembers.filter(m => !m.is_signage);
     const humanCount = humanMembers.length;
-    const signageUids = new Set(allMembers.filter(m => m.is_signage).map(m => m.eo_uid));
+    const signageUids = new Set(allMembersHist.filter(m => m.is_signage).map(m => m.eo_uid));
+    // 参加時刻マップ(過去含む全メンバー)
+    const memberJoinedAt = new Map();
+    allMembersHist.forEach(m => {
+      memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+    });
+    // 送信時刻・送信者マップ
+    const msgCreatedAtMap = {};
+    messages.forEach(m => { msgCreatedAtMap[m.id] = new Date(m.created_at).getTime(); });
+    const hwCreatedAtMap = {};
+    const hwSenderMap = {};
+    handovers.forEach(h => {
+      hwCreatedAtMap[h.id] = new Date(h.created_at).getTime();
+      hwSenderMap[h.id] = h.sender_eo_uid;
+    });
 
-    // 既読数マップ（サイネージ端末・送信者除外）
+    // 既読数マップ（サイネージ端末・送信者・送信時点未参加を除外）
     const senderMap = {};
     messages.forEach(m => { senderMap[m.id] = m.sender_eo_uid; });
     const readCountMap = {};
     receipts.forEach(r => {
-      if (signageUids.has(r.eo_uid)) return;
-      if (senderMap[r.message_id] === r.eo_uid) return;
+      if (signageUids.has(r.eo_uid)) return;                              // B
+      if (senderMap[r.message_id] === r.eo_uid) return;                   // C
+      const joinedAt = memberJoinedAt.get(r.eo_uid);
+      if (joinedAt !== undefined && joinedAt > msgCreatedAtMap[r.message_id]) return; // D
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
 
     // ── アンケート回答カウントマップを取得（is_survey=true のメッセージのみ対象）──
+    // ─── signage-fetch 経由化: アンケート回答もキャッシュから取得 (チャッピー第68回判定 v2) ───
     const surveyResponseCountMap = {};
     try {
       const surveyMsgIds = messages.filter(m => m.is_survey === true).map(m => m.id);
       if (surveyMsgIds.length > 0) {
-        const { data: resps } = await sbClient.from('message_responses')
-          .select('message_id, status')
-          .in('message_id', surveyMsgIds);
-        (resps || []).forEach(r => {
+        const surveyMsgIdSet = new Set(surveyMsgIds);
+        const allSurveyResps = _globalSignageData ? (_globalSignageData.survey_responses || []) : [];
+        const resps = allSurveyResps.filter(r => surveyMsgIdSet.has(r.message_id));
+        resps.forEach(r => {
           if (r.status === 'answered') {
             surveyResponseCountMap[r.message_id] = (surveyResponseCountMap[r.message_id] || 0) + 1;
           }
@@ -957,16 +1329,30 @@ async function loadMessage() {
     }
 
     // 確認済マップ（引き継ぎIDごとの確認者リスト）
+    // サイネージ端末・送信者・送信時点未参加を除外
     const confirmedMap = {};
     confirmations.forEach(c => {
+      if (signageUids.has(c.eo_uid)) return;                              // B
+      if (hwSenderMap[c.handover_id] === c.eo_uid) return;                // C
+      const joinedAt = memberJoinedAt.get(c.eo_uid);
+      if (joinedAt !== undefined && joinedAt > hwCreatedAtMap[c.handover_id]) return; // D
       if (!confirmedMap[c.handover_id]) confirmedMap[c.handover_id] = [];
       confirmedMap[c.handover_id].push({ eo_uid: c.eo_uid, display_name: c.display_name });
     });
 
     // 引き継ぎに確認状況を付与
+    // ※eligibleCount は引き継ぎごとに送信時点で在籍していた人間メンバー数を算出
     const handoverItems = handovers.map(h => {
+      const hCreatedAt = hwCreatedAtMap[h.id];
+      const hSender = hwSenderMap[h.id];
+      const eligibleCount = humanMembers.filter(m => {
+        if (m.eo_uid === hSender) return false;                           // C
+        const joinedAt = memberJoinedAt.get(m.eo_uid);
+        if (joinedAt !== undefined && joinedAt > hCreatedAt) return false; // D
+        return true;
+      }).length;
       const confirmed = (confirmedMap[h.id] || []).length;
-      const isFullyConfirmed = humanCount > 0 && confirmed >= humanCount;
+      const isFullyConfirmed = eligibleCount > 0 && confirmed >= eligibleCount;
       return { ...h, body: h.content, _type: 'handover', _confirmed: confirmed, _fullyConfirmed: isFullyConfirmed };
     });
     const messageItems = messages.map(m => ({ ...m, _type: 'message' }));
@@ -986,6 +1372,7 @@ async function loadMessage() {
       allMembers, humanMembers, humanCount,
       readCountMap, confirmedMap, msgPriorityMap,
       surveyResponseCountMap,
+      memberJoinedAt,  // [チャッピー第55-2回判定確定] buildItemHtml の receiver_count NULL フォールバック用
       allItemsFlat: [...handoverItems, ...messageItems]
     };
 
@@ -1042,10 +1429,10 @@ function openModalByIndex(index) {
   const hh = String(createdAt.getHours()).padStart(2, '0');
   const mm = String(createdAt.getMinutes()).padStart(2, '0');
   const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '');
+  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null);
 }
 
-async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid) {
+async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt) {
   const modal = document.getElementById('modal-msg-detail');
   document.getElementById('modal-priority-badge').innerHTML =
     `<span class="message-priority ${priorityCls}">${priorityLabel}</span>`;
@@ -1057,22 +1444,69 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
   modal.style.display = 'flex';
 
   try {
-    const { data: members } = await sbClient.from('group_members')
-      .select('eo_uid, display_name, is_signage')
-      .eq('group_session_id', currentGroupData.id)
-      .eq('status', 'approved');
+    // ════════════════════════════════════════════════════════════
+    // [詳細モーダル集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // A. 分母は送信時点で approved だった人間メンバーのみ
+    // B. サイネージ端末(is_signage=true)は分母・分子から除外
+    // C. 送信者は分母から除外
+    // D. 送信後参加(created_at > itemCreatedAt)は分母から除外
+    // G. created_at が NULL の既存データは「参加済み」として扱う
+    //    itemCreatedAt が null の場合は送信時点フィルタは無効化
+    // ※index.html / signage.html の計6箇所で同一仕様を維持
+    // ════════════════════════════════════════════════════════════
+    // ─── signage-fetch 経由化 (チャッピー第68回判定 v2) ───
+    // _globalSignageData から取得する (DB 直接アクセスを廃止)
+    const members = _globalSignageData ? (_globalSignageData.members || []) : [];
 
-    const humanMembers = (members || []).filter(m => !m.is_signage && m.eo_uid !== senderUid);
+    // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
+    const allMembersHist = _globalSignageData ? (_globalSignageData.all_members_hist || []) : [];
+
+    const signageUidsModal = new Set((allMembersHist || []).filter(m => m.is_signage).map(m => m.eo_uid));
+    const memberJoinedAtModal = new Map();
+    (allMembersHist || []).forEach(m => {
+      memberJoinedAtModal.set(m.eo_uid, new Date(m.created_at).getTime());
+    });
+    const itemCreatedAtMs = itemCreatedAt ? new Date(itemCreatedAt).getTime() : null;
+
+    // 送信時点で在籍していた人間メンバー = 分母対象
+    const humanMembers = (members || []).filter(m => {
+      if (m.is_signage === true) return false;                            // B
+      if (m.eo_uid === senderUid) return false;                           // C
+      if (itemCreatedAtMs !== null) {
+        const joinedAt = memberJoinedAtModal.get(m.eo_uid);
+        if (joinedAt !== undefined && joinedAt > itemCreatedAtMs) return false; // D
+      }
+      return true;
+    });
 
     let readUids = [];
     if (itemType === 'message') {
-      const { data: receipts } = await sbClient.from('read_receipts')
-        .select('eo_uid').eq('message_id', itemId);
-      readUids = (receipts || []).map(r => r.eo_uid);
+      // ─── signage-fetch 経由化: read_receipts はキャッシュから単一メッセージ分を抽出 ───
+      const allReceipts = _globalSignageData ? (_globalSignageData.read_receipts || []) : [];
+      const receipts = allReceipts.filter(r => r.message_id === itemId);
+      readUids = (receipts || [])
+        .filter(r => !signageUidsModal.has(r.eo_uid))                     // B
+        .filter(r => r.eo_uid !== senderUid)                              // C
+        .filter(r => {                                                    // D
+          if (itemCreatedAtMs === null) return true;
+          const j = memberJoinedAtModal.get(r.eo_uid);
+          return j === undefined || j <= itemCreatedAtMs;
+        })
+        .map(r => r.eo_uid);
     } else {
-      const { data: confirmations } = await sbClient.from('handover_confirmations')
-        .select('eo_uid, display_name, action').eq('handover_id', itemId);
-      readUids = (confirmations || []).map(c => c.eo_uid);
+      // ─── signage-fetch 経由化: handover_confirmations はキャッシュから単一引き継ぎ分を抽出 ───
+      // 注: Edge Function 側で action カラムも含めて返却している
+      const allConfirmations = _globalSignageData ? (_globalSignageData.handover_confirmations || []) : [];
+      const confirmations = allConfirmations.filter(c => c.handover_id === itemId);
+      readUids = (confirmations || [])
+        .filter(c => !signageUidsModal.has(c.eo_uid))                     // B
+        .filter(c => c.eo_uid !== senderUid)                              // C
+        .filter(c => {                                                    // D
+          if (itemCreatedAtMs === null) return true;
+          const j = memberJoinedAtModal.get(c.eo_uid);
+          return j === undefined || j <= itemCreatedAtMs;
+        })
+        .map(c => c.eo_uid);
     }
 
     const readMembers = humanMembers.filter(m => readUids.includes(m.eo_uid));
@@ -1092,7 +1526,7 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
             <div>
               <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:6px; font-weight:700;">❌ 未読 ${unreadMembers.length}名</div>
               ${unreadMembers.length === 0
-                ? `<div style="font-size:12px; color:rgba(255,255,255,0.3);">全員既読</div>`
+                ? `<div style="font-size:12px; color:rgba(255,255,255,0.3);">未読のメンバーはいません</div>`
                 : unreadMembers.map(m => `<div style="font-size:13px; color:rgba(255,255,255,0.5); margin-bottom:4px;">⬜ ${m.display_name}</div>`).join('')}
             </div>
           </div>
@@ -1120,10 +1554,121 @@ function closeModal() {
 }
 
 // ═══════════════════════════════════════════
+// [熱中症予防情報 2026/5/28 案B] 簡易WBGT(暑さ指数)近似・2値表示
+// ═══════════════════════════════════════════
+// 環境省 熱中症予防情報サイト採用の推定式(小野ら2014)を使用:
+//   WBGT = 0.735*Ta + 0.0374*RH + 0.00292*Ta*RH
+//          + 7.619*SR - 4.557*SR^2 - 0.0572*WS - 4.064
+//   Ta:気温(℃) RH:相対湿度(%) SR:全天日射量(kW/m2) WS:平均風速(m/s)
+// ※ Open-Meteo から取得した値で算出する「推定値」であり、
+//   環境省公式の実測WBGTや現場の実環境(輻射熱源・局所条件)とは異なる。
+//   表示は必ず「目安」と明示する。
+//
+// 表示仕様(案B):
+//   ・配置: メッセージエリア直下・全幅・折りたたみ対象外
+//   ・期間: 5月〜9月のみ表示
+//   ・閾値: 現在値・最大予測値のどちらかが WBGT 21(注意)以上で表示
+//          両方とも20以下なら完全非表示
+//   ・色: 2つのうち高いレベルに合わせる
+//   ・最大予測値: 今日1日の hourly 予測の最大値・日が変わるまで固定
+function calcWBGT(Ta, RH, SR, WS) {
+  // SR(全天日射量 kW/m2)・WS(風速 m/s)が無い場合は屋外夏季の代表値で補完
+  const sr = (typeof SR === 'number' && !isNaN(SR)) ? SR : 0.2;  // 屋外夏季 概ね0.2
+  const ws = (typeof WS === 'number' && !isNaN(WS)) ? WS : 1.0;  // 微風 1.0m/s
+  const wbgt = 0.735 * Ta
+             + 0.0374 * RH
+             + 0.00292 * Ta * RH
+             + 7.619 * sr
+             - 4.557 * sr * sr
+             - 0.0572 * ws
+             - 4.064;
+  return wbgt;
+}
+
+// WBGT値 → レベル情報(CSSクラス・アイコン・ラベル・ランク)に変換
+// 注意未満は null を返す(=「ほぼ安全」相当・バッジでは控えめに表示)
+function getHeatstrokeLevel(wbgt) {
+  if (wbgt >= 31) return { cls: 'hs-danger',  icon: '🔥', label: '危険',     rank: 5 };
+  if (wbgt >= 28) return { cls: 'hs-severe',  icon: '🥵', label: '厳重警戒', rank: 4 };
+  if (wbgt >= 25) return { cls: 'hs-warning', icon: '⚠️', label: '警戒',     rank: 3 };
+  if (wbgt >= 21) return { cls: 'hs-caution', icon: '💧', label: '注意',     rank: 2 };
+  return null;
+}
+
+// 高い方のランクに応じた行動指針
+function getHeatstrokeAdvice(rank) {
+  if (rank >= 5) return '運動・屋外作業は原則中止。涼しい室内へ';
+  if (rank >= 4) return '炎天下を避け、室内も室温に注意';
+  if (rank >= 3) return 'こまめに休憩・水分補給を';
+  return '運動・作業の合間に水分補給を';
+}
+
+// 2値バッジを描画する共通関数(成功時・失敗時の前回値再表示で共用)
+// badge: { nowWBGT, maxWBGT } または null(非表示)
+function renderHeatstroke(badge) {
+  const el = document.getElementById('heatstroke-display');
+  if (!el) return;
+  if (!badge) {
+    el.style.display = 'none';
+    return;
+  }
+  const { nowWBGT, maxWBGT } = badge;
+  const lvNow = getHeatstrokeLevel(nowWBGT);
+  const lvMax = getHeatstrokeLevel(maxWBGT);
+
+  // どちらも注意未満なら非表示
+  if (!lvNow && !lvMax) {
+    el.style.display = 'none';
+    return;
+  }
+
+  // 色は高い方のランクに合わせる(両方ある場合は値の高い方)
+  const higher = (lvMax && (!lvNow || lvMax.rank >= lvNow.rank)) ? lvMax : lvNow;
+  el.className = 'heatstroke-bar-full ' + higher.cls;
+
+  // 現在値・最大予測値の表示HTML(注意未満なら「ほぼ安全」と控えめに表示)
+  const nowHtml = lvNow
+    ? `${lvNow.icon} <span class="hs-section-value">${lvNow.label}</span>（${nowWBGT.toFixed(1)}）`
+    : `<span class="hs-section-value" style="opacity:0.7;">ほぼ安全</span>（${nowWBGT.toFixed(1)}）`;
+  const maxHtml = lvMax
+    ? `${lvMax.icon} <span class="hs-section-value">${lvMax.label}</span>（${maxWBGT.toFixed(1)}）`
+    : `<span class="hs-section-value" style="opacity:0.7;">ほぼ安全</span>（${maxWBGT.toFixed(1)}）`;
+
+  // 1行目: タイトル「熱中症情報（暑さ指数 WBGT）」
+  // 2行目: 今 ＋ 値 ／ 今日の最大 ＋ 値
+  // 3行目: 行動指針 ＋ 注釈(目安)を1行統合(大画面なら1行・小画面なら自動折り返し)
+  // 3行構成: タイトル / 値 / 行動指針+注釈(1行統合・改行禁止)
+  el.innerHTML = `<div class="hs-title">🌡 熱中症情報（暑さ指数 WBGT）</div>`
+               + `<div class="hs-values">`
+               +   `<div class="hs-section"><span class="hs-section-label">今</span>${nowHtml}</div>`
+               +   `<span class="hs-divider">／</span>`
+               +   `<div class="hs-section"><span class="hs-section-label">今日の最大</span>${maxHtml}</div>`
+               + `</div>`
+               + `<div class="hs-advice">${getHeatstrokeAdvice(higher.rank)}<span class="hs-note-inline">　※気温・湿度からの推定の目安です</span></div>`;
+  el.style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════
 // 天気・気温を取得・表示（Open-Meteo・APIキー不要）
 // ═══════════════════════════════════════════
 async function loadWeather() {
   const weatherRow = document.getElementById('weather-row');
+
+  // ─── [天気フェイルセーフ強化 2026/5/28] ───
+  // Open-Meteo を fetch する内部関数。失敗時は例外を投げる。
+  // 毎時00分ちょうどの一時失敗対策として、1回だけ短いリトライを行う。
+  async function fetchOpenMeteo(coords) {
+    // [熱中症予防情報 2026/5/28 案B] current=現在値・hourly=今日の最大予測値算出用
+    // hourly に気温・湿度・日射・風速を1時間刻みで取得し、今日0〜23時の最大WBGTを算出
+    // [予報精度改善 2026/5/30] /v1/forecast(グローバルモデル) → /v1/jma(気象庁モデル) に変更
+    // 気象庁5km高解像度予報を使用することで日本国内の予報精度を向上(tenki.jpと同じソース)
+    // パラメータ・レスポンス形式は /v1/forecast と完全互換のためロジック変更不要
+    const url = `https://api.open-meteo.com/v1/jma?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('天気API応答エラー: ' + res.status);
+    return await res.json();
+  }
+
   try {
     const region = currentGroupData.region || 'other';
     const coords = REGION_COORDS[region] || REGION_COORDS.other;
@@ -1133,11 +1678,17 @@ async function loadWeather() {
       regionNameEl.textContent = '📍 ' + coords.name;
     }
 
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('天気API応答エラー');
-    const data = await res.json();
+    // ─── [天気フェイルセーフ強化 2026/5/28] 1回だけ自動リトライ ───
+    // 毎時00分ジャストはアクセス集中等で一時的に失敗しやすいため、
+    // 1回目が失敗したら4秒待って即リトライ（5分後の定期更新を待たない）。
+    let data;
+    try {
+      data = await fetchOpenMeteo(coords);
+    } catch (firstErr) {
+      console.warn('[loadWeather] 1回目失敗、4秒後にリトライ:', firstErr?.message);
+      await new Promise(r => setTimeout(r, 4000));
+      data = await fetchOpenMeteo(coords); // 2回目も失敗したら catch へ
+    }
 
     const daily = data.daily;
     const currentTemp = data.current ? Math.round(data.current.temperature_2m) : null;
@@ -1171,21 +1722,94 @@ async function loadWeather() {
     const tomorrowStr = toDateStr(tomorrow);
     const holidayDisplay = document.getElementById('holiday-display');
 
+    let holidayText = null;
     if (ALL_HOLIDAYS[todayStr]) {
-      holidayDisplay.textContent = '🎌 今日は ' + ALL_HOLIDAYS[todayStr] + ' です';
-      holidayDisplay.style.display = 'block';
+      holidayText = '🎌 今日は ' + ALL_HOLIDAYS[todayStr] + ' です';
     } else if (ALL_HOLIDAYS[tomorrowStr]) {
-      holidayDisplay.textContent = '🎌 明日は ' + ALL_HOLIDAYS[tomorrowStr] + ' です';
+      holidayText = '🎌 明日は ' + ALL_HOLIDAYS[tomorrowStr] + ' です';
+    }
+    if (holidayText) {
+      holidayDisplay.textContent = holidayText;
       holidayDisplay.style.display = 'block';
     } else {
       holidayDisplay.style.display = 'none';
     }
 
+    // ─── [熱中症予防情報 2026/5/28 案B] 2値WBGT算出(現在値+今日の最大予測値) ───
+    // 夏季(5〜9月)のみ算出・バッジ表示
+    let heatstrokeBadge = null;
+    const month = today.getMonth() + 1; // 1〜12
+    if (month >= 5 && month <= 9 && data.current) {
+      // (1) 現在値WBGT
+      const Ta = data.current.temperature_2m;
+      const RH = data.current.relative_humidity_2m;
+      const SR = (typeof data.current.shortwave_radiation === 'number')
+                 ? data.current.shortwave_radiation / 1000 : undefined;
+      const WS = (typeof data.current.wind_speed_10m === 'number')
+                 ? data.current.wind_speed_10m / 3.6 : undefined;
+
+      // (2) 今日の最大予測WBGT(hourly配列から今日の日付に該当する0〜23時を抽出して最大値)
+      let maxWBGT = null;
+      if (data.hourly && Array.isArray(data.hourly.time)) {
+        const todayPrefix = toDateStr(today); // 'YYYY-MM-DD'
+        const times = data.hourly.time;
+        const temps = data.hourly.temperature_2m || [];
+        const rhs = data.hourly.relative_humidity_2m || [];
+        const srs = data.hourly.shortwave_radiation || [];
+        const wss = data.hourly.wind_speed_10m || [];
+        for (let i = 0; i < times.length; i++) {
+          if (typeof times[i] !== 'string' || !times[i].startsWith(todayPrefix)) continue;
+          const hTa = temps[i];
+          const hRH = rhs[i];
+          if (typeof hTa !== 'number' || typeof hRH !== 'number') continue;
+          const hSR = (typeof srs[i] === 'number') ? srs[i] / 1000 : undefined;
+          const hWS = (typeof wss[i] === 'number') ? wss[i] / 3.6 : undefined;
+          const w = calcWBGT(hTa, hRH, hSR, hWS);
+          if (maxWBGT === null || w > maxWBGT) maxWBGT = w;
+        }
+      }
+
+      // (3) 両方の値が揃ったらバッジ情報として渡す(renderHeatstroke内で閾値判定)
+      if (typeof Ta === 'number' && typeof RH === 'number') {
+        const nowWBGT = calcWBGT(Ta, RH, SR, WS);
+        heatstrokeBadge = {
+          nowWBGT: nowWBGT,
+          maxWBGT: (maxWBGT !== null) ? maxWBGT : nowWBGT  // hourlyが取れなければ現在値で代用
+        };
+      }
+    }
+    renderHeatstroke(heatstrokeBadge);
+
+    // ─── [天気フェイルセーフ強化 2026/5/28] 成功時に前回値として保持 ───
+    _lastWeatherHtml = html;
+    _lastHolidayText = holidayText;
+    _lastHeatstroke = heatstrokeBadge;
+    _weatherEverSucceeded = true;
+
     updateLastUpdated();
   } catch (e) {
     // ⚠️ 天気取得失敗でも全体停止しない（設計書事故ポイント③）
     console.error('天気取得エラー:', e);
-    weatherRow.innerHTML = '<div class="weather-error">天気情報を取得できませんでした</div>';
+
+    // ─── [天気フェイルセーフ強化 2026/5/28] 前回データ保持 ───
+    // 取得に一度でも成功していれば、前回の天気・祝日表示を維持する。
+    // (古いデータでも「最終更新時刻」表示で鮮度が判別できるため誤認しない)
+    // 一度も成功していない初回失敗時のみ「取得できませんでした」を表示する。
+    if (_weatherEverSucceeded && _lastWeatherHtml) {
+      weatherRow.innerHTML = _lastWeatherHtml;
+      const holidayDisplay = document.getElementById('holiday-display');
+      if (_lastHolidayText) {
+        holidayDisplay.textContent = _lastHolidayText;
+        holidayDisplay.style.display = 'block';
+      } else {
+        holidayDisplay.style.display = 'none';
+      }
+      // [熱中症予防情報 2026/5/28] 前回の熱中症バッジも維持
+      renderHeatstroke(_lastHeatstroke);
+      // ※ updateLastUpdated() は呼ばない＝最終更新時刻は前回成功時のまま維持
+    } else {
+      weatherRow.innerHTML = '<div class="weather-error">天気情報を取得できませんでした</div>';
+    }
   }
 }
 
@@ -1194,7 +1818,7 @@ async function loadWeather() {
 // ═══════════════════════════════════════════
 function generateQR() {
   try {
-    const joinUrl = 'https://liff.line.me/2009827939-rZo06gWm';
+    const joinUrl = 'https://lin.ee/5PZ1vPO'; // [5/18修正] LIFF直接URL→公式アカウント友達追加URL・QR読み取り時に友達追加ゲートを通す
     const container = document.getElementById('qr-canvas');
     container.innerHTML = '';
 
@@ -1317,22 +1941,26 @@ function startPolling() {
       // オフラインバナーで通知済み・データ更新も意味がないのでスキップ
       return;
     }
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    // ─── signage-fetch 経由化 (チャッピー第68回判定 v2 反映) ───
+    // signage-fetch 1回呼び出しで「トークン再検証」と「全データ更新」を同時実施
     try {
-      const { data: group } = await sbClient
-        .from('group_sessions')
-        .select('*')
-        .eq('signage_token', token)
-        .eq('signage_enabled', true)
-        .single();
-      if (!group) {
-        // トークン無効化されたら即エラー画面へ
+      const data = await fetchSignageData();
+
+      // ─── NETWORK_ERROR は表示を維持 (チャッピー最終確認 修正必須) ───
+      // 5分ポーリング中の一時的な通信エラーで「サイネージ無効」画面に落とさない
+      if (!data || data.error_code === 'NETWORK_ERROR') {
+        console.warn('[startPolling] network error; keep current display');
+        return;
+      }
+
+      if (!data.ok || !data.group) {
+        // トークン無効化されたら即エラー画面へ (INVALID_TOKEN / EXPIRED)
         showError('サイネージが無効になりました', 'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。');
         clearInterval(updateTimer);
         return;
       }
-      currentGroupData = group;
+      currentGroupData = data.group;
+      _globalSignageData = data;
     } catch (e) {
       // ネットワークエラーはスキップ（オフラインバナーで通知済み）
     }
@@ -1376,10 +2004,14 @@ function updateExpiryWarningBar() {
 
 // ═══════════════════════════════════════════
 async function init() {
-  // Supabase初期化
+  // ─── Supabase client 生成 (将来用に維持・現状は DB アクセスせず) ───
+  // チャッピー第68回判定 v2 反映:
+  // 全 DB アクセスは signage-fetch Edge Function 経由に統一されたため、
+  // sbClient は実質的に未使用となる。ただし削除はせず変数定義のみ残す
+  // (将来の機能追加や緊急のフォールバック用として安全側に倒す)
   sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // 認証（3段階）
+  // 認証（3段階）- signage-fetch Edge Function 経由
   const ok = await authenticate();
   if (!ok) return;
 
@@ -1396,7 +2028,14 @@ async function init() {
     if (vacanBtn) { vacanBtn.style.display = 'flex'; vacanBtn.style.alignItems = 'center'; }
   }
 
+  // [UI改善② LINKボタン] currentGroupData.link_url が設定されているグループのみLINKボタン表示
+  updateLinkButtonSignage();
+
   showMain();
+
+  // [UI改善③ 天気QR折りたたみ] localStorage から状態復元(初期は展開)
+  restoreBottomAccordionState();
+
   setupOfflineDetection();
   setupLayoutDetection();
   scheduleNightlyReload();

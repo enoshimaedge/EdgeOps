@@ -546,13 +546,145 @@
     transition: background 0.15s;
   }
   .join-new-group-btn:active { background: var(--green-dark); }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善① 横画面対応] チャッピー第50回判定 条件付きGO 準拠
+   * - 条件: (orientation: landscape) AND (min-width: 768px) のみ適用
+   * - スマホ縦画面・スマホ横画面(<768px)は現状維持
+   * - 本文エリアは max-width:900px で中央寄せ・可読性確保
+   * - 既存JSロジックには触らない・サイネージバグ修正3件と完全独立
+   * ══════════════════════════════════════════════════════ */
+  @media (orientation: landscape) and (min-width: 768px) {
+    body {
+      max-width: none;
+    }
+    .screen {
+      max-width: none;
+    }
+    .content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .header {
+      padding-left: max(16px, calc((100vw - 900px) / 2 + 16px));
+      padding-right: max(16px, calc((100vw - 900px) / 2 + 16px));
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善③ Androidスマホ縦画面 横幅余白対応] チャッピー第85回判定 GO
+   * - 条件: (orientation: portrait) AND (min-width: 431px) AND (max-width: 599px)
+   * - 既存 portrait ≥600px(第57回判定)とは重複しない範囲だけ対象
+   * - 既存 landscape ≥768px(第50回判定)とは重複しない範囲だけ対象
+   * - iPhone(~430px以下)は既存 max-width:430px を維持
+   * - Androidタブレット横画面(landscape ≥768px)は第50回判定で対応・本クエリは無影響
+   * ══════════════════════════════════════════════════════ */
+  @media (orientation: portrait) and (min-width: 431px) and (max-width: 599px) {
+    body {
+      max-width: none;
+    }
+    .screen {
+      max-width: none;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════
+   * [UI改善①-2 大画面portrait対応] チャッピー第57回判定 GO
+   * - 条件: (orientation: portrait) AND (min-width: 600px) のみ適用
+   * - タブレット縦 / MEGAPAD縦など 600px以上の縦画面だけ対象
+   * - スマホ縦画面(<600px)は既存 max-width:430px を維持
+   * - 既存 landscape メディアクエリ(第50回判定)は1文字も変更しない
+   * - 本文エリアは max-width:600px で中央寄せ・縦画面の可読性確保
+   * ══════════════════════════════════════════════════════ */
+  @media (orientation: portrait) and (min-width: 600px) {
+    body {
+      max-width: none;
+    }
+    .screen {
+      max-width: none;
+    }
+    .content {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 24px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .header {
+      padding-left: max(16px, calc((100vw - 600px) / 2 + 16px));
+      padding-right: max(16px, calc((100vw - 600px) / 2 + 16px));
+    }
+  }
 </style>
+
+<!-- ═══════════════════════════════════════════════════════════
+     A-1 リロード原因究明用 eruda モバイルデバッグ(2026-05-24)
+     URL に ?debug=1 を付けた時だけ eruda が起動する。
+     本番ユーザーには影響なし(?debug=1 なしなら何も起きない)。
+     A-1 真因究明完了後はこのブロック削除予定。
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  try {
+    if (location.search.indexOf('debug=1') !== -1) {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      s.onload = function() {
+        try {
+          eruda.init();
+          console.log('[eruda] initialized for A-1 debug');
+        } catch (e) {
+          console.warn('[eruda] init failed:', e);
+        }
+      };
+      s.onerror = function() {
+        console.warn('[eruda] CDN load failed');
+      };
+      document.head.appendChild(s);
+    }
+  } catch (e) {
+    // 万一の例外でも本番動作に影響させない
+  }
+})();
+</script>
+
 </head>
 <body>
 
 <div class="loading" id="loading">
   <div class="spinner"></div>
   <div style="color:#4a6080; font-size:14px;">EdgeOps を起動中...</div>
+</div>
+
+<!-- ══ [Phase 4-2D] 画像処理中モーダル(圧縮中のUI待機オーバーレイ) ══ -->
+<div id="image-processing-modal" style="display:none; position:fixed; inset:0; background:rgba(15,30,53,0.55); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+  <div style="background:white; padding:24px 28px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.2); text-align:center; max-width:300px;">
+    <div class="spinner" style="margin:0 auto 12px;"></div>
+    <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">画像を準備中...</div>
+    <div style="font-size:12px; color:var(--text-light); line-height:1.5;">この処理には数秒かかる場合があります</div>
+  </div>
+</div>
+
+<!-- ══ [Phase 4-2G] 全画面拡大ビューア(ピンチズーム/ダブルタップ/背景タップで閉じる) ══ -->
+<div id="full-image-viewer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:10000; touch-action:none; overflow:hidden;">
+  <!-- 閉じるボタン -->
+  <button type="button" id="full-image-close-btn" onclick="closeFullImageViewer()" style="position:absolute; top:max(12px, env(safe-area-inset-top)); right:12px; z-index:10002; width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,0.6); color:white; border:1.5px solid rgba(255,255,255,0.3); font-size:20px; font-weight:600; cursor:pointer; line-height:1; padding:0;">×</button>
+  <!-- ローディング表示 -->
+  <div id="full-image-loading" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); color:white; font-size:14px; text-align:center;">
+    <div class="spinner" style="margin:0 auto 10px; border-color:rgba(255,255,255,0.3); border-top-color:white;"></div>
+    画像を読込中...
+  </div>
+  <!-- 画像ステージ(ピンチズーム/パン用ラッパ) -->
+  <div id="full-image-stage" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+    <img id="full-image-content" alt="" style="max-width:100%; max-height:100%; object-fit:contain; transform-origin:center center; transition:transform 0.15s ease-out; user-select:none; -webkit-user-select:none; pointer-events:auto; image-orientation:from-image;">
+  </div>
+  <!-- 警告文(2026/5/21 野口さん経営判断・保存・転載抑止) -->
+  <div id="full-image-warning" style="position:absolute; bottom:max(46px, calc(env(safe-area-inset-bottom) + 30px)); left:50%; transform:translateX(-50%); color:#ffeb3b; font-size:12px; font-weight:700; text-align:center; pointer-events:none; padding:6px 12px; background:rgba(0,0,0,0.6); border-radius:6px; max-width:90vw; line-height:1.4;">⚠️ 投稿された画像の保存・転載は管理者の許可を得てください</div>
+  <!-- ヒント -->
+  <div id="full-image-hint" style="position:absolute; bottom:max(16px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.7); font-size:11px; text-align:center; pointer-events:none;">ピンチで拡縮・ダブルタップで切替・背景タップで閉じる</div>
 </div>
 
 <div id="toast"></div>
@@ -722,7 +854,7 @@
         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:10px 12px; background:#f8fff9; border-radius:10px; border:1.5px solid var(--border);">
           <input type="checkbox" id="join-is-signage"
             style="width:18px; height:18px; accent-color:var(--green); cursor:pointer; flex-shrink:0;">
-          <span style="font-size:14px; color:var(--text);">📺 サイネージ端末として参加する / Join as Signage</span>
+          <span style="font-size:14px; color:var(--text);">📺 サイネージとして利用する / Use as Signage</span>
         </label>
       </div>
       <button class="btn btn-secondary" onclick="joinGroup()">
@@ -806,8 +938,11 @@
 <div class="screen" id="screen-home">
   <div class="header">
     <div style="flex:1;">
-      <div class="header-title">EdgeOps</div>
-      <div class="header-sub" id="home-group-id-display"></div>
+      <!-- [UI改善 2026/5/23] EdgeOpsロゴを小さく上に・グループ名を大きく下に・グループIDは削除 -->
+      <!--   理由:グループまたぎ時にどのグループにいるかが視認しやすいよう、グループ名を主役にする -->
+      <!--   グループID はプロフィール画面で確認可能なので、ヘッダーからは削除 -->
+      <div style="color:rgba(255,255,255,0.75); font-size:11px; line-height:1.2;">EdgeOps</div>
+      <div id="home-group-id-display" style="color:white; font-size:18px; font-weight:700; line-height:1.3; margin-top:2px;"></div>
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
       <!-- エリア混雑度ボタン（藤沢グループのみ表示） -->
@@ -825,6 +960,26 @@
             <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
           </svg>
           サイネージ
+        </button>
+      </div>
+      <!-- [UI改善② LINKボタン] チャッピー第50回判定準拠
+           - グループ管理者が profile 画面から URL 設定 → 表示
+           - currentGroup.link_url が NULL または空ならボタン非表示
+           - 押下時は noopener,noreferrer で別タブ起動 -->
+      <div id="link-btn" style="display:none;">
+        <button onclick="openCustomLink()" title="カスタムリンク" style="
+          display:flex; align-items:center; gap:4px;
+          background:rgba(255,255,255,0.18); border:1.5px solid rgba(255,255,255,0.6);
+          border-radius:20px; padding:5px 10px;
+          color:white; font-size:11px; font-weight:700;
+          cursor:pointer; font-family:inherit;
+          white-space:nowrap; transition:background 0.15s;
+        " onmouseenter="this.style.background='rgba(255,255,255,0.3)'" onmouseleave="this.style.background='rgba(255,255,255,0.18)'">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          LINK
         </button>
       </div>
       <div id="vacan-btn" style="display:none;">
@@ -932,6 +1087,33 @@
       <label class="form-label" id="compose-body-label">メッセージ内容 / Message</label>
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
+    <!-- ══ [Phase 4-2C] 画像投稿UI(feature_flags=trueの時のみ表示) ══ -->
+    <!-- [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] -->
+    <!-- 隠しfile input(2分割: カメラ専用 + ライブラリ専用) -->
+    <input type="file" id="compose-image-file-camera" accept="image/*" capture="environment" style="display:none;" onchange="onComposeImageFileSelected(event)">
+    <input type="file" id="compose-image-file-library" accept="image/*" style="display:none;" onchange="onComposeImageFileSelected(event)">
+    <div class="form-group" id="compose-image-area" style="margin-bottom:16px;">
+      <div id="compose-image-btn-wrap" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" id="compose-image-btn-camera" onclick="onComposeImageButtonClickCamera()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
+          📷 写真を撮る / Take Photo
+        </button>
+        <button type="button" id="compose-image-btn-library" onclick="onComposeImageButtonClickLibrary()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
+          🖼️ 写真を選ぶ / Choose Photo
+        </button>
+      </div>
+      <!-- [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18] 残量表示エリア -->
+      <div id="compose-image-quota" style="margin-top:6px; min-height:16px;"></div>
+      <!-- ══ [Phase 4-2D] プレビュー領域(画像選択後に表示) ══ -->
+      <div id="compose-image-preview-wrap" style="display:none; margin-top:10px; padding:10px; background:#f8f9fb; border:1px solid var(--border); border-radius:8px;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <img id="compose-image-preview-img" alt="プレビュー" style="width:80px; height:80px; object-fit:cover; border-radius:6px; background:#e4e8f0; image-orientation:from-image;">
+          <div style="flex:1; min-width:0;">
+            <div id="compose-image-preview-info" style="font-size:12px; color:var(--text-mid); margin-bottom:6px; word-break:break-all;">画像準備完了</div>
+            <button type="button" onclick="onComposeImageCancel()" style="padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">✕ 取り消し</button>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- ══ アンケート機能(管理者のみ表示・通常メッセージ時のみ表示) ══ -->
     <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#f0fff4; border:1px solid #06C755; border-radius:8px; box-sizing:border-box;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600;">
@@ -958,6 +1140,16 @@
     <div class="card" style="padding:16px; margin-bottom:12px;">
       <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="detail-meta"></div>
       <div style="font-size:15px; line-height:1.7; word-break:break-all;" id="detail-body"></div>
+      <!-- [Phase 4-2F] 画像表示エリア(画像ありメッセージ時のみ表示) -->
+      <div id="detail-image-wrap" style="display:none; margin-top:12px;">
+        <img id="detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer; image-orientation:from-image;">
+        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">⚠️ 投稿された画像の保存・転載は管理者の許可を得てください</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div id="detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
+          <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
+          <button type="button" id="detail-image-delete-btn" onclick="deleteImageOnly(window.__currentDetailMessageId, 'message')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">🗑️ 画像を削除</button>
+        </div>
+      </div>
     </div>
     <!-- ══ アンケート回答UI(アンケートメッセージのみ表示) ══ -->
     <div id="detail-survey-wrap" class="card" style="display:none; padding:16px; margin-bottom:12px; background:#f0fff4; border:1px solid #06C755;">
@@ -1032,6 +1224,16 @@
     <div class="card" style="padding:16px; margin-bottom:12px;">
       <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="hw-detail-meta"></div>
       <div style="font-size:15px; line-height:1.7; word-break:break-all;" id="hw-detail-body"></div>
+      <!-- [Phase 4-2F] 引き継ぎ画像表示エリア -->
+      <div id="hw-detail-image-wrap" style="display:none; margin-top:12px;">
+        <img id="hw-detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer; image-orientation:from-image;">
+        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">⚠️ 投稿された画像の保存・転載は管理者の許可を得てください</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div id="hw-detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
+          <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
+          <button type="button" id="hw-detail-image-delete-btn" onclick="deleteImageOnly(window.__currentHandoverId, 'handover')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">🗑️ 画像を削除</button>
+        </div>
+      </div>
     </div>
     <!-- 確認ボタンエリア -->
     <div id="hw-confirm-area"></div>
@@ -1120,6 +1322,27 @@
         <button class="btn btn-secondary" onclick="showSurveyList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
           📊 アンケート集計結果 / Survey Results
         </button>
+        <!-- [UI改善② LINKボタン設定] チャッピー第50回判定準拠
+             - グループ管理者が自グループ用URLを設定・変更・削除
+             - https:// のみ許可・最大2048文字
+             - 空文字は NULL に正規化
+             - 超管理者は関与しない(初期ST版方針) -->
+        <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">🔗 カスタムLINK</div>
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:8px; line-height:1.5;">
+            グループ専用の外部リンクを設定できます。設定すると、ホーム画面のヘッダーに「LINK」ボタンが表示され、メンバー全員がアクセスできます。
+          </div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">URL(https://〜・最大2048文字)</label>
+            <input class="form-input" id="profile-link-url" type="url" placeholder="https://example.com/" maxlength="2048" inputmode="url">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <!-- [2026/5/23 修正] 保存ボタンと削除ボタンを同サイズに(flex:1 で半々)
+                 過剰 padding を削除して .btn のデフォルト padding を継承させる -->
+            <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">💾 保存 / Save</button>
+            <button class="btn" onclick="removeLinkUrl()" style="flex:1; background:#fff; color:#e53935; border:1.5px solid #e53935;">🗑️ 削除</button>
+          </div>
+        </div>
         <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
           <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージ管理</div>
@@ -1276,9 +1499,173 @@ const CFG = ENV_CONFIG[CURRENT_ENV];
 // 既存コード互換のため、グローバル定数として展開(Step 4-B以降の変更を最小化)
 const SUPABASE_URL = CFG.SUPABASE_URL;
 const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
+
+    // ════════════════════════════════════════════════════════════
+    // [2026/5/21 P0] LIFF外アクセス遮断ガード(チャッピー第64回判定対応)
+    // ────────────────────────────────────────────────────────────
+    // 目的:Chrome 等から app.edgeops.jp を直接開かれた場合に、
+    //   認証バイパスでDB書き込みが発生するのを防止する。
+    // 二重防御:
+    //   Layer 1 = liff.init() 直後の環境チェック(遮断画面表示)
+    //   Layer 2 = 書き込み系関数の入口で assertLiffEnvironment() を呼ぶ
+    // 注意:signage.html / admin.html には適用しない(別認証経路があるため)
+    // ════════════════════════════════════════════════════════════
+
+    function showLiffOutsideErrorScreen(reason) {
+      // 全画面の上に黒背景の警告を被せ、UI 操作を完全停止する
+      const existing = document.getElementById('liff-outside-error');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.id = 'liff-outside-error';
+      div.style.cssText = 'position:fixed; inset:0; z-index:99999; background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; font-family:sans-serif;';
+      div.innerHTML = '<div style="font-size:48px; margin-bottom:24px;">⚠️</div>' +
+        '<div style="font-size:20px; font-weight:bold; margin-bottom:16px;">この画面はLINEアプリ内でのみ使用できます</div>' +
+        '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#ddd;">LINEアプリのトークルームから「EdgeOpsを開く」をタップしてご利用ください。<br><br>Chrome や Safari などのブラウザから直接 app.edgeops.jp にアクセスすることはセキュリティ上できません。</div>' +
+        '<div style="font-size:12px; margin-top:24px; color:#888;">(理由: ' + (reason || '不明') + ')</div>';
+      document.body.appendChild(div);
+      // body のスクロール禁止
+      document.body.style.overflow = 'hidden';
+    }
+
+    // [2026/5/23 案D] LIFF SDK 初期化直後の誤判定対策で 500ms リトライ1回入れる(チャッピー第72回判定GO)
+    //   背景:liff.isInClient() が SDK 初期化直後・状態遷移直後に false を返すことがあり、
+    //         書き込み操作時に誤って遮断画面が出るバグ(超管理者ボタン誤遮断・5/22箱根新規グループ作成失敗の一要因)
+    async function assertLiffEnvironment() {
+      function check() {
+        return (typeof liff !== 'undefined'
+                && liff.isInClient
+                && liff.isInClient());
+      }
+      if (check()) return;
+      // 500ms 待って 1回再試行
+      console.warn('[LIFF Guard] First check failed. Retrying after 500ms.');
+      await new Promise(r => setTimeout(r, 500));
+      if (check()) {
+        console.log('[LIFF Guard] Retry succeeded.');
+        return;
+      }
+      console.error('[LIFF Guard] Write operation blocked: not in LINE client');
+      showLiffOutsideErrorScreen('LIFF外からの書き込み操作はブロックされました');
+      throw new Error('LIFF_OUTSIDE_ACCESS_BLOCKED');
+    }
+
+    // ═══════════════════════════════════════════
+    // [2026/5/23 案D拡張] LIFF SDK 初期化直後の isInClient 誤判定対策(チャッピー第76回判定GO)
+    //   背景:超管理者ボタン押下時に「LIFF外アクセス遮断画面」が一瞬出るバグ
+    //         真因:admin.html を新ウィンドウで開いた瞬間、元の index.html の init() が再評価され、
+    //              直後に liff.isInClient() が一瞬 false を返してしまう
+    //   設計:第72回判定の assertLiffEnvironment と同じパターンを init() 内のチェックにも適用
+    //   注意(チャッピー第76回判定):呼び出しは必ず await liff.init() 後に限定
+    // ═══════════════════════════════════════════
+    async function isInClientWithRetry() {
+      if (liff.isInClient()) return true;
+      console.warn('[LIFF Guard init] isInClient=false. Retrying once.');
+      await new Promise(r => setTimeout(r, 500));
+      return liff.isInClient();
+    }
+
+    // ═══════════════════════════════════════════
+    // [2026/5/23 案B] currentUser リロード耐性ガード(チャッピー第72回判定GO)
+    //   背景:画面リロードでJavaScript全変数リセット → currentUser null になる現象あり
+    //         書き込み系関数の入口で currentUser を必ず構築済にする
+    //   設計:
+    //     (1) currentUser が既に正常なら即return(高速)
+    //     (2) JWT から eo_uid を取得して currentUser を再構築
+    //     (3) JWT も無ければ resolveEoUid で完全再認証
+    //     (4) 完全失敗なら null を返す(呼び出し側でトースト表示)
+    //   注意(チャッピー第72回判定):
+    //     - JWT sub は Supabase auth.users の UUID であり、LINE provider_uid とは別物
+    //     - provider_uid は JWT sub から作らない(復元不能なら空文字)
+    // ═══════════════════════════════════════════
+    async function ensureCurrentUser() {
+      // (1) すでに正しく設定されているなら何もしない(高速return)
+      if (currentUser && currentUser.eo_uid) {
+        return currentUser;
+      }
+      console.warn('[ensureCurrentUser] currentUser is null. Attempting recovery.');
+
+      // (2) Supabase session があれば JWT から eo_uid を取得して再構築
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const part = token.split('.')[1];
+          const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+          const payload = JSON.parse(atob(padded));
+          const eoUidFromJwt = payload?.eo_uid;
+          if (eoUidFromJwt) {
+            // localStorage から表示名等を復元(2819行直後で保存している)
+            const lineName = localStorage.getItem('sl_line_name') || '';
+            const pictureUrl = localStorage.getItem('sl_picture_url') || '';
+            const displayName = localStorage.getItem('sl_display_name') || lineName;
+            currentUser = {
+              eo_uid: eoUidFromJwt,
+              provider: 'line',
+              provider_uid: '', // JWT sub は LINE provider_uid と別物のため復元しない
+              line_name: lineName,
+              picture_url: pictureUrl,
+              display_name: displayName
+            };
+            console.log('[ensureCurrentUser] Rebuilt from JWT.');
+            return currentUser;
+          }
+        }
+      } catch (e) {
+        console.warn('[ensureCurrentUser] JWT rebuild failed:', e?.message);
+      }
+
+      // (3) JWT が無ければ resolveEoUid() で完全再認証
+      try {
+        const _auth = await resolveEoUid(supabase);
+        if (_auth?.eoUid) {
+          currentUser = {
+            eo_uid: _auth.eoUid,
+            provider: 'line',
+            provider_uid: _auth.providerUid,
+            line_name: _auth.displayName,
+            picture_url: _auth.pictureUrl || '',
+            display_name: _auth.displayName
+          };
+          // localStorage にも保存
+          try {
+            localStorage.setItem('sl_line_name', _auth.displayName || '');
+            localStorage.setItem('sl_picture_url', _auth.pictureUrl || '');
+            localStorage.setItem('sl_display_name', _auth.displayName || '');
+          } catch (_) {}
+          console.log('[ensureCurrentUser] Rebuilt via resolveEoUid.');
+          return currentUser;
+        }
+      } catch (e) {
+        console.error('[ensureCurrentUser] resolveEoUid failed:', e?.message);
+      }
+
+      // (4) 完全失敗
+      console.error('[ensureCurrentUser] Recovery failed. currentUser remains null.');
+      return null;
+    }
+
+// [2026/5/27 チャッピー第90回判定 案(a) GO]
+// localStorage の EdgeOps 独自キーのみ削除するヘルパー
+// 旧 localStorage.clear() は Supabase JS SDK の sb-*-auth-token も消去するため、
+// 退出後の RPC が anonロールで実行され 42501 insufficient_privilege エラーになる
+// 真因問題があった(B5・α2-1)。本ヘルパーは EdgeOps 独自キーのみ削除し、
+// Supabase セッションを保持する。signOut() は呼ばない(同じLINEアカウント継続前提)。
+function clearEdgeOpsLocalStorage() {
+  const keys = [
+    // auth.js LS_KEYS 準拠(edgeops_* プレフィックス)
+    'edgeops_eo_uid', 'edgeops_provider', 'edgeops_provider_uid',
+    'edgeops_group_session_id', 'edgeops_current_group_id',
+    'edgeops_facility_id', 'edgeops_language', 'edgeops_signage_token',
+    // 旧プレフィックス sl_*(表示名等の補助情報)
+    'sl_member_id', 'sl_group_id', 'sl_display_name', 'sl_line_name', 'sl_picture_url'
+  ];
+  keys.forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+}
+
 const LIFF_ID = CFG.LIFF_ID;
 const LINE_AUTH_URL = CFG.LINE_AUTH_URL;
-const POLL_INTERVAL = 5000;
+const POLL_INTERVAL = 30000; // [チャッピー第53回判定後] 5秒→30秒(サムネ画像のチカチカ防止・LIFFは即時性不要)
 
 // デバッグ用ログ(本番でも害なし・問題発生時の切り分けに有用)
 console.log('[EdgeOps] Environment:', CURRENT_ENV, '| hostname:', window.location.hostname);
@@ -1299,11 +1686,1305 @@ let currentHandoverId = null;
 let homeFilter = 'msg'; // 'msg' | 'handover' | 'all'
 
 // ═══════════════════════════════════════════
+// [Phase 4-2B] 画像投稿機能 - feature_flags 状態管理
+// ═══════════════════════════════════════════
+// チャッピー第49回判定(II): 起動時+5分キャッシュ・送信直前は再確認
+// マスタースイッチ image_upload=FALSE で完全無効化(緊急OFF最大5分以内)
+// ═══════════════════════════════════════════
+let __featureFlagsCache = null;
+let __featureFlagsExpiresAt = 0;
+const FEATURE_FLAGS_TTL_MS = 5 * 60 * 1000; // 5分
+const TARGET_FEATURE_FLAGS = ['image_upload', 'image_upload_message', 'image_upload_handover', 'image_delete'];
+const DEFAULT_FEATURE_FLAGS = { image_upload: false, image_upload_message: false, image_upload_handover: false, image_delete: false };
+
+async function getFeatureFlags(forceRefresh) {
+  const now = Date.now();
+  if (!forceRefresh && __featureFlagsCache && now < __featureFlagsExpiresAt) {
+    return __featureFlagsCache;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('feature_flags')
+      .select('flag_name, enabled')
+      .in('flag_name', TARGET_FEATURE_FLAGS);
+    if (error) throw error;
+    const map = Object.assign({}, DEFAULT_FEATURE_FLAGS);
+    (data || []).forEach(row => { if (row && row.flag_name in map) map[row.flag_name] = !!row.enabled; });
+    __featureFlagsCache = map;
+    __featureFlagsExpiresAt = now + FEATURE_FLAGS_TTL_MS;
+    return map;
+  } catch (e) {
+    console.error('[Phase 4-2B] feature_flags取得失敗(安全側で全FALSE):', e);
+    // 取得失敗時は安全側で全FALSE(画像UI非表示)
+    return Object.assign({}, DEFAULT_FEATURE_FLAGS);
+  }
+}
+
+// 送信直前用: マスタースイッチ+context別フラグを強制再取得して許可判定
+async function isImageUploadAllowedForContext(context) {
+  const flags = await getFeatureFlags(true);
+  if (!flags.image_upload) return false;
+  if (context === 'message') return !!flags.image_upload_message;
+  if (context === 'handover') return !!flags.image_upload_handover;
+  return false;
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2A] クライアント画像圧縮ヘルパー
+// ═══════════════════════════════════════════
+// チャッピー第49回判定(III): Main thread + 処理中モーダル(WebWorkerはPro版以降)
+// 仕様書 v2.5 5-4 準拠: フル1920px品質80% + サムネ400px品質70%
+// 出力5MB超過時は SIZE_OVER_5MB エラー
+// ═══════════════════════════════════════════
+const IMAGE_MAX_DIMENSION_FULL = 1920;
+const IMAGE_MAX_DIMENSION_THUMB = 400;
+const IMAGE_QUALITY_FULL = 0.8;
+const IMAGE_QUALITY_THUMB = 0.7;
+const IMAGE_MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+function _loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    let objectUrl = null;
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (_) {
+      reject(new Error('IMAGE_LOAD_FAILED'));
+      return;
+    }
+    const img = new Image();
+    img.onload = () => resolve({ img: img, objectUrl: objectUrl });
+    img.onerror = () => {
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      reject(new Error('IMAGE_LOAD_FAILED'));
+    };
+    img.src = objectUrl;
+  });
+}
+
+function _drawToJpegBlob(img, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    try {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h) { reject(new Error('CANVAS_FAILED')); return; }
+      let cw = w, ch = h;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { cw = maxDim; ch = Math.max(1, Math.round(h * maxDim / w)); }
+        else { ch = maxDim; cw = Math.max(1, Math.round(w * maxDim / h)); }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('CANVAS_FAILED')); return; }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('CANVAS_FAILED')); return; }
+        resolve(blob);
+      }, 'image/jpeg', quality);
+    } catch (e) {
+      reject(new Error('CANVAS_FAILED'));
+    }
+  });
+}
+
+// 戻り値: { fullBlob, thumbBlob, fullSize, thumbSize, width, height }
+// 例外: INVALID_MIME / HEIC_UNSUPPORTED / IMAGE_LOAD_FAILED / CANVAS_FAILED / SIZE_OVER_5MB
+async function compressImageForUpload(file) {
+  if (!file) throw new Error('INVALID_MIME');
+
+  const mime = (file.type || '').toLowerCase();
+  const name = (file.name || '').toLowerCase();
+
+  // [チャッピー第52回判定 修正3] HEIC/HEIF を明示拒否(MIME・拡張子の両方で判定)
+  // iPhone標準のHEIC撮影をスクショ案内で誘導(仕様書v2.5 第14章 項目13・第5章5-3に整合)
+  const isHeic =
+    mime === 'image/heic' ||
+    mime === 'image/heif' ||
+    name.endsWith('.heic') ||
+    name.endsWith('.heif');
+  if (isHeic) {
+    throw new Error('HEIC_UNSUPPORTED');
+  }
+
+  // 仕様書v2.5 5-3(改): JPEG / PNG / WebP のみ対応(HEIC/HEIF は撤回・拒否)
+  const allowed =
+    mime === 'image/jpeg' ||
+    mime === 'image/png' ||
+    mime === 'image/webp' ||
+    name.endsWith('.jpg') ||
+    name.endsWith('.jpeg') ||
+    name.endsWith('.png') ||
+    name.endsWith('.webp');
+  if (!allowed) {
+    throw new Error('INVALID_MIME');
+  }
+
+  let loaded = null;
+  try {
+    loaded = await _loadImageFromFile(file);
+    const fullBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_FULL, IMAGE_QUALITY_FULL);
+    const thumbBlob = await _drawToJpegBlob(loaded.img, IMAGE_MAX_DIMENSION_THUMB, IMAGE_QUALITY_THUMB);
+    if (fullBlob.size > IMAGE_MAX_OUTPUT_SIZE_BYTES) {
+      throw new Error('SIZE_OVER_5MB');
+    }
+    return {
+      fullBlob: fullBlob,
+      thumbBlob: thumbBlob,
+      fullSize: fullBlob.size,
+      thumbSize: thumbBlob.size,
+      width: loaded.img.naturalWidth || loaded.img.width,
+      height: loaded.img.naturalHeight || loaded.img.height
+    };
+  } finally {
+    if (loaded && loaded.objectUrl) {
+      try { URL.revokeObjectURL(loaded.objectUrl); } catch (_) {}
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2C/D] 画像投稿UI状態管理(ボタン表示・選択ファイル保持)
+// ═══════════════════════════════════════════
+// __pendingImageFile: 選択中のFile(送信時にcompressImageForUpload→sendImageMessageへ)
+// Phase 4-2E sendImageMessage() が参照する。本Phase(4-2A〜D)では送信側は未実装。
+// ═══════════════════════════════════════════
+window.__pendingImageFile = null;
+let __imageProcessingModalShown = false;
+
+async function applyImageUploadButtonVisibility() {
+  // compose画面の📷/🖼️ボタン表示制御。feature_flagsの状態 + isCreatorロールにより出し分け。
+  // [チャッピー第52回判定 修正1] isCreator !== true の場合は無条件で非表示
+  // [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] camera/library 2ボタン対応
+  const btnCamera = document.getElementById('compose-image-btn-camera');
+  const btnLibrary = document.getElementById('compose-image-btn-library');
+  if (!btnCamera || !btnLibrary) return;
+  const hideBoth = () => { btnCamera.style.display = 'none'; btnLibrary.style.display = 'none'; };
+  if (isCreator !== true) { hideBoth(); return; }
+  try {
+    const flags = await getFeatureFlags(false);
+    if (!flags.image_upload) { hideBoth(); return; }
+    const ctx = (typeof selectedComposeType === 'string') ? selectedComposeType : 'msg';
+    if (ctx === 'msg' && !flags.image_upload_message) { hideBoth(); return; }
+    if (ctx === 'handover' && !flags.image_upload_handover) { hideBoth(); return; }
+    btnCamera.style.display = 'inline-flex';
+    btnLibrary.style.display = 'inline-flex';
+  } catch (_) {
+    hideBoth();
+  }
+  // [⑫クォータ表示UI] ボタン表示更新後にクォータUIも更新(非表示時はクリアされる)
+  try { updateImageQuotaUI(); } catch (_) {}
+}
+
+function _showImageProcessingModal(show) {
+  const modal = document.getElementById('image-processing-modal');
+  if (!modal) return;
+  modal.style.display = show ? 'flex' : 'none';
+  __imageProcessingModalShown = !!show;
+  // 送信ボタンの二重押下防止
+  const sendBtn = document.getElementById('compose-send-btn');
+  if (sendBtn) sendBtn.disabled = !!show;
+}
+
+function _resetPendingImage() {
+  window.__pendingImageFile = null;
+  const previewWrap = document.getElementById('compose-image-preview-wrap');
+  const previewImg = document.getElementById('compose-image-preview-img');
+  if (previewImg) {
+    if (previewImg.src && previewImg.src.startsWith('blob:')) {
+      try { URL.revokeObjectURL(previewImg.src); } catch (_) {}
+    }
+    previewImg.src = '';
+  }
+  if (previewWrap) previewWrap.style.display = 'none';
+  // [②Androidカメラ起動対策・チャッピー第59-2回判定/2026-05-18] 両 file input をリセット
+  const fileInputCamera = document.getElementById('compose-image-file-camera');
+  if (fileInputCamera) fileInputCamera.value = '';
+  const fileInputLibrary = document.getElementById('compose-image-file-library');
+  if (fileInputLibrary) fileInputLibrary.value = '';
+}
+
+// [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18]
+// カメラ専用ボタン押下:capture="environment" 付き input をトリガー
+// 同期処理のみ・await を挟まない(iOS Safari WebViewのユーザージェスチャー連鎖維持)
+// 残量チェック・isCreator確認・MIMEチェックは onComposeImageFileSelected 側で実施
+function onComposeImageButtonClickCamera() {
+  const fileInput = document.getElementById('compose-image-file-camera');
+  if (fileInput) fileInput.click();
+}
+
+// ライブラリ専用ボタン押下:capture 属性なし input をトリガー(現状挙動継承)
+function onComposeImageButtonClickLibrary() {
+  const fileInput = document.getElementById('compose-image-file-library');
+  if (fileInput) fileInput.click();
+}
+
+async function onComposeImageFileSelected(ev) {
+  const file = ev && ev.target && ev.target.files && ev.target.files[0];
+  if (!file) return;
+  // [チャッピー第52回判定 修正2] isCreator !== true なら拒否(表示制御の二重防御)
+  if (isCreator !== true) {
+    showToast('画像投稿はグループ管理者のみ利用できます');
+    return;
+  }
+  // [⑫クォータ表示UI・チャッピー第58回判定 条件7・iPhone Safari対策/2026-05-18]
+  // ファイル選択直後に残量再確認(ボタン押下時にチェックすると iOS Safari でジェスチャー連鎖が切れるため)
+  try {
+    const quotaCtx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+    const { remaining, limit } = await getRemainingQuota(quotaCtx);
+    if (remaining <= 0) {
+      showToast(`本日の画像投稿上限(${limit}回)に達しました。明日までお待ちください`);
+      try { updateImageQuotaUI(); } catch (_) {}
+      // ファイル選択をクリア(同じファイルを連続選択できるようにするため)
+      try { ev.target.value = ''; } catch (_) {}
+      return;
+    }
+  } catch (_) { /* 取得失敗時はサーバ側 QUOTA_EXCEEDED に任せる */ }
+  // 二重選択防止
+  if (__imageProcessingModalShown) return;
+  // 圧縮前のバリデーション(MIME・サイズの最低限チェック)
+  if (!file.type || !file.type.startsWith('image/')) {
+    showToast('画像ファイルを選択してください');
+    return;
+  }
+  // 起動時キャッシュではなく、選択時点でcontext別フラグを軽く再確認(キャッシュ許容)
+  const flags = await getFeatureFlags(false);
+  const ctx = (typeof selectedComposeType === 'string') ? selectedComposeType : 'msg';
+  if (!flags.image_upload || (ctx === 'msg' && !flags.image_upload_message) || (ctx === 'handover' && !flags.image_upload_handover)) {
+    showToast('画像投稿は現在利用できません');
+    applyImageUploadButtonVisibility();
+    return;
+  }
+  // 圧縮中モーダル表示(チャッピー条件: Main thread + 処理中モーダル)
+  _showImageProcessingModal(true);
+  try {
+    const result = await compressImageForUpload(file);
+    // プレビューはサムネを使う(メモリ節約)
+    const previewWrap = document.getElementById('compose-image-preview-wrap');
+    const previewImg = document.getElementById('compose-image-preview-img');
+    const previewInfo = document.getElementById('compose-image-preview-info');
+    if (previewImg) {
+      if (previewImg.src && previewImg.src.startsWith('blob:')) {
+        try { URL.revokeObjectURL(previewImg.src); } catch (_) {}
+      }
+      previewImg.src = URL.createObjectURL(result.thumbBlob);
+    }
+    if (previewInfo) {
+      const kb = Math.round(result.fullSize / 1024);
+      previewInfo.textContent = `画像準備完了 / ${result.width}×${result.height} / ${kb}KB`;
+    }
+    if (previewWrap) previewWrap.style.display = 'block';
+    // 送信時の本体は元File(sendImageMessage側で再圧縮 or 圧縮済Blobを引き渡し)
+    // Phase 4-2E実装時に圧縮結果を直接渡す形に変更可能(現状は元Fileを保持し再圧縮も許容)
+    window.__pendingImageFile = file;
+    window.__pendingImageCompressed = result; // 圧縮結果をキャッシュ(4-2Eで使用)
+  } catch (e) {
+    const code = (e && e.message) || 'UNKNOWN';
+    let msg = '画像の処理に失敗しました';
+    if (code === 'INVALID_MIME') msg = '画像ファイルを選択してください(JPEG・PNG・WebP形式)';
+    else if (code === 'HEIC_UNSUPPORTED') msg = 'HEIC形式には対応していません。スクリーンショットを撮るか、JPEG・PNG・WebP形式の画像を選んでください';
+    else if (code === 'IMAGE_LOAD_FAILED') msg = '画像を読み込めませんでした';
+    else if (code === 'CANVAS_FAILED') msg = '画像の変換に失敗しました。JPEG・PNG・WebP形式の画像を選んでください';
+    else if (code === 'SIZE_OVER_5MB') msg = '画像サイズが大きすぎます(5MB超)。別の画像を選んでください';
+    showToast(msg);
+    _resetPendingImage();
+    console.error('[Phase 4-2A] 圧縮失敗:', code, e);
+  } finally {
+    _showImageProcessingModal(false);
+  }
+}
+
+function onComposeImageCancel() {
+  // プレビュー横の✕ボタン: 選択画像をクリア
+  _resetPendingImage();
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2E] 画像投稿送信フロー sendImageMessage()
+// ═══════════════════════════════════════════
+// チャッピー第49回判定の必須条件:
+//   (I) sendMessage既存本体は触らず冒頭に分岐ガードのみ追加 → 済
+//   (II) 送信直前にfeature_flags再確認 (isImageUploadAllowedForContext)
+//   (III) Main thread + 処理中モーダル (再圧縮時のみ表示)
+//   (V) 失敗時は本文・画像プレビューを入力欄に残す(画像由来エラーのみ画像クリア)
+//   sendImageMessage失敗時に通常sendMessageへ「フォールバックしない」(事故防止)
+// upload-image Edge Function (auth.js window.callImageFunction 経由・Authorization自動付与)
+// ═══════════════════════════════════════════
+async function sendImageMessage() {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
+  const body = document.getElementById('compose-body').value.trim();
+
+  // [チャッピー第52回判定 修正2] isCreator !== true なら送信拒否(送信入口の二重防御)
+  if (isCreator !== true) {
+    showToast('画像投稿はグループ管理者のみ利用できます');
+    return;
+  }
+
+  // [チャッピー第54回判定 GO] ⑦アンケート画像ガード:アンケート選択時は画像送信不可
+  // context = 'message'(連絡)時のみ survey-checkbox を確認
+  const composeContextType = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+  if (composeContextType === 'message') {
+    const surveyCb = document.getElementById('survey-checkbox');
+    if (surveyCb && surveyCb.checked === true) {
+      showToast('アンケートでは画像を添付できません');
+      return;
+    }
+  }
+
+  // ガード: 画像が選択されていない場合は通常フローへ戻す(理論上は呼ばれない)
+  if (!window.__pendingImageFile) {
+    showToast('画像が選択されていません');
+    return;
+  }
+
+  // [チャッピー第53回判定 修正] 本文必須(Edge Function側でmetadata.body空NGのため)
+  if (!body) {
+    showToast('本文を入力してください(画像投稿には本文が必要です)');
+    return;
+  }
+
+  // context判定(現在のcompose種別)
+  const context = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+
+  // [チャッピー条件II] 送信直前にfeature_flagsを強制再取得(緊急OFF即時反映)
+  let allowed = false;
+  try {
+    allowed = await isImageUploadAllowedForContext(context);
+  } catch (_) { allowed = false; }
+  if (!allowed) {
+    showToast('画像投稿は現在利用できません');
+    try { applyImageUploadButtonVisibility(); } catch (_) {}
+    return;
+  }
+
+  // 圧縮結果を取得(4-2Aで選択時にキャッシュ済)
+  let compressed = window.__pendingImageCompressed;
+  if (!compressed) {
+    // 念のため再圧縮(通常はあり得ない・キャッシュ消失時のみ)
+    _showImageProcessingModal(true);
+    try {
+      compressed = await compressImageForUpload(window.__pendingImageFile);
+      window.__pendingImageCompressed = compressed;
+    } catch (e) {
+      _showImageProcessingModal(false);
+      const code = (e && e.message) || 'UNKNOWN';
+      if (code === 'SIZE_OVER_5MB') showToast('画像サイズが大きすぎます。別の画像を選んでください');
+      else if (code === 'HEIC_UNSUPPORTED') showToast('HEIC形式には対応していません。スクリーンショットを撮るか、JPEG・PNG・WebP形式の画像を選んでください');
+      else if (code === 'INVALID_MIME') showToast('画像ファイルを選択してください(JPEG・PNG・WebP形式)');
+      else if (code === 'CANVAS_FAILED') showToast('画像の変換に失敗しました。JPEG・PNG・WebP形式の画像を選んでください');
+      else showToast('画像の処理に失敗しました');
+      // 画像由来エラー: 画像はクリアするが本文は残す
+      _resetPendingImage();
+      console.error('[Phase 4-2E] 再圧縮失敗:', code, e);
+      return;
+    }
+    _showImageProcessingModal(false);
+  }
+
+  // 送信ボタン disable(二重送信防止)
+  const sendBtn = document.getElementById('compose-send-btn');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    showToast('画像を送信中...');
+
+    // [チャッピー第53回判定 修正] Edge Function (upload-image) 仕様準拠
+    // metadata(JSON文字列)+ fullImage(File)+ thumbnail(File) の3フィールドのみ
+    // sender_eo_uid/sender_name/priority/receiver_count等はEdge Function側で取得or不使用
+    const metadata = {
+      body: body,
+      group_session_id: String(currentGroup?.id || ''),
+      context: context, // 'message' | 'handover'
+      image_mode: 'expandable' // ST版デフォルト(タップで全画面拡大)
+    };
+
+    const fd = new FormData();
+    fd.append('metadata', JSON.stringify(metadata));
+    fd.append('fullImage', compressed.fullBlob, 'image_full.jpg');
+    fd.append('thumbnail', compressed.thumbBlob, 'image_thumb.jpg');
+
+    // auth.js の callImageFunction 経由(Authorization自動付与・401自動リトライ)
+    const url = `${SUPABASE_URL}/functions/v1/upload-image`;
+    if (typeof window.callImageFunction !== 'function') {
+      throw new Error('AUTH_HELPER_MISSING');
+    }
+    const res = await window.callImageFunction(url, { method: 'POST', body: fd });
+
+    if (!res || !res.ok) {
+      // エラーコード抽出(Edge Function 応答仕様 v2.4)
+      let errorCode = 'SERVER_ERROR';
+      try {
+        const errBody = await res.text();
+        if (errBody) {
+          try {
+            const errJson = JSON.parse(errBody);
+            errorCode = errJson.error || errJson.code || `HTTP_${res.status}`;
+          } catch (_) {
+            errorCode = `HTTP_${res.status}`;
+          }
+        } else {
+          errorCode = `HTTP_${res.status}`;
+        }
+      } catch (_) { errorCode = `HTTP_${(res && res.status) || 'UNKNOWN'}`; }
+      throw new Error(errorCode);
+    }
+
+    // ───── 成功時: 既存sendMessageと同じ後処理 ─────
+    document.getElementById('compose-body').value = '';
+    _resetPendingImage();
+
+    if (context === 'message') {
+      selectedPriority = 'info';
+      selectPriority('info');
+      // アンケートUIリセット(既存sendMessageと同じ)
+      const surveyCb = document.getElementById('survey-checkbox');
+      if (surveyCb) surveyCb.checked = false;
+      const dlWrap = document.getElementById('survey-deadline-wrap');
+      if (dlWrap) dlWrap.style.display = 'none';
+      const dlInput = document.getElementById('survey-deadline-input');
+      if (dlInput) dlInput.value = '';
+    } else {
+      selectedComposeType = 'msg';
+    }
+
+    await loadMessages();
+    // [チャッピー第60-3回判定 GO] 引き継ぎ投稿後の遷移バグ修正
+    // context に応じて適切なタブをアクティブにする(setHomeFilterは内部でloadMessagesを呼ばないため二重ロードなし)
+    if (context === 'handover') {
+      await setHomeFilter('handover');
+    } else {
+      await setHomeFilter('msg');
+    }
+    showScreen('screen-home');
+    showToast(context === 'handover' ? '引き継ぎを投稿しました！' : '送信しました！');
+    // [⑫クォータ表示UI・チャッピー第58回判定 条件4] 投稿成功後にクォータUI更新(次回compose画面表示時に最新値で表示)
+    try { updateImageQuotaUI(); } catch (_) {}
+
+  } catch (e) {
+    // ───── [チャッピー条件V] 失敗時は本文・画像プレビューを残す ─────
+    const code = (e && e.message) || 'UNKNOWN_ERROR';
+    let msg = '送信に失敗しました';
+    let resetImage = false; // 画像由来エラーのみ画像クリア
+
+    if (code === 'SIZE_OVER_5MB' || code === 'INVALID_MIME' || code === 'CANVAS_FAILED') {
+      msg = '画像に問題があります。別の画像を選んでください';
+      resetImage = true;
+    } else if (code === 'QUOTA_EXCEEDED') {
+      msg = '本日の画像投稿上限に達しました。明日までお待ちください';
+    } else if (code === 'AUTH_TOKEN_INVALID' || code === 'AUTH_TOKEN_EXPIRED' || code === 'AUTH_TOKEN_MISSING') {
+      msg = '認証エラー。LINEを開き直してください';
+    } else if (code === 'FEATURE_DISABLED' || code === 'IMAGE_UPLOAD_DISABLED') {
+      msg = '画像投稿は現在利用できません';
+      resetImage = true;
+    } else if (code === 'AUTH_HELPER_MISSING') {
+      msg = '内部エラー(auth helper)。LINEを開き直してください';
+    } else if (code === 'NETWORK_ERROR' || code.startsWith('HTTP_5') || code === 'SERVER_ERROR') {
+      msg = '通信エラー。もう一度お試しください';
+    } else if (code.startsWith('HTTP_4')) {
+      msg = 'リクエストエラー。内容を確認してください';
+    }
+
+    showToast(msg);
+    if (resetImage) {
+      _resetPendingImage();
+    }
+    // ★ 重要: 本文は document.getElementById('compose-body').value をクリアしない
+    //         画像プレビュー(resetImage=false時)も保持 → 再送信可能
+    //         通常sendMessageへのフォールバックは絶対に「しない」
+    console.error('[Phase 4-2E] 画像送信失敗:', code, e);
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2F] サムネ表示・Lazy load (IntersectionObserver + 署名URLキャッシュ)
+// ═══════════════════════════════════════════
+// チャッピー第49回判定条件(IV):
+//   - 画面に入った画像だけ署名URLを取得 (IntersectionObserver)
+//   - Mapで55分キャッシュ (Supabase signed URLの有効期限60分より短く)
+//   - Promise同時発行最大5件
+//   - localStorage保存禁止 (memory only)・consoleにtoken/署名URL出さない
+// ═══════════════════════════════════════════
+const __signedUrlCache = new Map(); // key: storage_path, value: { url, expiresAt }
+const SIGNED_URL_CACHE_TTL_MS = 55 * 60 * 1000; // 55分
+const SIGNED_URL_MAX_CONCURRENT = 5;
+let __signedUrlInflight = 0;
+const __signedUrlWaitQueue = [];
+let __imageThumbObserver = null;
+
+// 同時発行制限付きシリアライザ(チャッピー条件IV)
+function _acquireSignedUrlSlot() {
+  return new Promise(resolve => {
+    if (__signedUrlInflight < SIGNED_URL_MAX_CONCURRENT) {
+      __signedUrlInflight++;
+      resolve();
+    } else {
+      __signedUrlWaitQueue.push(resolve);
+    }
+  });
+}
+function _releaseSignedUrlSlot() {
+  __signedUrlInflight--;
+  const next = __signedUrlWaitQueue.shift();
+  if (next) { __signedUrlInflight++; next(); }
+}
+
+// storage_path → signed URL を取得(キャッシュ優先・なければEdge Function呼出)
+async function getSignedThumbUrl(storagePath) {
+  if (!storagePath) return null;
+  const now = Date.now();
+  const cached = __signedUrlCache.get(storagePath);
+  if (cached && now < cached.expiresAt) return cached.url;
+
+  await _acquireSignedUrlSlot();
+  try {
+    if (typeof window.callImageFunction !== 'function') return null;
+    const url = `${SUPABASE_URL}/functions/v1/create-signed-url`;
+    const res = await window.callImageFunction(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: storagePath, expires_in: 3600 })
+    });
+    if (!res || !res.ok) return null;
+    const json = await res.json().catch(() => null);
+    if (!json) return null;
+    const signedUrl = json.signed_url || json.signedUrl || json.url;
+    if (!signedUrl || typeof signedUrl !== 'string') return null;
+    // メモリキャッシュのみ(localStorage禁止・チャッピー条件IV注意点)
+    __signedUrlCache.set(storagePath, { url: signedUrl, expiresAt: now + SIGNED_URL_CACHE_TTL_MS });
+    return signedUrl;
+  } catch (e) {
+    // 署名URL本体や認証情報はログに出さない(チャッピー条件IV注意点)
+    console.error('[Phase 4-2F] signed URL取得失敗 path=', storagePath);
+    return null;
+  } finally {
+    _releaseSignedUrlSlot();
+  }
+}
+
+// IntersectionObserver初期化(1度だけ作成・全画像で共有)
+function _initImageThumbObserver() {
+  if (__imageThumbObserver) return __imageThumbObserver;
+  if (typeof IntersectionObserver === 'undefined') return null;
+  __imageThumbObserver = new IntersectionObserver(async (entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const img = entry.target;
+      const path = img.getAttribute('data-thumbnail-path');
+      if (!path) { __imageThumbObserver.unobserve(img); continue; }
+      // 一度観測したら解除(再取得防止)
+      __imageThumbObserver.unobserve(img);
+      if (img.src && !img.src.startsWith('data:')) continue;
+      try {
+        const url = await getSignedThumbUrl(path);
+        if (url) {
+          img.src = url;
+        } else {
+          img.alt = '画像読込失敗';
+          img.style.background = '#fee';
+        }
+      } catch (_) {
+        img.alt = '画像読込失敗';
+        img.style.background = '#fee';
+      }
+    }
+  }, { rootMargin: '200px 0px', threshold: 0.01 });
+  return __imageThumbObserver;
+}
+
+// container内の data-thumbnail-path 属性を持つ img を Observer に登録
+function observeImageThumbnails(container) {
+  if (!container) return;
+  const obs = _initImageThumbObserver();
+  if (!obs) {
+    // IntersectionObserver非対応(古いブラウザ)時は即時取得
+    const imgs = container.querySelectorAll('img[data-thumbnail-path]:not([data-observed])');
+    imgs.forEach(async img => {
+      img.setAttribute('data-observed', '1');
+      const path = img.getAttribute('data-thumbnail-path');
+      const url = await getSignedThumbUrl(path);
+      if (url) img.src = url;
+    });
+    return;
+  }
+  const imgs = container.querySelectorAll('img[data-thumbnail-path]:not([data-observed])');
+  imgs.forEach(img => {
+    img.setAttribute('data-observed', '1');
+    obs.observe(img);
+  });
+}
+
+// ═══════════════════════════════════════════
+// 画像署名URLプリロード(チャッピー第79回判定 案(a) 2026-05-24)
+// メッセージ一覧・引き継ぎ一覧表示後に、画像付きアイテムの
+// 署名URLだけバックグラウンドで先取得して __signedUrlCache に格納する。
+// 画像本体は先読みしない(通信量配慮)。
+// 既存の __signedUrlCache(55分TTL)・SIGNED_URL_MAX_CONCURRENT=5 を流用。
+// awaitしない・失敗握りつぶし・上限20件。
+// ═══════════════════════════════════════════
+function preloadMessageImageUrls(items, limit = 20) {
+  try {
+    const targets = (items || [])
+      .map(item => item && (item.thumbnail_url || item.image_url))
+      .filter(path => !!path)
+      .slice(0, limit);
+    for (const path of targets) {
+      getSignedThumbUrl(path).catch(() => {});
+    }
+  } catch (e) {
+    console.warn('[preloadMessageImageUrls] skipped:', e && e.message ? e.message : e);
+  }
+}
+
+// メッセージ/引き継ぎ用のサムネHTML生成(共通化)
+// data-thumbnail-path に storage_path を持たせ、IntersectionObserverで遅延読込
+// 戻り値: '' (画像なし) または '<div class="msg-thumb-wrap">...</div>'
+function renderImageThumbnailHtml(item) {
+  if (!item) return '';
+  // [Phase 4-2I] image_mode='deleted' は「🗑️ 削除済」プレースホルダ表示
+  if (item.image_mode === 'deleted') {
+    return `<div class="msg-thumb-wrap" style="margin-top:8px;">
+      <div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:12px;">
+        🗑️ 画像は削除されました
+      </div>
+    </div>`;
+  }
+  // image_url + thumbnail_url のどちらかがあれば表示対象(優先: thumbnail_url)
+  const thumbPath = item.thumbnail_url || item.image_url;
+  if (!thumbPath) return '';
+  const escPath = escHtml(thumbPath);
+  const fullPath = item.image_url ? escHtml(item.image_url) : escPath;
+  // [Phase 4-2G] クリックで全画面拡大(フル画像取得)
+  // [チャッピー第53回判定後・4回目] image-orientation: from-image で表示時にEXIF適用
+  return `<div class="msg-thumb-wrap" style="margin-top:8px;">
+    <img data-thumbnail-path="${escPath}"
+         data-full-path="${fullPath}"
+         alt="画像読込中..."
+         loading="lazy"
+         style="max-width:160px; max-height:120px; border-radius:6px; background:#e4e8f0; object-fit:cover; display:block; cursor:zoom-in; image-orientation:from-image;"
+         onclick="event.stopPropagation(); openFullImageViewer('${fullPath}')">
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18]
+// 画像投稿クォータの残量取得・UI表示・上限到達時のボタンガード
+// - JST日付で当日のクォータを取得(toISOString直使用NG・第58回判定条件6)
+// - 取得失敗時は上限値で表示するフォールバック(ST版初期は許容)
+// - 上限到達時は📷ボタンをdisabled + 視覚表示
+// ══════════════════════════════════════════════════════
+
+// JST日付(YYYY-MM-DD)を返す(チャッピー第58回判定 条件6)
+function getJstDateString() {
+  const now = new Date();
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return jst.toISOString().substring(0, 10);
+}
+
+// 当日の残量を取得(context: 'message' | 'handover')
+async function getRemainingQuota(context) {
+  const QUOTA_LIMITS = { message: 10, handover: 5 };
+  const limit = QUOTA_LIMITS[context] || 10;
+  try {
+    if (!currentUser || !currentUser.eo_uid || !currentGroup || !currentGroup.id) {
+      return { used: 0, limit, remaining: limit };
+    }
+    const today = getJstDateString();
+    const { data, error } = await supabase
+      .from('image_upload_quota')
+      .select('upload_count')
+      .eq('eo_uid', currentUser.eo_uid)
+      .eq('group_session_id', currentGroup.id)
+      .eq('upload_date', today)
+      .eq('context', context)
+      .maybeSingle();
+    if (error) {
+      console.warn('クォータ取得失敗・上限値で表示');
+      return { used: 0, limit, remaining: limit };
+    }
+    const used = data?.upload_count || 0;
+    return { used, limit, remaining: Math.max(0, limit - used) };
+  } catch (_) {
+    console.warn('クォータ取得例外・上限値で表示');
+    return { used: 0, limit, remaining: limit };
+  }
+}
+
+// 画像投稿エリアの残量表示・ボタン状態を更新(context は selectedComposeType から自動判定)
+// [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] camera/library 両ボタン対応 + aria-disabled
+async function updateImageQuotaUI() {
+  const btnCamera = document.getElementById('compose-image-btn-camera');
+  const btnLibrary = document.getElementById('compose-image-btn-library');
+  const quotaEl = document.getElementById('compose-image-quota');
+  if (!btnCamera || !btnLibrary || !quotaEl) return;
+  // 両ボタンとも非表示なら残量UIも空に(isCreator!==true / feature_flags OFF時)
+  if ((btnCamera.style.display === 'none' && btnLibrary.style.display === 'none') || isCreator !== true) {
+    quotaEl.innerHTML = '';
+    return;
+  }
+  // context判定(selectedComposeType: 'msg' or 'handover' → 'message' or 'handover')
+  const ctx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
+  const { remaining, limit } = await getRemainingQuota(ctx);
+  if (remaining > 0) {
+    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--text-light);">📊 あと <strong style="color:#06C755;">${remaining}</strong> 回投稿できます</span>`;
+    // [チャッピー第59-2回判定] btn.disabled は使わず opacity/cursor/aria-disabled のみで視覚演出
+    btnCamera.style.opacity = '1';
+    btnCamera.style.cursor = 'pointer';
+    btnCamera.setAttribute('aria-disabled', 'false');
+    btnLibrary.style.opacity = '1';
+    btnLibrary.style.cursor = 'pointer';
+    btnLibrary.setAttribute('aria-disabled', 'false');
+  } else {
+    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--red);">⛔ 本日の上限(${limit}回)に達しました・明日0時にリセット</span>`;
+    btnCamera.style.opacity = '0.4';
+    btnCamera.style.cursor = 'not-allowed';
+    btnCamera.setAttribute('aria-disabled', 'true');
+    btnLibrary.style.opacity = '0.4';
+    btnLibrary.style.cursor = 'not-allowed';
+    btnLibrary.setAttribute('aria-disabled', 'true');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// [⑪運用変更・チャッピー第58回判定 条件付きGO / 2026-05-18]
+// 引き継ぎリスト専用の画像ラベル表示(サムネ撤廃・「📷画像あり」テキスト表示)
+// - サイネージ画面(signage.html L1031-1042)と同等仕様
+// - メッセージリストには影響しない(renderImageThumbnailHtml をそのまま使う)
+// - 詳細画面(showHandoverDetail内 _renderDetailImage)は無変更・タップ時に画像表示維持
+// ══════════════════════════════════════════════════════
+function renderHandoverImageLabel(item) {
+  // [チャッピー第60-3回判定 解釈β] サイネージと同配置・priority-badge右横にインライン
+  if (!item) return '';
+  if (item.image_mode === 'deleted') {
+    return `<span class="priority-badge" style="background:#f5f5f5; color:#888; border:1px solid #bbb; margin-left:6px;">🗑️ 削除済</span>`;
+  }
+  if (item.image_url || item.thumbnail_url) {
+    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`;
+  }
+  return '';
+}
+
+// 詳細画面用: メッセージ/引き継ぎオブジェクトから画像エリアを表示・サムネ即時取得
+// [チャッピー第60-3回判定] 失敗時に再読み込みボタン+診断表示を持たせる強化版
+async function _renderDetailImage(item, wrapId, imgId, statusId) {
+  const wrap = document.getElementById(wrapId);
+  const img = document.getElementById(imgId);
+  const status = document.getElementById(statusId);
+  if (!wrap || !img) return;
+  // リセット(前回表示の残骸を消す)
+  img.src = '';
+  img.removeAttribute('data-thumbnail-path');
+  img.removeAttribute('data-full-path');
+  img.onclick = null;
+  img.style.background = '';
+  img.alt = '';
+  if (status) status.innerHTML = '';
+  if (!item) {
+    wrap.style.display = 'none';
+    return;
+  }
+  // [Phase 4-2I] 削除済プレースホルダ
+  if (item.image_mode === 'deleted') {
+    wrap.style.display = 'block';
+    img.style.display = 'none';
+    if (status) {
+      status.innerHTML = '<div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:13px;">🗑️ 画像は削除されました</div>';
+    }
+    return;
+  }
+  img.style.display = 'block';
+  const thumbPath = item.thumbnail_url || item.image_url;
+  if (!thumbPath) {
+    wrap.style.display = 'none';
+    return;
+  }
+  img.setAttribute('data-thumbnail-path', thumbPath);
+  if (item.image_url) {
+    img.setAttribute('data-full-path', item.image_url);
+  }
+  // [Phase 4-2G] クリックで全画面拡大(フル画像取得)
+  const fullPath = item.image_url || thumbPath;
+  img.style.cursor = 'zoom-in';
+  img.onclick = function(ev) { ev.stopPropagation(); openFullImageViewer(fullPath); };
+  wrap.style.display = 'block';
+  // 詳細画面は1枚のみなので即時取得(IntersectionObserverを使わない)
+  await _attemptLoadDetailImage(item, img, status, thumbPath, false);
+}
+
+// [チャッピー第60-3回判定 案C+] サムネ取得試行(初回・リトライ共通)
+async function _attemptLoadDetailImage(item, img, status, thumbPath, isRetry) {
+  try {
+    const url = await getSignedThumbUrl(thumbPath);
+    if (url) {
+      img.src = url;
+      img.style.background = '';
+      img.alt = '';
+      if (status) {
+        const kb = item.image_size ? Math.round(item.image_size / 1024) : null;
+        const sizeText = kb ? ` ・ ${kb}KB` : '';
+        status.innerHTML = `<span style="color:#666; font-size:13px;">画像${sizeText} ・ タップで拡大</span>`;
+      }
+    } else {
+      _showImageError(item, img, status, thumbPath, isRetry);
+    }
+  } catch (e) {
+    _showImageError(item, img, status, thumbPath, isRetry);
+  }
+}
+
+// [チャッピー第60-3回判定 案C+] エラー表示+再読み込みボタン
+// 1回目失敗: 再読み込みボタン表示・2回目失敗: ボタン非表示で最終文言
+function _showImageError(item, img, status, thumbPath, isRetry) {
+  img.alt = '画像を表示できません';
+  img.style.background = '#fff3cd';
+  if (!status) return;
+  // 2回目失敗時はボタン非表示・最終文言
+  if (isRetry) {
+    status.innerHTML = `
+      <div style="display:inline-block; padding:8px 12px; background:#fff3cd; border:1px solid #ffe082; border-radius:6px; color:#795548; font-size:13px; line-height:1.5;">
+        画像を表示できません。EdgeOpsを一度閉じて開き直してください。
+      </div>`;
+    return;
+  }
+  // 1回目失敗:再読み込みボタン表示
+  status.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; background:#fff3cd; border:1px solid #ffe082; border-radius:6px;">
+      <span style="color:#795548; font-size:13px;">画像を表示できません</span>
+      <button id="_retry-image-btn" type="button" style="padding:4px 10px; background:#1976d2; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">🔄 再読み込み</button>
+    </div>
+    <div id="_retry-diag" style="margin-top:4px; min-height:0; display:flex; flex-direction:column; gap:2px;"></div>
+  `;
+  const btn = document.getElementById('_retry-image-btn');
+  const diagArea = document.getElementById('_retry-diag');
+  if (btn) {
+    btn.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      await _handleRetryImage(item, img, status, thumbPath, btn, diagArea);
+    });
+  }
+}
+
+// [チャッピー第60-3回判定 案C+] 再読み込みボタン押下時の処理
+// JWT 強制更新 + キャッシュバイパス + 再取得 を 1ボタンで実行
+async function _handleRetryImage(item, img, status, thumbPath, btn, diagArea) {
+  // 多重押下防止(チャッピー第60-3回判定 条件)
+  btn.disabled = true;
+  btn.style.opacity = '0.6';
+  btn.style.cursor = 'wait';
+  btn.textContent = '⏳ 再取得中...';
+  // 5秒タイムアウト(押しっぱなし防止・診断のみ)
+  const timeoutId = setTimeout(() => {
+    _appendDiag(diagArea, '診断: タイムアウト', '#fff3cd', '#795548');
+  }, 5000);
+  // ① JWT 強制更新
+  let refreshOk = false;
+  try {
+    if (typeof window.refreshEdgeOpsAccessToken === 'function') {
+      const newToken = await window.refreshEdgeOpsAccessToken();
+      refreshOk = !!newToken;
+    }
+  } catch (_) { refreshOk = false; }
+  _appendDiag(diagArea, refreshOk ? '診断: token更新 ✅' : '診断: refresh失敗', refreshOk ? '#e8f5e9' : '#ffebee', refreshOk ? '#2e7d32' : '#c62828');
+  // ② キャッシュバイパス
+  try {
+    if (typeof __signedUrlCache !== 'undefined' && __signedUrlCache && __signedUrlCache.delete) {
+      __signedUrlCache.delete(thumbPath);
+      _appendDiag(diagArea, '診断: キャッシュ削除 ✅', '#e8f5e9', '#2e7d32');
+    }
+  } catch (_) { /* cache 失敗は処理を止めない */ }
+  // ③ 再取得
+  try {
+    const url = await getSignedThumbUrl(thumbPath);
+    clearTimeout(timeoutId);
+    if (url) {
+      img.src = url;
+      img.style.background = '';
+      img.alt = '';
+      _appendDiag(diagArea, '診断: 再取得成功 ✅', '#e8f5e9', '#2e7d32');
+      // 成功時はステータス全体を成功表示に置換(3秒後)
+      setTimeout(() => {
+        if (status) {
+          const kb = item.image_size ? Math.round(item.image_size / 1024) : null;
+          const sizeText = kb ? ` ・ ${kb}KB` : '';
+          status.innerHTML = `<span style="color:#666; font-size:13px;">画像${sizeText} ・ タップで拡大</span>`;
+        }
+      }, 3000);
+    } else {
+      _appendDiag(diagArea, '診断: 取得失敗(URL空)', '#ffebee', '#c62828');
+      // 2回目失敗 → 最終文言+ボタン非表示
+      setTimeout(() => _showImageError(item, img, status, thumbPath, true), 1500);
+    }
+  } catch (e) {
+    clearTimeout(timeoutId);
+    _appendDiag(diagArea, '診断: 取得失敗(throw)', '#ffebee', '#c62828');
+    setTimeout(() => _showImageError(item, img, status, thumbPath, true), 1500);
+  }
+}
+
+// [チャッピー第60-3回判定 案C+] 診断ログ表示ヘルパー
+// 5秒後フェードアウト・token・署名URLは出力しない
+function _appendDiag(area, text, bgColor, textColor) {
+  if (!area) return;
+  const div = document.createElement('div');
+  div.style.cssText = `padding:4px 8px; background:${bgColor}; color:${textColor}; border-radius:4px; font-size:11px; display:inline-block; align-self:flex-start;`;
+  div.textContent = text;
+  area.appendChild(div);
+  setTimeout(() => {
+    div.style.transition = 'opacity 0.5s';
+    div.style.opacity = '0';
+    setTimeout(() => { try { div.remove(); } catch (_) {} }, 500);
+  }, 5000);
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2G] 全画面拡大ビューア (ピンチズーム + ダブルタップ + パン)
+// ═══════════════════════════════════════════
+// 起動: openFullImageViewer(storage_path) を呼ぶ
+//   - storage_path から create-signed-url 経由でフル画像URLを取得
+//   - 取得完了後にビューアにフェードイン
+// 操作:
+//   - ピンチ: 2本指でズーム (scale 1.0 ~ 4.0)
+//   - ダブルタップ: 等倍⇔2倍切替
+//   - 1本指ドラッグ(拡大時のみ): パン
+//   - 背景タップ(画像外): 閉じる
+//   - ×ボタン: 閉じる
+// ═══════════════════════════════════════════
+const FULL_IMAGE_MIN_SCALE = 1.0;
+const FULL_IMAGE_MAX_SCALE = 4.0;
+const FULL_IMAGE_DOUBLE_TAP_SCALE = 2.0;
+let __fullImageState = null; // { scale, tx, ty, startScale, startTx, startTy, startDist, startMidX, startMidY, lastTapAt }
+
+async function openFullImageViewer(storagePath) {
+  if (!storagePath) return;
+  const viewer = document.getElementById('full-image-viewer');
+  const imgEl = document.getElementById('full-image-content');
+  const loadingEl = document.getElementById('full-image-loading');
+  if (!viewer || !imgEl) return;
+  // 初期化
+  imgEl.src = '';
+  imgEl.style.transform = 'translate(0px, 0px) scale(1)';
+  __fullImageState = { scale: 1, tx: 0, ty: 0, startScale: 1, startTx: 0, startTy: 0, startDist: 0, startMidX: 0, startMidY: 0, lastTapAt: 0, panStartX: 0, panStartY: 0, panning: false };
+  viewer.style.display = 'block';
+  if (loadingEl) loadingEl.style.display = 'block';
+  imgEl.style.visibility = 'hidden';
+  // bodyスクロール停止
+  document.body.style.overflow = 'hidden';
+  // ESCキーで閉じる
+  document.addEventListener('keydown', _fullImageEscHandler);
+  // 画面外タッチで閉じる(viewer のクリック・タッチ)
+  viewer.addEventListener('click', _fullImageBackgroundClickHandler);
+  // フル画像URL取得(キャッシュ利用)
+  try {
+    const url = await getSignedThumbUrl(storagePath); // 同じキャッシュ機構を流用
+    if (!url) {
+      if (loadingEl) loadingEl.innerHTML = '画像を読み込めませんでした<br><span style="font-size:11px;">×ボタンで閉じる</span>';
+      return;
+    }
+    imgEl.onload = function() {
+      if (loadingEl) loadingEl.style.display = 'none';
+      imgEl.style.visibility = 'visible';
+      _attachFullImageGestures(imgEl);
+    };
+    imgEl.onerror = function() {
+      if (loadingEl) loadingEl.innerHTML = '画像を読み込めませんでした<br><span style="font-size:11px;">×ボタンで閉じる</span>';
+    };
+    imgEl.src = url;
+  } catch (e) {
+    if (loadingEl) loadingEl.innerHTML = '画像を読み込めませんでした<br><span style="font-size:11px;">×ボタンで閉じる</span>';
+  }
+}
+
+function closeFullImageViewer() {
+  const viewer = document.getElementById('full-image-viewer');
+  const imgEl = document.getElementById('full-image-content');
+  if (!viewer) return;
+  viewer.style.display = 'none';
+  if (imgEl) {
+    _detachFullImageGestures(imgEl);
+    imgEl.src = '';
+    imgEl.style.transform = '';
+  }
+  __fullImageState = null;
+  document.body.style.overflow = '';
+  document.removeEventListener('keydown', _fullImageEscHandler);
+  viewer.removeEventListener('click', _fullImageBackgroundClickHandler);
+}
+
+function _fullImageEscHandler(ev) {
+  if (ev.key === 'Escape') closeFullImageViewer();
+}
+
+function _fullImageBackgroundClickHandler(ev) {
+  // 画像本体・閉じるボタン・ヒントへのクリックは閉じない
+  const t = ev.target;
+  if (!t) return;
+  if (t.id === 'full-image-content') return;
+  if (t.id === 'full-image-close-btn') return;
+  if (t.closest && t.closest('#full-image-close-btn')) return;
+  closeFullImageViewer();
+}
+
+// ジェスチャ実装(touch + pointer 両対応)
+let __fullImageHandlers = null;
+
+function _attachFullImageGestures(imgEl) {
+  if (!imgEl) return;
+  _detachFullImageGestures(imgEl); // 二重登録防止
+
+  const onTouchStart = (ev) => {
+    if (!__fullImageState) return;
+    if (ev.touches.length === 2) {
+      // ピンチ開始
+      ev.preventDefault();
+      const t1 = ev.touches[0], t2 = ev.touches[1];
+      const dx = t2.clientX - t1.clientX, dy = t2.clientY - t1.clientY;
+      __fullImageState.startDist = Math.hypot(dx, dy);
+      __fullImageState.startScale = __fullImageState.scale;
+      __fullImageState.startTx = __fullImageState.tx;
+      __fullImageState.startTy = __fullImageState.ty;
+      __fullImageState.startMidX = (t1.clientX + t2.clientX) / 2;
+      __fullImageState.startMidY = (t1.clientY + t2.clientY) / 2;
+      __fullImageState.panning = false;
+    } else if (ev.touches.length === 1) {
+      // 1本指: ダブルタップ判定 + パン開始
+      const now = Date.now();
+      const dt = now - __fullImageState.lastTapAt;
+      __fullImageState.lastTapAt = now;
+      if (dt < 300 && dt > 0) {
+        // ダブルタップ
+        ev.preventDefault();
+        if (__fullImageState.scale > 1.05) {
+          // 拡大中 → 等倍に戻す
+          _animateFullImageTransform(1, 0, 0, imgEl);
+        } else {
+          // 等倍 → 2倍にズーム
+          _animateFullImageTransform(FULL_IMAGE_DOUBLE_TAP_SCALE, 0, 0, imgEl);
+        }
+        __fullImageState.lastTapAt = 0; // 連続ダブルタップ防止
+        return;
+      }
+      // パン開始(拡大時のみ意味あり)
+      if (__fullImageState.scale > 1.05) {
+        __fullImageState.panning = true;
+        __fullImageState.panStartX = ev.touches[0].clientX;
+        __fullImageState.panStartY = ev.touches[0].clientY;
+        __fullImageState.startTx = __fullImageState.tx;
+        __fullImageState.startTy = __fullImageState.ty;
+      }
+    }
+  };
+
+  const onTouchMove = (ev) => {
+    if (!__fullImageState) return;
+    if (ev.touches.length === 2) {
+      // ピンチ中
+      ev.preventDefault();
+      const t1 = ev.touches[0], t2 = ev.touches[1];
+      const dx = t2.clientX - t1.clientX, dy = t2.clientY - t1.clientY;
+      const dist = Math.hypot(dx, dy);
+      if (__fullImageState.startDist > 0) {
+        let newScale = __fullImageState.startScale * (dist / __fullImageState.startDist);
+        newScale = Math.max(FULL_IMAGE_MIN_SCALE * 0.9, Math.min(FULL_IMAGE_MAX_SCALE, newScale));
+        __fullImageState.scale = newScale;
+        // ピンチ中央を中心に拡縮(簡易): 平行移動は維持
+        imgEl.style.transition = 'none';
+        imgEl.style.transform = `translate(${__fullImageState.tx}px, ${__fullImageState.ty}px) scale(${newScale})`;
+      }
+    } else if (ev.touches.length === 1 && __fullImageState.panning) {
+      // パン中
+      ev.preventDefault();
+      const t = ev.touches[0];
+      const dx = t.clientX - __fullImageState.panStartX;
+      const dy = t.clientY - __fullImageState.panStartY;
+      __fullImageState.tx = __fullImageState.startTx + dx;
+      __fullImageState.ty = __fullImageState.startTy + dy;
+      imgEl.style.transition = 'none';
+      imgEl.style.transform = `translate(${__fullImageState.tx}px, ${__fullImageState.ty}px) scale(${__fullImageState.scale})`;
+    }
+  };
+
+  const onTouchEnd = (ev) => {
+    if (!__fullImageState) return;
+    __fullImageState.panning = false;
+    // 等倍以下に縮小したら中央に戻す
+    if (__fullImageState.scale < 1.05) {
+      _animateFullImageTransform(1, 0, 0, imgEl);
+    } else {
+      // バウンス(画面外に出すぎたら戻す・簡易)
+      imgEl.style.transition = 'transform 0.15s ease-out';
+    }
+  };
+
+  // ホイールズーム(PC向け・補助)
+  const onWheel = (ev) => {
+    if (!__fullImageState) return;
+    ev.preventDefault();
+    const delta = -ev.deltaY * 0.002;
+    let newScale = __fullImageState.scale * (1 + delta);
+    newScale = Math.max(FULL_IMAGE_MIN_SCALE, Math.min(FULL_IMAGE_MAX_SCALE, newScale));
+    __fullImageState.scale = newScale;
+    if (newScale <= 1.05) { __fullImageState.tx = 0; __fullImageState.ty = 0; }
+    imgEl.style.transition = 'transform 0.1s ease-out';
+    imgEl.style.transform = `translate(${__fullImageState.tx}px, ${__fullImageState.ty}px) scale(${newScale})`;
+  };
+
+  // PCダブルクリック
+  const onDblClick = (ev) => {
+    if (!__fullImageState) return;
+    ev.preventDefault();
+    if (__fullImageState.scale > 1.05) {
+      _animateFullImageTransform(1, 0, 0, imgEl);
+    } else {
+      _animateFullImageTransform(FULL_IMAGE_DOUBLE_TAP_SCALE, 0, 0, imgEl);
+    }
+  };
+
+  imgEl.addEventListener('touchstart', onTouchStart, { passive: false });
+  imgEl.addEventListener('touchmove', onTouchMove, { passive: false });
+  imgEl.addEventListener('touchend', onTouchEnd);
+  imgEl.addEventListener('touchcancel', onTouchEnd);
+  imgEl.addEventListener('wheel', onWheel, { passive: false });
+  imgEl.addEventListener('dblclick', onDblClick);
+
+  __fullImageHandlers = { onTouchStart, onTouchMove, onTouchEnd, onWheel, onDblClick };
+}
+
+function _detachFullImageGestures(imgEl) {
+  if (!imgEl || !__fullImageHandlers) return;
+  const h = __fullImageHandlers;
+  imgEl.removeEventListener('touchstart', h.onTouchStart);
+  imgEl.removeEventListener('touchmove', h.onTouchMove);
+  imgEl.removeEventListener('touchend', h.onTouchEnd);
+  imgEl.removeEventListener('touchcancel', h.onTouchEnd);
+  imgEl.removeEventListener('wheel', h.onWheel);
+  imgEl.removeEventListener('dblclick', h.onDblClick);
+  __fullImageHandlers = null;
+}
+
+function _animateFullImageTransform(scale, tx, ty, imgEl) {
+  if (!__fullImageState) return;
+  __fullImageState.scale = scale;
+  __fullImageState.tx = tx;
+  __fullImageState.ty = ty;
+  imgEl.style.transition = 'transform 0.2s ease-out';
+  imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+}
+
+// ═══════════════════════════════════════════
+// [Phase 4-2H] 画像削除フロー (delete-image Edge Function 呼出)
+// ═══════════════════════════════════════════
+// 起動: deleteImageOnly(itemId, context) ('message' | 'handover')
+//   - 自分が送信者かつ image_mode='attached' のメッセージのみ削除可能
+//   - 確認ダイアログ → delete-image Edge Function → 描画更新
+//   - 削除後はサーバー側で image_mode='deleted' に更新される
+// feature_flags.image_delete が FALSE なら削除ボタン非表示・送信直前にも再確認
+// ═══════════════════════════════════════════
+async function isImageDeleteEnabled() {
+  try {
+    const flags = await getFeatureFlags(false);
+    return !!(flags && flags.image_upload && flags.image_delete);
+  } catch (_) { return false; }
+}
+
+async function deleteImageOnly(itemId, context) {
+  if (!itemId) { showToast('対象が指定されていません'); return; }
+  if (context !== 'message' && context !== 'handover') {
+    showToast('内部エラー(context)');
+    return;
+  }
+  // 削除機能フラグ強制再取得(緊急OFF即時反映)
+  let flags;
+  try { flags = await getFeatureFlags(true); }
+  catch (_) { flags = null; }
+  if (!flags || !flags.image_upload || !flags.image_delete) {
+    showToast('画像削除は現在利用できません');
+    return;
+  }
+  // 確認ダイアログ
+  // [2026/5/20 野口さん指示] クォータ警告追加(削除しても投稿可能数は戻らない・明日0時リセット)
+  if (!confirm('この画像を削除しますか?\n\n本文は残り、画像のみ削除されます。\n削除した画像は復元できません。\n\n⚠️ 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)')) return;
+
+  showToast('削除中...');
+  try {
+    if (typeof window.callImageFunction !== 'function') {
+      throw new Error('AUTH_HELPER_MISSING');
+    }
+    const url = `${SUPABASE_URL}/functions/v1/delete-image`;
+    const res = await window.callImageFunction(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_id: itemId, context: context })
+    });
+    if (!res || !res.ok) {
+      let errorCode = 'SERVER_ERROR';
+      try {
+        const errBody = await res.text();
+        if (errBody) {
+          try {
+            const errJson = JSON.parse(errBody);
+            errorCode = errJson.error || errJson.code || `HTTP_${res.status}`;
+          } catch (_) { errorCode = `HTTP_${res.status}`; }
+        } else { errorCode = `HTTP_${res.status}`; }
+      } catch (_) { errorCode = `HTTP_${(res && res.status) || 'UNKNOWN'}`; }
+      throw new Error(errorCode);
+    }
+    showToast('画像を削除しました');
+    // 描画更新
+    if (context === 'message') {
+      await loadMessages();
+      // 詳細画面表示中なら再描画
+      const detailScreen = document.getElementById('screen-detail');
+      if (detailScreen && detailScreen.classList.contains('active')) {
+        try { await showDetail(itemId); } catch (_) {}
+      } else {
+        showScreen('screen-home');
+      }
+    } else {
+      await loadHandoverNotes();
+      const hwDetailScreen = document.getElementById('screen-handover-detail');
+      if (hwDetailScreen && hwDetailScreen.classList.contains('active')) {
+        try { await showHandoverDetail(itemId); } catch (_) {}
+      } else {
+        showScreen('screen-handover');
+      }
+    }
+  } catch (e) {
+    const code = (e && e.message) || 'UNKNOWN_ERROR';
+    let msg = '削除に失敗しました';
+    if (code === 'NOT_OWNER' || code === 'FORBIDDEN' || code.startsWith('HTTP_403')) {
+      msg = '自分が投稿した画像のみ削除できます';
+    } else if (code === 'ALREADY_DELETED' || code === 'NOT_FOUND' || code.startsWith('HTTP_404')) {
+      msg = 'この画像はすでに削除されています';
+      // 表示を最新化
+      if (context === 'message') { try { await loadMessages(); } catch (_) {} }
+      else { try { await loadHandoverNotes(); } catch (_) {} }
+    } else if (code === 'AUTH_TOKEN_INVALID' || code === 'AUTH_TOKEN_EXPIRED' || code === 'AUTH_TOKEN_MISSING') {
+      msg = '認証エラー。LINEを開き直してください';
+    } else if (code === 'FEATURE_DISABLED' || code === 'IMAGE_DELETE_DISABLED') {
+      msg = '画像削除は現在利用できません';
+    } else if (code.startsWith('HTTP_5') || code === 'SERVER_ERROR') {
+      msg = '通信エラー。もう一度お試しください';
+    }
+    showToast(msg);
+    console.error('[Phase 4-2H] 画像削除失敗:', code);
+  }
+}
+
+// ═══════════════════════════════════════════
 // 初期化
 // ═══════════════════════════════════════════
 async function init() {
   try {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // [Phase 4-2B] feature_flagsプリロード(fire-and-forget・起動阻害しない)
+    // 5分キャッシュを起動時にウォームアップ。失敗時は安全側で全FALSE扱い。
+    getFeatureFlags(true).catch(()=>{});
 
     const liffInitPromise = liff.init({ liffId: LIFF_ID });
     const timeoutPromise = new Promise((_, reject) =>
@@ -1313,25 +2994,45 @@ async function init() {
     try {
       await Promise.race([liffInitPromise, timeoutPromise]);
     } catch (liffError) {
-      // [Phase 0 5-3] LIFFタイムアウト時はdev eo_uid生成
-      const dev = generateDevEoUid();
-      currentUser = { eo_uid: dev.eoUid, provider: 'dev', provider_uid: dev.providerUid, line_name: 'テストユーザー', picture_url: '', display_name: 'テストユーザー' };
-      hideLoading(); showScreen('screen-start'); return;
+      // [2026/5/21 P0] LIFF初期化失敗 = LIFF外アクセス・dev生成は廃止し遮断画面表示
+      console.warn('[LIFF Guard] LIFF init failed:', liffError);
+      hideLoading();
+      showLiffOutsideErrorScreen('LIFFの初期化に失敗しました');
+      return;
     }
 
     if (!liff.isLoggedIn()) {
-      if (!liff.isInClient()) {
-        // [Phase 0 5-3] ブラウザテスト時はdev eo_uid生成
-        const dev = generateDevEoUid();
-        currentUser = { eo_uid: dev.eoUid, provider: 'dev', provider_uid: dev.providerUid, line_name: 'ブラウザテスト', picture_url: '', display_name: 'ブラウザテスト' };
-        hideLoading(); showScreen('screen-start'); return;
+      if (!(await isInClientWithRetry())) {
+        // [2026/5/21 P0 + 2026/5/23 第76回判定] LIFF外Chromeアクセス遮断(500msリトライ付)
+        console.warn('[LIFF Guard] Not in LINE client (after retry). Blocking access.');
+        hideLoading();
+        showLiffOutsideErrorScreen('LINEアプリ内でのみ動作します');
+        return;
       }
       liff.login(); return;
+    }
+
+    // [2026/5/21 P0 + 2026/5/23 第76回判定] ログイン済でも LIFF外なら遮断(二重チェック・500msリトライ付)
+    if (!(await isInClientWithRetry())) {
+      console.warn('[LIFF Guard] Logged in but not in LINE client (after retry). Blocking access.');
+      hideLoading();
+      showLiffOutsideErrorScreen('LINEアプリ内でのみ動作します');
+      return;
     }
 
     // [Phase 0 5-3] auth.js の resolveEoUid を使用してeo_uidを解決
     const _auth = await resolveEoUid(supabase);
     currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, line_name: _auth.displayName, picture_url: _auth.pictureUrl || '', display_name: _auth.displayName };
+
+    // [2026/5/23 案B] リロード耐性のため localStorage に保存(チャッピー第72回判定GO)
+    //   ensureCurrentUser() が JWT 再構築時に参照する
+    try {
+      localStorage.setItem('sl_line_name', _auth.displayName || '');
+      localStorage.setItem('sl_picture_url', _auth.pictureUrl || '');
+      localStorage.setItem('sl_display_name', _auth.displayName || '');
+    } catch (e) {
+      console.warn('[init] localStorage save failed (continue):', e?.message);
+    }
 
     // ── 友達登録チェック（LINEアプリ内のみ） ──
     if (liff.isInClient()) {
@@ -1365,10 +3066,50 @@ async function restoreSession(memberId, groupId) {
   try {
     const { data: member } = await supabase
       .from('group_members').select('*, group_sessions(*)').eq('id', memberId).single();
-    if (!member) { localStorage.clear(); hideLoading(); showScreen('screen-start'); return; }
+    if (!member) { clearEdgeOpsLocalStorage(); hideLoading(); showScreen('screen-start'); return; }
     // [Phase 0 後 追加] 退出済みメンバー(left)は localStorage クリアして起動画面へ(チャッピー承認済み)
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
     if (member.status === 'left') {
-      localStorage.clear();
+      clearEdgeOpsLocalStorage();
+      hideLoading();
+      showScreen('screen-start');
+      return;
+    }
+    // ═══════════════════════════════════════════
+    // [チャッピー第86回判定 案(a) GO・2026-05-25]
+    // 却下された本人の LIFF 起動時挙動(サイレント却下・通知なし)
+    // - 他に approved グループあれば → 最新1件に自動切替 + 柔らかいトースト
+    // - 他になければ → screen-start(localStorage クリア)
+    // - 「却下されました」とは絶対に表示しない(人間関係摩擦回避)
+    // - 現状の脱退時動作(L5587-L5618)と一貫したロジック
+    // ═══════════════════════════════════════════
+    if (member.status === 'rejected') {
+      try {
+        const { data: remainingMemberships } = await supabase
+          .from('group_members').select('id, group_session_id, group_sessions(*)')
+          .eq('eo_uid', currentUser.eo_uid).eq('status', 'approved')
+          .order('created_at', { ascending: false }).limit(1);
+        if (remainingMemberships && remainingMemberships.length > 0) {
+          const next = remainingMemberships[0];
+          currentMemberId = next.id;
+          currentGroup = next.group_sessions;
+          localStorage.setItem('sl_member_id', next.id);
+          localStorage.setItem('sl_group_id', next.group_sessions.group_id);
+          const [creatorResult] = await Promise.all([
+            resolveIsCreator(next.group_session_id, next.id),
+            loadHome()
+          ]);
+          isCreator = creatorResult;
+          hideLoading();
+          showScreen('screen-home');
+          showToast(`参加中のグループに切り替えました`);
+          return;
+        }
+      } catch (err) {
+        console.warn('rejected 後の他グループ取得失敗・screen-start にフォールバック:', err);
+      }
+      // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+      clearEdgeOpsLocalStorage();
       hideLoading();
       showScreen('screen-start');
       return;
@@ -1384,7 +3125,8 @@ async function restoreSession(memberId, groupId) {
       // ST版(SL-)の期限切れチェック
       if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
         if (new Date(currentGroup.expires_at) <= new Date()) {
-          localStorage.clear();
+          // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+          clearEdgeOpsLocalStorage();
           hideLoading();
           const notice = document.getElementById('start-expiry-notice');
           if (notice) notice.style.display = 'block';
@@ -1401,7 +3143,10 @@ async function restoreSession(memberId, groupId) {
       hideLoading();
       showScreen('screen-home'); return;
     }
-  } catch (e) { localStorage.clear(); hideLoading(); showScreen('screen-start'); }
+  } catch (e) {
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+    clearEdgeOpsLocalStorage(); hideLoading(); showScreen('screen-start');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1500,6 +3245,21 @@ async function recheckFriendship() {
 // グループ作成・参加
 // ═══════════════════════════════════════════
 async function createGroup() {
+  await assertLiffEnvironment();
+  // [2026/5/27 β6対処] 「サイネージとして利用する」チェックON時は新規グループ作成を阻害
+  //   サイネージ端末はグループ作成者になるべきではない(設計書 §15-5 準拠)
+  //   ユーザーが誤ってチェックONのまま「新規グループを作る」を押した場合に阻害
+  const isSignageChecked = document.getElementById('join-is-signage')?.checked || false;
+  if (isSignageChecked) {
+    showToast('サイネージとして新規グループは作成できません。チェックを外してください。');
+    return;
+  }
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) {
+    showToast('認証エラーです。アプリを再起動してください。');
+    return;
+  }
   const displayName = document.getElementById('input-display-name').value.trim();
   const industryVal = document.getElementById('input-industry').value;
   const groupNameVal = document.getElementById('input-group-name').value.trim();
@@ -1508,108 +3268,193 @@ async function createGroup() {
   // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(孤児グループ作成防止)
   const restored = await restoreExistingMembershipIfAny();
   if (restored) return;
+
+  // ═══════════════════════════════════════════
+  // [2026/5/23 案あ] RPC化でgroup_sessions + group_members を同一トランザクション化
+  //   (チャッピー第74回判定GO)
+  //   背景:第73回判定後にhas_creator(_gid uuid)の実装が「メンバー存在判定」と判明し、
+  //         単純なRLS Policy修正では .insert().select().single() の SELECT 0行問題を
+  //         解決できないため、SECURITY DEFINER RPC関数で同一トランザクション化
+  //   設計:
+  //     - 関数内で current_eo_uid() を取得・他人になりすませない
+  //     - public.users 存在確認 / group_id 重複確認 / 入力バリデーション込
+  //     - 戻り値はjsonbで group_session_id・member_id 等を返却
+  // ═══════════════════════════════════════════
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
     const expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);
     const regionVal = document.getElementById('input-region').value;
-    const insertData = { group_id: groupId, expires_at: expiresAt.toISOString(), max_members: 50, industry: industryVal };
-    if (groupNameVal) insertData.group_name = groupNameVal;
-    if (regionVal) insertData.region = regionVal;
-    const { data: group, error: groupError } = await supabase
-      .from('group_sessions').insert(insertData).select().single();
-    if (groupError) throw groupError;
-    const { data: member, error: memberError } = await supabase
-      .from('group_members').insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'approved', is_creator: true }).select().single();
-    if (memberError) throw memberError;
-    localStorage.setItem('sl_member_id', member.id);
-    localStorage.setItem('sl_group_id', groupId);
-    currentUser.display_name = displayName; currentGroup = group; currentMemberId = member.id; isCreator = true;
-    await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
-  } catch (e) { console.error(e); showToast('エラーが発生しました。再試行してください。'); }
-}
 
+    const { data: result, error: rpcError } = await supabase.rpc(
+      'create_group_with_creator',
+      {
+        p_display_name: displayName,
+        p_industry: industryVal,
+        p_group_id: groupId,
+        p_group_name: groupNameVal || null,
+        p_region: regionVal || null,
+        p_expires_at: expiresAt.toISOString(),
+        p_max_members: 50
+      }
+    );
+    if (rpcError) {
+      console.error('[createGroup] RPC error:', rpcError.code, rpcError.message);
+      throw rpcError;
+    }
+    if (!result) {
+      console.error('[createGroup] RPC returned null');
+      throw new Error('RPC returned null');
+    }
+
+    // RPC戻り値(jsonb):
+    //   { group_session_id (uuid), group_id (SL-形式), group_name, industry, region,
+    //     member_id (uuid), display_name, eo_uid, is_creator, status }
+    localStorage.setItem('sl_member_id', result.member_id);
+    localStorage.setItem('sl_group_id', result.group_id);
+    currentUser.display_name = displayName;
+    currentGroup = {
+      id: result.group_session_id,
+      group_id: result.group_id,
+      group_name: result.group_name,
+      industry: result.industry,
+      region: result.region,
+      expires_at: expiresAt.toISOString(),
+      max_members: 50
+    };
+    currentMemberId = result.member_id;
+    isCreator = true;
+    // [2026/5/23 案B 追加] 作成成功時にも sl_display_name 更新(チャッピー第72回判定GO)
+    try { localStorage.setItem('sl_display_name', displayName || ''); } catch (_) {}
+    await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
+  } catch (e) {
+    console.error(e);
+    showToast('エラーが発生しました。再試行してください。');
+  }
+}
 async function joinGroup() {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   const displayName = document.getElementById('input-display-name').value.trim();
   const groupIdInput = document.getElementById('input-group-id').value.trim().toUpperCase();
   if (!displayName) { showToast('表示名を入力してください'); return; }
   if (!groupIdInput) { showToast('グループIDを入力してください'); return; }
-  // [2026/5/14 追加] 学び13 対策A:既存所属あれば自動復帰(二重所属防止)
-  const restored = await restoreExistingMembershipIfAny();
-  if (restored) return;
-  // ★ v1.3 Step 6: 20グループ上限チェック(チャッピーレビュー反映)
-  // status は 'approved' と 'pending' の両方をカウント(申請大量化攻撃を防ぐ)
+
+  // [2026/5/27 チャッピー第88回判定 案(a) GO]
+  //   「📺 サイネージ端末として参加する」チェックボックス値を取得
+  //   設計書 v27.7 §11-6 ステップ6 通りに RPC へ反映する
+  //   第75回判定の「p_is_signage=true 拒否」条件は撤回・改訂(2026/5/27)
+  const isSignage = document.getElementById('join-is-signage')?.checked || false;
+
+  // ═══════════════════════════════════════════
+  // [2026/5/23 案(B)] joinGroup を RPC化(チャッピー第75回判定GO・第88回判定で条件2撤回)
+  //   背景:
+  //     ・restoreExistingMembershipIfAny()(学び13対策A)を joinGroup から削除
+  //       → joinGroup は新規グループ作成しないため孤児リスクなし・複数グループまたぎ対応
+  //     ・group_members.insert().select().single() のSELECT 0行問題を構造的に解決
+  //     ・全ロジック(20件上限・既存所属分岐・left再参加・新規pending INSERT)を
+  //       join_group_with_member RPC関数に集約・同一トランザクション化
+  //   チャッピー第75回判定の修正条件:
+  //     ・20件上限チェックは既存所属確認の後(新規参加時のみ評価)→維持
+  //     ・p_is_signage=true は SIGNAGE_JOIN_NOT_SUPPORTED 例外で拒否
+  //       → ★第88回判定で撤回(2026/5/27)・設計書 v27.7 §11-6 ステップ6 を正本として復活
+  //     ・全 action 戻り値に industry/region 含む → 再SELECT 不要→維持
+  // ═══════════════════════════════════════════
+
   try {
-    const { count: myGroupCount, error: countError } = await supabase
-      .from('group_members')
-      .select('id', { count: 'exact', head: true })
-      .eq('eo_uid', currentUser.eo_uid)
-      .in('status', ['approved', 'pending']);
-    if (countError) {
-      showToast('参加可能グループ数の確認に失敗しました');
+    showToast('参加申請中...');
+
+    const { data: result, error: rpcError } = await supabase.rpc(
+      'join_group_with_member',
+      {
+        p_group_id: groupIdInput,
+        p_display_name: displayName,
+        p_is_signage: isSignage  // チェックボックス値(第88回判定・設計書 v27.7 §11-6 ステップ6)
+      }
+    );
+
+    if (rpcError) {
+      console.error('[joinGroup] RPC error:', rpcError.code, rpcError.message);
+      const msg = rpcError.message || '';
+      if (msg.includes('GROUP_NOT_FOUND_OR_EXPIRED')) {
+        showToast('グループが見つかりません。IDを確認してください。');
+      } else if (msg.includes('TOO_MANY_GROUPS')) {
+        alert('所属しすぎですね!\n参加できるグループは最大20までです。\n(申請中のグループも含む)\nプロフィール画面で不要なグループから退出してから再度お試しください。');
+      } else if (msg.includes('GROUP_FULL')) {
+        showToast('このグループは満員です（最大50名）');
+      } else if (msg.includes('USER_NOT_FOUND')) {
+        showToast('ユーザー情報が見つかりません。アプリを再起動してください。');
+      } else if (msg.includes('AUTH_REQUIRED')) {
+        showToast('認証エラーです。アプリを再起動してください。');
+      } else {
+        // [2026/5/27 課題① 真因究明用エラー詳細表示・チャッピー第89回判定 Q2 GO]
+        // console には詳細・トーストには短めに(α2 統合究明用の観測点)
+        console.error('[joinGroup] UNCAUGHT RPC error - code:', rpcError.code, 'message:', rpcError.message, 'details:', rpcError.details, 'hint:', rpcError.hint, 'full:', JSON.stringify(rpcError));
+        showToast(`参加処理でエラーが発生しました: ${rpcError.code || rpcError.message || 'UNKNOWN'}`);
+      }
       return;
     }
-    if (myGroupCount >= 20) {
-      alert('所属しすぎですね!\n参加できるグループは最大20までです。\n(申請中のグループも含む)\nプロフィール画面で不要なグループから退出してから再度お試しください。');
+
+    if (!result) {
+      console.error('[joinGroup] RPC returned null');
+      showToast('エラーが発生しました。再試行してください。');
       return;
     }
+
+    // RPC戻り値(jsonb)の action による分岐
+    const currentGroupObj = {
+      id: result.group_session_id,
+      group_id: result.group_id,
+      group_name: result.group_name,
+      industry: result.industry,
+      region: result.region
+    };
+
+    if (result.action === 'already_approved') {
+      // 既に承認済 → そのグループに切替・screen-home 表示
+      localStorage.setItem('sl_member_id', result.member_id);
+      localStorage.setItem('sl_group_id', result.group_id);
+      currentUser.display_name = result.display_name;
+      currentGroup = currentGroupObj;
+      currentMemberId = result.member_id;
+      isCreator = result.is_creator === true;
+      await loadHome();
+      showScreen('screen-home');
+      showToast('既に参加しているグループです');
+      return;
+    }
+
+    if (result.action === 'already_pending') {
+      // 既に申請中 → screen-pending 表示
+      localStorage.setItem('sl_member_id', result.member_id);
+      localStorage.setItem('sl_group_id', result.group_id);
+      currentMemberId = result.member_id;
+      document.getElementById('pending-group-id').textContent = result.group_id;
+      showScreen('screen-pending');
+      showToast('既に参加申請中です。承認をお待ちください。');
+      return;
+    }
+
+    if (result.action === 'rejoined' || result.action === 'new_request') {
+      // 再参加 または 新規参加申請 → screen-pending 表示
+      localStorage.setItem('sl_member_id', result.member_id);
+      localStorage.setItem('sl_group_id', result.group_id);
+      currentMemberId = result.member_id;
+      document.getElementById('pending-group-id').textContent = result.group_id;
+      showScreen('screen-pending');
+      showToast('参加申請を送りました。承認をお待ちください。');
+      return;
+    }
+
+    // 想定外の action
+    console.warn('[joinGroup] unexpected action:', result.action);
+    showToast('予期せぬ応答です。再試行してください。');
   } catch (e) {
-    console.error('20グループ上限チェック失敗:', e);
-    showToast('参加可能グループ数の確認に失敗しました');
-    return;
+    console.error(e);
+    showToast('エラーが発生しました。再試行してください。');
   }
-  try {
-    showToast('グループを検索中...');
-    const { data: group, error } = await supabase
-      .from('group_sessions').select('*').eq('group_id', groupIdInput).gt('expires_at', new Date().toISOString()).single();
-    if (error || !group) { showToast('グループが見つかりません。IDを確認してください。'); return; }
-    const { count } = await supabase.from('group_members').select('*', { count: 'exact', head: true })
-      .eq('group_session_id', group.id).eq('status', 'approved');
-    if (count >= group.max_members) { showToast('このグループは満員です（最大50名）'); return; }
-    const { data: existing } = await supabase.from('group_members').select('*')
-      .eq('group_session_id', group.id).eq('eo_uid', currentUser.eo_uid).maybeSingle();
-    if (existing) {
-      if (existing.status === 'approved') {
-        localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
-        currentUser.display_name = existing.display_name; currentGroup = group; currentMemberId = existing.id;
-        isCreator = await resolveIsCreator(group.id, existing.id);
-        await loadHome(); showScreen('screen-home'); return;
-      }
-      if (existing.status === 'pending') {
-        localStorage.setItem('sl_member_id', existing.id); localStorage.setItem('sl_group_id', groupIdInput);
-        document.getElementById('pending-group-id').textContent = groupIdInput;
-        showScreen('screen-pending'); return;
-      }
-      // [Phase 0 後 追加] 退出済みメンバーの再参加処理(チャッピー承認済み)
-      if (existing.status === 'left') {
-        const isSignage = document.getElementById('join-is-signage')?.checked || false;
-        const { error: rejoinError } = await supabase.from('group_members')
-          .update({
-            status: 'pending',
-            display_name: displayName,
-            is_signage: isSignage,
-            approved_at: null
-          })
-          .eq('id', existing.id);
-        if (rejoinError) throw rejoinError;
-        localStorage.setItem('sl_member_id', existing.id);
-        localStorage.setItem('sl_group_id', groupIdInput);
-        currentMemberId = existing.id;
-        document.getElementById('pending-group-id').textContent = groupIdInput;
-        showScreen('screen-pending');
-        showToast('参加申請を送りました。承認をお待ちください。');
-        return;
-      }
-    }
-    const isSignage = document.getElementById('join-is-signage')?.checked || false;
-    const { data: member, error: memberError } = await supabase.from('group_members')
-      .insert({ group_session_id: group.id, eo_uid: currentUser.eo_uid, display_name: displayName, status: 'pending', is_signage: isSignage }).select().single();
-    if (memberError) throw memberError;
-    localStorage.setItem('sl_member_id', member.id); localStorage.setItem('sl_group_id', groupIdInput);
-    currentMemberId = member.id;
-    document.getElementById('pending-group-id').textContent = groupIdInput;
-    showScreen('screen-pending'); showToast('参加申請を送りました。承認をお待ちください。');
-  } catch (e) { console.error(e); showToast('エラーが発生しました。'); }
 }
 
 async function checkApproval() {
@@ -1631,6 +3476,40 @@ async function cancelRequest() {
   try {
     await supabase.from('group_members').delete().eq('id', currentMemberId);
     currentMemberId = null;
+
+    // ═══════════════════════════════════════════
+    // [2026-05-25 バグ修正] 申請取消後の他グループ自動切替
+    // - 脱退時動作(L5587-L5618)と同型のロジック
+    // - 他に approved グループあれば最新1件に自動切替
+    // - なければ screen-start
+    // ═══════════════════════════════════════════
+    try {
+      const { data: remainingMemberships } = await supabase
+        .from('group_members').select('id, group_session_id, group_sessions(*)')
+        .eq('eo_uid', currentUser.eo_uid).eq('status', 'approved')
+        .order('created_at', { ascending: false }).limit(1);
+      if (remainingMemberships && remainingMemberships.length > 0) {
+        const next = remainingMemberships[0];
+        currentMemberId = next.id;
+        currentGroup = next.group_sessions;
+        localStorage.setItem('sl_member_id', next.id);
+        localStorage.setItem('sl_group_id', next.group_sessions.group_id);
+        const [creatorResult] = await Promise.all([
+          resolveIsCreator(next.group_session_id, next.id),
+          loadHome()
+        ]);
+        isCreator = creatorResult;
+        showScreen('screen-home');
+        showToast('参加中のグループに切り替えました');
+        return;
+      }
+    } catch (err) {
+      console.warn('申請取消後の他グループ取得失敗・screen-start にフォールバック:', err);
+    }
+
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+    clearEdgeOpsLocalStorage();
+    currentGroup = null;
     showToast('申請を取り消しました / Request cancelled');
     showScreen('screen-start');
   } catch (e) { showToast('取り消し中にエラーが発生しました。'); }
@@ -1674,10 +3553,10 @@ function updateExpiryWarningBar() {
 }
 
 async function loadHome() {
-  // グループ名があればヘッダーに表示、なければグループIDを表示
-  const groupLabel = currentGroup.group_name
-    ? currentGroup.group_name + '　(' + currentGroup.group_id + ')'
-    : currentGroup.group_id;
+  // [UI改善 2026/5/23] グループ名のみヘッダーに表示・グループIDは削除
+  //   理由:グループまたぎ時の視認性向上・グループID はプロフィール画面で確認可能
+  //   group_name が未設定(NULL/空)の場合は「(グループ名未設定)」と表示
+  const groupLabel = currentGroup.group_name || '(グループ名未設定)';
   document.getElementById('home-group-id-display').textContent = groupLabel;
   document.getElementById('profile-group-id').textContent = currentGroup.group_id;
   document.getElementById('profile-name').textContent = currentUser.display_name;
@@ -1697,6 +3576,9 @@ async function loadHome() {
   } else {
     vacanBtn.style.display = 'none';
   }
+
+  // [UI改善② LINKボタン] currentGroup.link_url が設定されているグループのみLINKボタン表示
+  updateLinkButton();
 
   // is_signage=trueのメンバーのみサイネージボタンを表示
   const signageBtn = document.getElementById('signage-btn');
@@ -1724,7 +3606,7 @@ function openSignage() {
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
     liff.openWindow({ url: url, external: true });
   } else {
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -1733,7 +3615,7 @@ function openVacanMap() {
   if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
     liff.openWindow({ url: url, external: true });
   } else {
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
@@ -1782,6 +3664,22 @@ async function loadMessages() {
     // （サイネージ端末が参加前にread_countが加算されたズレを防ぐ）
     // ★ EdgeOps受信対象モデル R(M)/K(M) 準拠（v7.17 第18章 / v1.14 第21章）
     //    送信時に未参加だったメンバーの既読は read_count に加算しない
+    // ════════════════════════════════════════════════════════════
+    // [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // A. 分母は送信時点で approved だった人間メンバーのみ
+    // B. サイネージ端末(is_signage=true)は分母・分子から除外
+    // C. 送信者は分母から除外
+    // D. 送信後参加(created_at > item.created_at)は分母から除外
+    // E. 退出済(status='left')は分子から除外
+    // G. created_at が NULL の既存データは「参加済み」として扱う
+    // ※index.html / signage.html の計6箇所で同一仕様を維持
+    //    ① index.html リスト集計(メッセージ)        L2935-2967
+    //    ①' index.html リスト集計(引き継ぎ)         L2970-2982
+    //    ② index.html メッセージ詳細                L3704-3740
+    //    ③ index.html 引き継ぎ詳細                  L3601-3683
+    //    ④ signage.html リスト集計                  L1080-1151
+    //    ⑤ signage.html 詳細モーダル                L1239-1290
+    // ════════════════════════════════════════════════════════════
     if (messages.length > 0) {
       const msgIds = messages.map(m => m.id);
       const { data: receipts } = await supabase.from('read_receipts')
@@ -1818,11 +3716,36 @@ async function loadMessages() {
     }
 
     // ホーム画面でも引き継ぎの確認状態を正しく表示するためconfirmationsを取得
+    // ════════════════════════════════════════════════════════════
+    // [確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // 仕様 A〜E・G を適用(上記コメント参照)
+    // - サイネージ端末・送信者・送信時点未参加者を分子から除外
+    // ════════════════════════════════════════════════════════════
     if (handoverNotes.length > 0) {
       const hwIds = handoverNotes.map(n => n.id);
       const { data: hwConfs } = await supabase.from('handover_confirmations').select('*').in('handover_id', hwIds);
+      // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
+      const { data: allMembersForHw } = await supabase.from('group_members')
+        .select('eo_uid, created_at, is_signage')
+        .eq('group_session_id', currentGroup.id);
+      const signageUidsHw = new Set((allMembersForHw || []).filter(m => m.is_signage).map(m => m.eo_uid));
+      const memberJoinedAtHw = new Map();
+      (allMembersForHw || []).forEach(m => {
+        memberJoinedAtHw.set(m.eo_uid, new Date(m.created_at).getTime());
+      });
+      // 引き継ぎIDごとの送信時刻・送信者マップ
+      const hwCreatedAtMap = {};
+      const hwSenderMap = {};
+      handoverNotes.forEach(h => {
+        hwCreatedAtMap[h.id] = new Date(h.created_at).getTime();
+        hwSenderMap[h.id] = h.sender_eo_uid;
+      });
       const confirmMap = {};
       (hwConfs || []).forEach(c => {
+        if (signageUidsHw.has(c.eo_uid)) return;                          // B: サイネージ除外
+        if (hwSenderMap[c.handover_id] === c.eo_uid) return;              // C: 送信者除外
+        const joinedAt = memberJoinedAtHw.get(c.eo_uid);
+        if (joinedAt !== undefined && joinedAt > hwCreatedAtMap[c.handover_id]) return; // D: 送信時点フィルタ
         if (!confirmMap[c.handover_id]) confirmMap[c.handover_id] = [];
         confirmMap[c.handover_id].push(c);
       });
@@ -1852,6 +3775,7 @@ async function loadMessages() {
     }
 
     renderMessages();
+    preloadMessageImageUrls(messages); // ★ 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
     const badge = document.getElementById('approval-badge');
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
     else { badge.style.display = 'none'; }
@@ -1990,9 +3914,13 @@ function renderMessages() {
       const surveyLabel = isSurvey
         ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>${surveyDeadlineLabel}`
         : '';
+      // [チャッピー第60-3回判定 解釈β] 連絡サムネ廃止・📷画像ありバッジ(priority-badge右横・サイネージと同配置)
+      const imageLabel = (msg.image_url || msg.thumbnail_url)
+        ? `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`
+        : '';
       html += `
         <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
-          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}
+          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}${imageLabel}
           <div class="msg-title">${getMessageTitle(msg.body, 40)}</div>
           <div class="msg-meta">${senderName}　${timeStr}</div>
           <div class="msg-read-bar">
@@ -2007,6 +3935,8 @@ function renderMessages() {
   });
 
   container.innerHTML = html;
+  // [Phase 4-2F] サムネを IntersectionObserver に登録 (画面内に入った時のみ署名URL取得)
+  try { observeImageThumbnails(container); } catch (_) {}
 }
 
 function toggleMonth(id) {
@@ -2139,6 +4069,9 @@ function applyComposeType(type) {
   if (sendBtn) sendBtn.textContent = isMsgActive ? '📢 送信する / Send' : '📋 引き継ぎを投稿する';
   // アンケートセクションは「通常メッセージ」かつ「グループ管理者」のときのみ表示
   applySurveyVisibility(isMsgActive);
+  // [Phase 4-2C] タイプ切替時に画像ボタン表示制御＆選択中画像をクリア(context変更で画像保持は不自然)
+  try { _resetPendingImage(); } catch (_) {}
+  try { applyImageUploadButtonVisibility(); } catch (_) {}
 }
 
 // アンケートセクションの表示制御（グループ管理者かつ通常メッセージ作成時のみ表示）
@@ -2194,8 +4127,21 @@ function selectPriority(p) {
 }
 
 async function sendMessage() {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   const body = document.getElementById('compose-body').value.trim();
   if (!body) { showToast('内容を入力してください'); return; }
+
+  // ◀━━ [Phase 4-2E] 画像選択時は専用フローへ分岐(既存ロジック1行も変更しない) ━━▶
+  // チャッピー第49回判定条件(I): bodyチェック後・handover分岐前で分岐
+  // 重要: sendImageMessage失敗時に本文だけ通常sendMessageへフォールバック「しない」
+  //       失敗時は本文・画像を入力欄に残す(チャッピー条件V・本文ドラフト保存)
+  if (window.__pendingImageFile) {
+    return await sendImageMessage();
+  }
+  // ◀━━ [Phase 4-2E] 追加ここまで ━━▶
 
   if (selectedComposeType === 'handover') {
     // 引き継ぎノート投稿
@@ -2292,7 +4238,14 @@ async function updateHandoverBadge() {
       targetNotes = notes;
     } else {
       // スタッフ：自分が投稿した未確認のみ表示
-      targetNotes = notes.filter(n => n.sender_eo_uid === currentUser.eo_uid);
+      // [2026/5/25 1人グループ論理破綻対応 / チャッピー第86回判定GO]
+      // 自分以外の人間メンバーが0人の場合、確認依頼先が存在しないためバナー対象なし
+      const otherHumanMembers = members.filter(m =>
+        !m.is_signage && m.eo_uid !== currentUser.eo_uid
+      );
+      targetNotes = otherHumanMembers.length === 0
+        ? []
+        : notes.filter(n => n.sender_eo_uid === currentUser.eo_uid);
     }
 
     if (targetNotes.length === 0) {
@@ -2368,6 +4321,7 @@ async function loadHandoverNotes() {
     });
     html += '</div>';
     container.innerHTML = html;
+    preloadMessageImageUrls(handoverNotes); // ★ 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
   } catch(e) { console.error(e); }
 }
 
@@ -2399,9 +4353,10 @@ function renderHandoverCardHtml(hw, confs, myConf) {
   } else {
     statusHtml = `<div class="handover-unconfirmed">⚠️ 未確認${confirmNames ? '（確認済：' + escHtml(confirmNames) + '）' : ''}</div>`;
   }
+  // [チャッピー第60-3回判定 解釈β] 引き継ぎ側も📷画像あり配置をサイネージと統一(priority-badge右横)
   return `
     <div class="handover-card priority-${p}" onclick="showHandoverDetail('${hw.id}')">
-      <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>
+      <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>${renderHandoverImageLabel(hw)}
       <div class="msg-title">${getMessageTitle(hw.content||'', 40)}</div>
       <div class="msg-meta">${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}</div>
       ${statusHtml}
@@ -2428,6 +4383,8 @@ function renderHandoverInline(container) {
   });
   html += '</div>';
   container.innerHTML = html;
+  // [Phase 4-2F] 引き継ぎサムネを IntersectionObserver に登録
+  try { observeImageThumbnails(container); } catch (_) {}
 }
 
 async function showHandoverDetail(handoverId) {
@@ -2441,10 +4398,50 @@ async function showHandoverDetail(handoverId) {
     document.getElementById('hw-detail-title').textContent = pLabels[hw.priority] || '引き継ぎ詳細';
     document.getElementById('hw-detail-meta').textContent = `${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}`;
     document.getElementById('hw-detail-body').innerHTML = linkify(hw.content || '');
+    // [Phase 4-2F] 引き継ぎ画像表示
+    try { _renderDetailImage(hw, 'hw-detail-image-wrap', 'hw-detail-image-thumb', 'hw-detail-image-status'); } catch (_) {}
+    // [Phase 4-2H] 削除ボタンの表示制御
+    window.__currentHandoverId = hw.id;
+    (async function() {
+      const delBtn = document.getElementById('hw-detail-image-delete-btn');
+      if (!delBtn) return;
+      const isOwner = hw.sender_eo_uid === currentUser.eo_uid;
+      const hasImage = hw.image_mode === 'attached' && (hw.image_url || hw.thumbnail_url);
+      if (!isOwner || !hasImage) { delBtn.style.display = 'none'; return; }
+      const enabled = await isImageDeleteEnabled();
+      delBtn.style.display = enabled ? 'inline-block' : 'none';
+    })();
 
     // 確認情報を取得
+    // ════════════════════════════════════════════════════════════
+    // [確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+    // 仕様 A〜E・G を適用(loadHome内コメント参照)
+    // - サイネージ端末・送信者・送信時点未参加者を分子(validConfs)から除外
+    // - 未確認リストも eligibleMembers(送信時点で在籍していた人間メンバー)から算出
+    // ════════════════════════════════════════════════════════════
     const { data: confs } = await supabase.from('handover_confirmations').select('*').eq('handover_id', handoverId);
-    const myConf = (confs || []).find(c => c.eo_uid === currentUser.eo_uid);
+
+    // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
+    const { data: allMembersForHwDetail } = await supabase.from('group_members')
+      .select('eo_uid, created_at, is_signage, status')
+      .eq('group_session_id', currentGroup.id);
+    const signageUidsHwDetail = new Set((allMembersForHwDetail || []).filter(m => m.is_signage).map(m => m.eo_uid));
+    const memberJoinedAtHwDetail = new Map();
+    (allMembersForHwDetail || []).forEach(m => {
+      memberJoinedAtHwDetail.set(m.eo_uid, new Date(m.created_at).getTime());
+    });
+    const hwCreatedAtMs = new Date(hw.created_at).getTime();
+
+    // 確認データをフィルタ適用後の validConfs に変換
+    const validConfs = (confs || []).filter(c => {
+      if (signageUidsHwDetail.has(c.eo_uid)) return false;                // B: サイネージ除外
+      if (c.eo_uid === hw.sender_eo_uid) return false;                    // C: 送信者除外
+      const joinedAt = memberJoinedAtHwDetail.get(c.eo_uid);
+      if (joinedAt !== undefined && joinedAt > hwCreatedAtMs) return false; // D: 送信時点フィルタ
+      return true;
+    });
+
+    const myConf = validConfs.find(c => c.eo_uid === currentUser.eo_uid);
     const confirmedList = document.getElementById('hw-confirmed-list');
     const unconfirmedList = document.getElementById('hw-unconfirmed-list');
     const confirmArea = document.getElementById('hw-confirm-area');
@@ -2454,14 +4451,30 @@ async function showHandoverDetail(handoverId) {
       .eq('group_session_id', currentGroup.id).eq('status', 'approved');
     const allMembers = latestMembers || [];
 
+    // 送信時点で在籍していた人間メンバー = 分母対象
+    const eligibleMembers = allMembers.filter(m => {
+      if (m.is_signage === true) return false;                            // B
+      if (m.eo_uid === hw.sender_eo_uid) return false;                    // C
+      const joinedAt = memberJoinedAtHwDetail.get(m.eo_uid);
+      if (joinedAt !== undefined && joinedAt > hwCreatedAtMs) return false; // D
+      return true;
+    });
+
     // 誰かがすでに「引き継ぎました」または「対応しました」を押していたら完了済み
-    const isCompleted = (confs || []).some(c => c.action === 'takeover' || c.action === 'done');
-    const completedConf = (confs || []).find(c => c.action === 'takeover' || c.action === 'done');
+    // (サイネージZの汚染データは validConfs で除外済)
+    const isCompleted = validConfs.some(c => c.action === 'takeover' || c.action === 'done');
+    const completedConf = validConfs.find(c => c.action === 'takeover' || c.action === 'done');
 
     // 確認ボタン：投稿者本人・完了済み・自分が確認済みの場合はボタン非表示
+    // [チャッピー第56回判定確定] 送信時点で未参加だった場合もボタン非表示
     const isSender = hw.sender_eo_uid === currentUser.eo_uid;
+    const myMember = allMembers.find(m => m.eo_uid === currentUser.eo_uid);
+    const canWrite = wasMemberAtItemCreated(myMember, hw.created_at);
     if (isSender) {
       confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #66bb6a; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#2e7d32; margin-bottom:10px;">📋 自分が投稿した引き継ぎです</div>`;
+    } else if (!canWrite) {
+      // 送信時点で未参加だった新規参加者
+      confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #90caf9; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#1565c0; margin-bottom:10px;">📋 あなたの参加前の引き継ぎです<br><span style="font-size:11px; color:#1976d2;">内容は確認できますが、確認・対応操作の対象外です。</span></div>`;
     } else if (isCompleted) {
       // 誰かが完了済み→ボタンをロック・完了済みバナーを表示
       const completedLabel = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
@@ -2476,26 +4489,29 @@ async function showHandoverDetail(handoverId) {
       `;
     }
 
-    // 確認済みメンバー
-    const confirmedUids = new Set((confs || []).map(c => c.eo_uid));
-    if ((confs || []).length > 0) {
-      confirmedList.innerHTML = (confs || []).map(c =>
+    // 確認済みメンバー(validConfsベース)
+    const confirmedUids = new Set(validConfs.map(c => c.eo_uid));
+    if (validConfs.length > 0) {
+      confirmedList.innerHTML = validConfs.map(c =>
         `<div class="person-row"><div><div class="person-name">${escHtml(c.display_name)}</div><div class="person-time">${c.action === 'takeover' ? '引き継ぎました' : '対応しました'}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(c.confirmed_at)}</div><div class="check-yes">✅</div></div></div>`
       ).join('');
     } else {
       confirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も確認していません</div>';
     }
 
-    // 未確認メンバー：投稿者本人は除外、残りで未確認の人を表示
-    const unconfirmed = allMembers.filter(m =>
-      m.eo_uid !== hw.sender_eo_uid && !confirmedUids.has(m.eo_uid)
-    );
-    if (unconfirmed.length > 0) {
+    // 未確認メンバー：eligibleMembersから確認済を除外
+    const unconfirmed = eligibleMembers.filter(m => !confirmedUids.has(m.eo_uid));
+    if (eligibleMembers.length === 0) {
+      // [2026/5/25 1人グループ論理破綻対応 / チャッピー第86回判定GO]
+      // 確認対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
+      unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">確認対象のメンバーがいません</div>';
+    } else if (unconfirmed.length > 0) {
       unconfirmedList.innerHTML = unconfirmed.map(m =>
         `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`
       ).join('');
     } else {
-      unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">全員が確認しました ✅</div>';
+      // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
+      unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未確認メンバーはいません</div>';
     }
 
     showScreen('screen-handover-detail');
@@ -2503,8 +4519,26 @@ async function showHandoverDetail(handoverId) {
 }
 
 async function confirmHandover(action) {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   if (!currentHandoverId) return;
   try {
+    // ════════════════════════════════════════════════════════════
+    // [送信時点ガード / チャッピー第56回判定確定 / 2026-05-18]
+    // 過去引き継ぎ(自分の参加前のもの)に対する書き込みを止める。
+    // 通常 showHandoverDetail でボタン非表示にしているが、関数の
+    // 直呼び出し・ブラウザ戻る等の経路にも備える二重ガード。
+    // ════════════════════════════════════════════════════════════
+    const hwForGuard = handoverNotes.find(n => n.id === currentHandoverId)
+      || (await supabase.from('handover_notes').select('created_at').eq('id', currentHandoverId).single()).data;
+    const myMember = members.find(m => m.eo_uid === currentUser.eo_uid);
+    if (hwForGuard && !wasMemberAtItemCreated(myMember, hwForGuard.created_at)) {
+      console.log('[confirmHandover] skip: joined after handover created');
+      showToast('あなたの参加前の引き継ぎです');
+      return;
+    }
     const { error } = await supabase.from('handover_confirmations').insert({
       handover_id: currentHandoverId,
       eo_uid: currentUser.eo_uid,
@@ -2521,6 +4555,11 @@ async function confirmHandover(action) {
 }
 
 async function showDetail(messageId) {
+  // ════════════════════════════════════════════════════════════
+  // [既読集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+  // 仕様 A〜E・G を適用(loadHome内コメント参照)
+  // ※既存の正解実装が L3727-3733 に存在(joinedAt > msgCreatedAtMs を除外)
+  // ════════════════════════════════════════════════════════════
   const msg = messages.find(m => m.id === messageId);
   if (!msg) return;
   currentDetailMessageId = messageId; // 削除用に保持
@@ -2551,15 +4590,41 @@ async function showDetail(messageId) {
     return true;
   });
   const readUids = new Set(validReads.map(r => r.eo_uid));
-  // 送信者・サイネージ端末を除いた受信者リスト
+  // 送信者・サイネージ端末・送信時点未参加メンバーを除いた受信者リスト
   // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
-  const receivers = members.filter(m => m.eo_uid !== msg.sender_eo_uid && !m.is_signage);
+  // ════════════════════════════════════════════════════════════
+  // [未読リスト分母仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+  // B: サイネージ除外 / C: 送信者除外 / D: 送信時点未参加除外
+  // ※ 数値(totalMembers)は msg.receiver_count を優先利用、
+  //    名前リスト(unreadMembers)は receivers から派生するため
+  //    receivers 自体に送信時点フィルタを適用する必要がある
+  // ════════════════════════════════════════════════════════════
+  const receivers = members.filter(m => {
+    if (m.eo_uid === msg.sender_eo_uid) return false;                          // C
+    if (m.is_signage) return false;                                            // B
+    const joinedAt = detailMemberJoinedAt.get(m.eo_uid);
+    if (joinedAt !== undefined && joinedAt > msgCreatedAtMs) return false;     // D
+    return true;
+  });
   const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
   const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
   document.getElementById('detail-title').textContent = getMessageTitle(msg.body, 20);
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
+  // [Phase 4-2F] 画像表示(画像ありメッセージのみ・サムネを即時取得)
+  try { _renderDetailImage(msg, 'detail-image-wrap', 'detail-image-thumb', 'detail-image-status'); } catch (_) {}
+  // [Phase 4-2H] 削除ボタンの表示制御(自分が送信者かつ image_mode='attached' かつ feature_flags.image_delete=ON)
+  window.__currentDetailMessageId = msg.id;
+  (async function() {
+    const delBtn = document.getElementById('detail-image-delete-btn');
+    if (!delBtn) return;
+    const isOwner = msg.sender_eo_uid === currentUser.eo_uid;
+    const hasImage = msg.image_mode === 'attached' && (msg.image_url || msg.thumbnail_url);
+    if (!isOwner || !hasImage) { delBtn.style.display = 'none'; return; }
+    const enabled = await isImageDeleteEnabled();
+    delBtn.style.display = enabled ? 'inline-block' : 'none';
+  })();
   document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
   document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
   document.getElementById('detail-total-count').textContent = totalMembers;
@@ -2580,10 +4645,15 @@ async function showDetail(messageId) {
     readListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も読んでいません</div>';
   }
   const unreadListEl = document.getElementById('detail-unread-list');
-  if (unreadMembers.length > 0) {
+  if (receivers.length === 0) {
+    // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
+    // 未読対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
+    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">未読対象のメンバーがいません</div>';
+  } else if (unreadMembers.length > 0) {
     unreadListEl.innerHTML = unreadMembers.map(m => `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`).join('');
   } else {
-    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">全員が読みました ✅</div>';
+    // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
+    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未読のメンバーはいません</div>';
   }
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
@@ -2776,11 +4846,51 @@ async function submitSurveyNotApplicable() {
 
 let currentDetailMessageId = null; // 削除用に現在表示中のメッセージIDを保持
 
+// ════════════════════════════════════════════════════════════
+// [書き込み可否判定ヘルパー / チャッピー第56回判定確定 / 2026-05-18]
+// 送信時点で在籍していた人間メンバーかを判定する共通関数。
+// recordRead / confirmHandover / showHandoverDetail から呼び出す。
+//
+// 仕様(チャッピー第55-2回・第56回確定):
+//   - サイネージ端末(is_signage=true) → false
+//   - 未承認(status!=='approved')      → false
+//   - created_at が item.created_at より後(送信時点で未参加) → false
+//   - 上記いずれにも該当しない(送信時点で在籍していた人間) → true
+// ※既存DBに created_at が NULL の行があれば「参加済み扱い」(true)
+//   (チャッピー第56回 NULL救済方針)
+// ════════════════════════════════════════════════════════════
+function wasMemberAtItemCreated(member, itemCreatedAt) {
+  if (!member) return false;
+  if (member.is_signage === true) return false;
+  if (member.status !== 'approved') return false;
+  if (!member.created_at) return true; // 既存データ救済
+  if (!itemCreatedAt) return true;     // 未取得時は閉じない側に倒す
+  const joinedMs = new Date(member.created_at).getTime();
+  const itemMs = new Date(itemCreatedAt).getTime();
+  if (isNaN(joinedMs) || isNaN(itemMs)) return true;
+  return joinedMs <= itemMs;
+}
+
 async function recordRead(messageId) {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  // recordRead は頻繁に呼ばれるが、ensureCurrentUser は currentUser 正常時は即returnする高速設計
+  const u = await ensureCurrentUser();
+  if (!u) return; // recordRead は静かに失敗(トースト出さない・既読は再表示時に再記録される)
   try {
     // サイネージ端末は既読記録しない
     const currentMember = members.find(m => m.eo_uid === currentUser.eo_uid);
     if (currentMember && currentMember.is_signage) return;
+    // ════════════════════════════════════════════════════════════
+    // [送信時点ガード / チャッピー第56回判定確定 / 2026-05-18]
+    // 過去メッセージ(自分の参加前のもの)を開いても read_receipts に
+    // 書き込まない。表示はするが書き込みはしない仕様。
+    // ════════════════════════════════════════════════════════════
+    const msgForGuard = messages.find(m => m.id === messageId);
+    if (msgForGuard && !wasMemberAtItemCreated(currentMember, msgForGuard.created_at)) {
+      console.log('[recordRead] skip: joined after message created');
+      return;
+    }
     const { data: existing } = await supabase.from('read_receipts').select('id')
       .eq('message_id', messageId).eq('eo_uid', currentUser.eo_uid).maybeSingle();
     if (existing) return;
@@ -2808,7 +4918,10 @@ async function loadApprovals() {
     container.innerHTML = pending.map(p => `
       <div class="approval-item">
         <div><div class="approval-name">${escHtml(p.display_name)}</div><div class="approval-time">${formatTime(p.created_at)}</div></div>
-        <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認 / Approve</button>
+        <div style="display:flex; gap:8px; flex-shrink:0;">
+          <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認 / Approve</button>
+          <button class="reject-btn" onclick="rejectMember('${p.id}', '${escHtml(p.display_name)}')" style="background:#9e9e9e; color:white; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">却下 / Reject</button>
+        </div>
       </div>
     `).join('');
   } catch (e) { console.error(e); }
@@ -2817,7 +4930,73 @@ async function loadApprovals() {
 async function approveMember(memberId, displayName) {
   try {
     await supabase.from('group_members').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', memberId);
-    showToast(`${displayName}さんを承認しました`);
+
+    // [2026/5/27 課題② 設計書 §11-6 の盲点解消・チャッピー第89回判定 案(b) GO]
+    // 承認対象が is_signage=true の場合、DB から最新 signage_token を SELECT してから判定
+    // (currentGroup キャッシュが古い場合に新トークン上書きする懸念を回避)
+    // UPDATE 時も .is('signage_token', null) を付けて二重発行防止
+    // この自動発行は「初回発行補助」であり、generateSignageToken の再生成フローとは別扱い
+    const { data: approvedMember } = await supabase
+      .from('group_members')
+      .select('is_signage')
+      .eq('id', memberId)
+      .single();
+    if (approvedMember?.is_signage) {
+      const { data: latestGroup, error: groupFetchError } = await supabase
+        .from('group_sessions')
+        .select('id, signage_token, signage_enabled')
+        .eq('id', currentGroup.id)
+        .single();
+      if (groupFetchError) {
+        console.error('[approveMember] group fetch failed:', groupFetchError);
+        showToast(`${displayName}さんを承認しました(URL確認に失敗)`);
+      } else if (!latestGroup?.signage_token) {
+        // 初回 signage_token 自動発行(DBが NULL の時のみ・二重発行防止)
+        const newToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+        const { error: tokenError } = await supabase
+          .from('group_sessions')
+          .update({ signage_token: newToken, signage_enabled: true })
+          .eq('id', currentGroup.id)
+          .is('signage_token', null);
+        if (!tokenError) {
+          currentGroup.signage_token = newToken;
+          currentGroup.signage_enabled = true;
+          updateSignageUrlDisplay();
+          showToast(`${displayName}さんを承認し、サイネージURLを自動発行しました`);
+        } else {
+          console.error('[approveMember] signage_token auto-issue failed:', tokenError);
+          showToast(`${displayName}さんを承認しました(URL発行は管理者操作が必要です)`);
+        }
+      } else {
+        // 既に signage_token 発行済 → currentGroup を最新化のみ・上書きしない(★第89回判定 Q3 重点)
+        currentGroup.signage_token = latestGroup.signage_token;
+        currentGroup.signage_enabled = latestGroup.signage_enabled;
+        showToast(`${displayName}さんを承認しました`);
+      }
+    } else {
+      showToast(`${displayName}さんを承認しました`);
+    }
+    await loadApprovals(); await loadMessages();
+  } catch (e) { showToast('エラーが発生しました。'); }
+}
+
+// ═══════════════════════════════════════════
+// [チャッピー第86回判定 案(a) GO・2026-05-25]
+// 参加申請の却下機能(サイレント却下・履歴残す)
+// - status='rejected' に変更(履歴残す・DELETE しない)
+// - UPDATE 条件に status='pending' 付加(二重押し・先承認対策・チャッピー指示)
+// - 申請者本人には通知しない(野口さん人間関係摩擦回避方針)
+// - 却下された本人は次回 LIFF 起動時に restoreSession() で他グループ自動切替 or screen-start
+// ═══════════════════════════════════════════
+async function rejectMember(memberId, displayName) {
+  if (!confirm(`${displayName}さんの参加申請を却下しますか?\n本人には通知されません。`)) return;
+  try {
+    await supabase.from('group_members')
+      .update({ status: 'rejected' })
+      .eq('id', memberId)
+      .eq('status', 'pending');
+    showToast(`${displayName}さんを却下しました`);
     await loadApprovals(); await loadMessages();
   } catch (e) { showToast('エラーが発生しました。'); }
 }
@@ -2836,7 +5015,7 @@ async function showMemberList() {
   try {
     const { data: memberList } = await supabase
       .from('group_members')
-      .select('display_name, is_creator, created_at')
+      .select('display_name, is_creator, is_signage, created_at')
       .eq('group_session_id', currentGroup.id)
       .eq('status', 'approved')
       .order('created_at', { ascending: true });
@@ -2844,11 +5023,13 @@ async function showMemberList() {
       content.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:24px;">メンバーがいません</div>';
       return;
     }
+    // [2026/5/27 課題③修正] is_signage=true メンバーに📺バッジ表示
     const html = memberList.map((m, i) => {
-      const badge = m.is_creator ? ' <span style="font-size:11px;background:var(--green);color:white;border-radius:4px;padding:1px 6px;">管理者</span>' : '';
+      const adminBadge = m.is_creator ? ' <span style="font-size:11px;background:var(--green);color:white;border-radius:4px;padding:1px 6px;">管理者</span>' : '';
+      const signageBadge = m.is_signage ? ' <span style="font-size:11px;background:#5c6bc0;color:white;border-radius:4px;padding:1px 6px;">📺サイネージ</span>' : '';
       return `<div style="display:flex;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">`
            + `<div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-right:10px;flex-shrink:0;">${i+1}</div>`
-           + `<div style="font-size:14px;font-weight:500;">${escHtml(m.display_name)}${badge}</div>`
+           + `<div style="font-size:14px;font-weight:500;">${escHtml(m.display_name)}${adminBadge}${signageBadge}</div>`
            + `</div>`;
     }).join('');
     content.innerHTML = `<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">${memberList.length}人が参加中</div>` + html;
@@ -3233,8 +5414,8 @@ async function updateGroupName() {
       .update({ group_name: newName }).eq('id', currentGroup.id);
     if (error) throw error;
     currentGroup.group_name = newName;
-    const groupLabel = newName + '　(' + currentGroup.group_id + ')';
-    document.getElementById('home-group-id-display').textContent = groupLabel;
+    // [UI改善 2026/5/23] グループ名のみ表示・グループID連結を削除(loadHome と整合)
+    document.getElementById('home-group-id-display').textContent = newName;
     showToast('グループ名を更新しました');
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
@@ -3254,6 +5435,112 @@ async function updateIndustry() {
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
 
+// ═══════════════════════════════════════════
+// [UI改善② LINKボタン] チャッピー第50回判定準拠
+// ═══════════════════════════════════════════
+// 設計原則:
+//   - グループ管理者(isCreator)のみが自グループのlink_urlを設定・変更・削除
+//   - https:// のみ許可(http://・javascript: 等は拒否)
+//   - 最大2048文字
+//   - 空文字は NULL に正規化
+//   - URL未設定時(NULL)は index.html / signage.html 双方でLINKボタン非表示
+//   - 押下時は noopener,noreferrer で別タブ起動(XSS・タブナビゲーション対策)
+//   - DB側 CHECK制約により不正値は弾かれる(二重防御)
+
+// ── カスタムLINK URLを保存(管理者のみ・httpsのみ・空文字はNULL正規化) ──
+async function updateLinkUrl() {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
+  if (!isCreator) { showToast('管理者のみ変更できます'); return; }
+  const inputEl = document.getElementById('profile-link-url');
+  if (!inputEl) return;
+  const raw = (inputEl.value || '').trim();
+  // 空文字なら削除扱いに誘導(明示的にremoveLinkUrlを呼ぶよう促す)
+  if (raw === '') {
+    showToast('URLを削除するには「🗑️ 削除」ボタンを押してください');
+    return;
+  }
+  // クライアントサイドバリデーション(DB CHECK制約と同一ロジック)
+  if (!/^https:\/\//.test(raw)) {
+    showToast('URLは https:// で始まる必要があります');
+    return;
+  }
+  if (raw.length > 2048) {
+    showToast('URLは2048文字以内にしてください');
+    return;
+  }
+  try {
+    const { error } = await supabase.from('group_sessions')
+      .update({ link_url: raw }).eq('id', currentGroup.id);
+    if (error) {
+      // DB CHECK制約違反など
+      console.error('[updateLinkUrl] DB error:', error);
+      showToast('保存に失敗しました。URL形式を確認してください。');
+      return;
+    }
+    currentGroup.link_url = raw;
+    updateLinkButton();
+    showToast('カスタムLINKを保存しました');
+  } catch (e) {
+    console.error('[updateLinkUrl] exception:', e);
+    showToast('保存に失敗しました。');
+  }
+}
+
+// ── カスタムLINK URLを削除(管理者のみ・NULL正規化) ──
+async function removeLinkUrl() {
+  await assertLiffEnvironment();
+  // [2026/5/23 案B] リロード耐性ガード(チャッピー第72回判定GO)
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
+  if (!isCreator) { showToast('管理者のみ変更できます'); return; }
+  if (!currentGroup?.link_url) {
+    showToast('削除対象のLINKがありません');
+    return;
+  }
+  if (!confirm('カスタムLINKを削除しますか?\n削除するとメンバー全員のLINKボタンが非表示になります。')) return;
+  try {
+    const { error } = await supabase.from('group_sessions')
+      .update({ link_url: null }).eq('id', currentGroup.id);
+    if (error) throw error;
+    currentGroup.link_url = null;
+    const inputEl = document.getElementById('profile-link-url');
+    if (inputEl) inputEl.value = '';
+    updateLinkButton();
+    showToast('カスタムLINKを削除しました');
+  } catch (e) {
+    console.error('[removeLinkUrl] exception:', e);
+    showToast('削除に失敗しました。');
+  }
+}
+
+// ── ヘッダーのLINKボタン表示制御(currentGroup.link_url の有無で切替) ──
+function updateLinkButton() {
+  const btn = document.getElementById('link-btn');
+  if (!btn) return;
+  // currentGroup.link_url が文字列で空文字以外の場合のみ表示
+  const url = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url.trim() : '';
+  if (url && /^https:\/\//.test(url)) {
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// ── カスタムLINK押下時のハンドラ(noopener,noreferrer で別タブ起動) ──
+function openCustomLink() {
+  const url = currentGroup?.link_url;
+  if (!url || typeof url !== 'string' || !/^https:\/\//.test(url.trim())) {
+    showToast('LINKが設定されていません');
+    return;
+  }
+  // セキュリティ対策: noopener,noreferrer 必須(チャッピー第50回判定 条件6)
+  window.open(url.trim(), '_blank', 'noopener,noreferrer');
+}
+
 // ── メッセージ削除 ──
 async function deleteMessage() {
   if (!currentDetailMessageId) return;
@@ -3261,7 +5548,13 @@ async function deleteMessage() {
   if (!msg || msg.sender_eo_uid !== currentUser.eo_uid) {
     showToast('自分のメッセージのみ削除できます'); return;
   }
-  if (!confirm('このメッセージを削除しますか？\n既読データも削除されます。')) return;
+  // [2026/5/20 野口さん指示] 画像付きメッセージの場合はクォータ警告を追加
+  // [2026/5/20 訂正] image_mode は 'attached' ではなく 'expandable' のため依存をやめる
+  const hasImage = !!(msg.image_url || msg.thumbnail_url);
+  const confirmMsg = hasImage
+    ? 'このメッセージを削除しますか?\n既読データも削除されます。\n\n⚠️ 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)'
+    : 'このメッセージを削除しますか?\n既読データも削除されます。';
+  if (!confirm(confirmMsg)) return;
   try {
     // read_receiptsを先に削除
     await supabase.from('read_receipts').delete().eq('message_id', currentDetailMessageId);
@@ -3308,6 +5601,9 @@ function showProfile() {
   // 業種をセレクトにセット（管理者のみ）
   const indEl = document.getElementById('profile-industry');
   if (indEl) indEl.value = currentGroup?.industry || '';
+  // [UI改善② LINKボタン] カスタムLINK URLを入力欄にセット(管理者のみ)
+  const linkEl = document.getElementById('profile-link-url');
+  if (linkEl) linkEl.value = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url : '';
   // LINEプロフィール画像を表示
   const avatarEl = document.getElementById('profile-avatar');
   if (avatarEl) {
@@ -3370,10 +5666,23 @@ async function checkSuperAdmin() {
 
 function openAdminPanel() {
   // ?uid=パラメータは廃止(admin.html側でliff.getProfile()のみで認証・adminsテーブルで権限確認)
+  //
   // [2026/5/14 修正] 学び13 / 課題① 対応・チャッピー第24回判定承認済み
   // 真因:external: true で Chrome 外部ブラウザ起動するとLINEのJWTセッション喪失 → アクセス拒否
   // 対策:external: true 削除して LINE 内ブラウザで開く → JWT継続 → 認証成功
-  liff.openWindow({ url: "https://app.edgeops.jp/admin.html" });
+  // ↓
+  // [2026/5/23 修正] 第77回判定 案(A)前倒し実装(野口判断・本日中対応)
+  // 経緯:第76回判定の init() 内 500msリトライ修正が効かず、二郎で再現テストにて
+  //       「LINE 内ブラウザ(URL バー+ナビゲーション付き普通の WebView)で開かれて
+  //        LIFF コンテキストが保持されない」事実が判明。
+  //       つまり 5/14 第24回判定の前提(LINE 内ブラウザでも LIFF 文脈維持)が崩れた。
+  // 真因:liff.openWindow は LINE 内ブラウザの「新規モーダル」として URL を開くため、
+  //       LIFF コンテキストが保持されない構造。
+  // 対策:window.location.href で同一ウィンドウ内遷移にする。
+  //       LIFF SDK が読み込まれた同じウィンドウ内で admin.html を読むため、
+  //       LIFF コンテキストが保持される可能性が高い。
+  // ロールバック:この行を liff.openWindow({ url: "https://app.edgeops.jp/admin.html" }); に戻すだけ。
+  window.location.href = "https://app.edgeops.jp/admin.html";
 }
 
 // ── サイネージURL管理 ──
@@ -3468,11 +5777,29 @@ async function leaveGroup() {
           .eq('id', remainingMembers[0].id);
       }
     }
-    await supabase.from('group_members').update({ status: 'left', is_creator: false }).eq('id', currentMemberId);
+    await supabase.from('group_members').update({ status: 'left', is_creator: false, is_signage: false }).eq('id', currentMemberId);
     // ── 設計書 16-A-6 に準拠：メンバー脱退時に当該UIDのアンケート回答を削除（集計から完全に消す） ──
-    // 注意: group_session_id 非限定削除。複数グループ在籍時は他グループの回答も消える点に留意
+    // [2026/5/16 課題⑨修正・チャッピー第40回判定GO] group_session_id 限定削除
+    // message_responses に group_session_id カラムが存在しないため messages 経由で2クエリに分割
+    // currentGroup.id は UUID 形式・messages.group_session_id と互換性あり（確認済）
+    // またぎ機能利用者が1グループ脱退した時に他グループの回答まで消える問題を解消
     try {
-      await supabase.from('message_responses').delete().eq('eo_uid', currentUser.eo_uid);
+      const { data: groupMessages, error: msgErr } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('group_session_id', currentGroup.id);
+      if (msgErr) throw msgErr;
+      const messageIds = (groupMessages || []).map(m => m.id);
+      if (messageIds.length > 0) {
+        const { error: respErr } = await supabase
+          .from('message_responses')
+          .delete()
+          .eq('eo_uid', currentUser.eo_uid)
+          .in('message_id', messageIds);
+        if (respErr) throw respErr;
+      } else {
+        console.log('[leaveGroup] no message_responses to delete (no messages in this group)');
+      }
     } catch (e) {
       console.warn('アンケート回答のクリーンアップに失敗:', e);
     }
@@ -3503,8 +5830,11 @@ async function leaveGroup() {
       console.warn('残りグループ取得失敗・従来動作にフォールバック:', err);
     }
 
-    // 残りグループなし or 取得失敗 → 従来動作(localStorage 全消去 + screen-start)
-    localStorage.clear(); currentGroup = null; currentMemberId = null;
+    // 残りグループなし or 取得失敗 → 従来動作(EdgeOps独自キャッシュのみ消去 + screen-start)
+    // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
+    // 旧 localStorage.clear() は Supabase JS SDK の sb-*-auth-token も消し、
+    // 退出後の RPC が anonロールで実行され 42501 エラーになる致命的バグがあった
+    clearEdgeOpsLocalStorage(); currentGroup = null; currentMemberId = null;
     showScreen('screen-start'); showToast('グループを退出しました');
   } catch (e) { showToast('エラーが発生しました。'); }
 }
