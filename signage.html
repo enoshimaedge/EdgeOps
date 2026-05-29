@@ -1660,7 +1660,10 @@ async function loadWeather() {
   async function fetchOpenMeteo(coords) {
     // [熱中症予防情報 2026/5/28 案B] current=現在値・hourly=今日の最大予測値算出用
     // hourly に気温・湿度・日射・風速を1時間刻みで取得し、今日0〜23時の最大WBGTを算出
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
+    // [予報精度改善 2026/5/30] /v1/forecast(グローバルモデル) → /v1/jma(気象庁モデル) に変更
+    // 気象庁5km高解像度予報を使用することで日本国内の予報精度を向上(tenki.jpと同じソース)
+    // パラメータ・レスポンス形式は /v1/forecast と完全互換のためロジック変更不要
+    const url = `https://api.open-meteo.com/v1/jma?latitude=${coords.lat}&longitude=${coords.lng}&current=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m,shortwave_radiation,wind_speed_10m&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Asia%2FTokyo&forecast_days=2`;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error('天気API応答エラー: ' + res.status);
     return await res.json();
