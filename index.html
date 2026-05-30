@@ -620,36 +620,6 @@
   }
 </style>
 
-<!-- ═══════════════════════════════════════════════════════════
-     A-1 リロード原因究明用 eruda モバイルデバッグ(2026-05-24)
-     URL に ?debug=1 を付けた時だけ eruda が起動する。
-     本番ユーザーには影響なし(?debug=1 なしなら何も起きない)。
-     A-1 真因究明完了後はこのブロック削除予定。
-     ═══════════════════════════════════════════════════════════ -->
-<script>
-(function() {
-  try {
-    if (location.search.indexOf('debug=1') !== -1) {
-      var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/eruda';
-      s.onload = function() {
-        try {
-          eruda.init();
-          console.log('[eruda] initialized for A-1 debug');
-        } catch (e) {
-          console.warn('[eruda] init failed:', e);
-        }
-      };
-      s.onerror = function() {
-        console.warn('[eruda] CDN load failed');
-      };
-      document.head.appendChild(s);
-    }
-  } catch (e) {
-    // 万一の例外でも本番動作に影響させない
-  }
-})();
-</script>
 
 </head>
 <body>
