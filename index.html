@@ -1,3 +1,75 @@
+<!-- ════════════════════════════════════════════════════════════════════
+     EdgeOps  index.html  ──  構造マップ / STRUCTURE MAP
+     更新: 2026-06-02 ／ 本体 6065行（このマップ追加前）
+     ────────────────────────────────────────────────────────────────────
+     【使い方】各項目の ▼ の語を端末の「ページ内検索」にかけると該当箇所へ飛べます。
+       行番号はあえて載せていません（コード増減でズレて嘘になるため）。
+       確実なのは ▼ 検索語。このマップの更新は、修正版フルファイル出力時に
+       Claude が本体と一緒に行います（野口さんの手作業での二重管理は不要）。
+     ────────────────────────────────────────────────────────────────────
+     ■ 3層の境界（タグで検索）
+        外部読込    先頭〜      ▼<script src=   LIFF SDK / Supabase / crypto-js / auth.js
+        CSS         ▼<style>    〜  ▼</style>
+        HTML body   ▼<body>     〜  直後の ▼<script>
+        JavaScript  本文末尾の  ▼<script>  〜  ▼</script>
+     ────────────────────────────────────────────────────────────────────
+     ■ HTML 画面（id= で検索）
+        ▼screen-not-friend      友達未登録ブロック
+        ▼screen-start           起動・グループ選択
+        ▼screen-join-only       他グループ参加申請（既存ユーザー専用）
+        ▼screen-pending         承認待ち
+        ▼screen-home            ホーム（メッセージ一覧・サイネージ/混雑度ボタン）
+        ▼screen-compose         メッセージ作成（＋画像投稿UI・アンケート）
+        ▼screen-detail          メッセージ詳細（＋画像表示・アンケート回答）
+        ▼screen-handover        引き継ぎ一覧
+        ▼screen-handover-detail 引き継ぎ詳細（＋画像・確認者リスト）
+        ▼screen-approval        承認管理
+        ▼screen-profile         プロフィール（各種設定・管理者パネル入口）
+        ▼modal-report           月次レポート
+        ▼modal-members          メンバー一覧
+        ▼modal-survey-list      アンケート集計一覧
+        ▼modal-survey-detail    アンケート集計詳細
+     ────────────────────────────────────────────────────────────────────
+     ■ JavaScript 主要領域（═══バナーの語 / 代表関数で検索）
+        ▼環境設定             prod/staging/dev 分岐・detectEnvironment
+        ▼LIFF外アクセス       assertLiffEnvironment / ensureCurrentUser
+        ▼グローバル状態        currentUser / currentGroup 等
+        ▼画像投稿             getFeatureFlags / compressImageForUpload
+        ▼sendImageMessage     画像付き送信フロー
+        ▼サムネ表示            getSignedThumbUrl / observeImageThumbnails
+        ▼全画面拡大ビューア     openFullImageViewer
+        ▼画像削除フロー         deleteImageOnly
+        ▼初期化               init
+        ▼セッション復元         restoreSession / restoreExistingMembershipIfAny
+        ▼is_creator           resolveIsCreator
+        ▼グループ作成・参加     createGroup / joinGroup（RPC化）
+        ▼ホーム・ポーリング     loadHome / loadMessages / renderMessages
+        ▼メッセージ送信・詳細   sendMessage / showDetail / recordRead
+        ▼引き継ぎノート         loadHandoverNotes / confirmHandover
+        ▼承認管理             loadApprovals / approveMember / rejectMember
+        ▼月次レポート          showMonthlyReport / loadReportData
+        ▼アンケート集計        showSurveyList / showSurveyDetail
+        ▼プロフィール          updateGroupName / updateLinkUrl / leaveGroup
+        ▼サイネージ            openSignage / generateSignageToken / signage-btn
+        ▼ユーティリティ         escHtml / formatTime / linkify / showScreen / showToast
+        ▼グループまたぎ         loadMyGroups / switchGroup / showGroupSwitcher
+     ────────────────────────────────────────────────────────────────────
+     ■ 絶対保護（リファクタリング対象外・第98回判定 禁止領域）
+        触る前に必ずこのリストと照合すること。
+        ・eo_uid生成式 / salt='edgeops_v1_2026'（auth.js・不変）
+        ・current_eo_uid / line-auth
+        ・group_sessions / group_members / messages の RLS・GRANT・Policy
+        ・RPC: create_group_with_creator / join_group_with_member
+        ・Edge Function: signage-fetch / create-signed-url / upload-image / delete-image
+        ・画像自動削除の本番関数（delete_expired_images 等）
+        ・PoCデータ SL-5M7UZ-KSAG（facility_id NULL・6レコード）
+        ・超管理者 EU-1109C4BD / サブ EU-F3FF6ECD
+        ・サイネージバグ修正3件
+            ★旧資料の行番号(L1205-1211 / L1350-1369 / L3129-3135)は
+              現在の本体とズレている（2026-06-02確認）。R1着手前に実位置の
+              再特定が必須。▼サイネージ 領域を起点に確認すること。
+     ════════════════════════════════════════════════════════════════════
+-->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
