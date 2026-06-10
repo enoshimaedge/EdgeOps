@@ -1385,6 +1385,22 @@
             <button class="btn" onclick="removeLinkUrl()" style="flex:1; background:#fff; color:#e53935; border:1.5px solid #e53935;">🗑️ 削除</button>
           </div>
         </div>
+        <!-- ══ [マイテンプレ機能 v3.0] 連絡メッセージ テンプレ編集(管理者のみ) ══
+             チャッピー第100回判定 GO
+             - グループ管理者(isCreator)のみが自グループの連絡テンプレを編集
+             - 最大6枠(本文のみ)・空欄可・空欄はDBに保存しない
+             - 保存先: group_templates (kind='contact', slot 1〜6)
+             - 初期値: 未登録時のみ業種別TEMPLATESを初期表示(編集済みは上書きしない)
+             - 一般スタッフにはこのUIを出さない(プロフィール画面自体が管理者導線) -->
+        <div id="template-edit-section" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:none;">
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📋 連絡メッセージ テンプレ / Templates</div>
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:10px; line-height:1.5;">
+            よく使う連絡文を最大6件まで登録できます。ここで登録した文は、メンバー全員がメッセージ作成時に呼び出せます。現場に合わせて自由に編集・削除してください。空欄にした枠は表示されません。
+          </div>
+          <div id="template-edit-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
+          <button class="btn btn-secondary" onclick="saveGroupTemplates()" style="width:100%;">💾 テンプレを保存 / Save Templates</button>
+        </div>
+
         <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
           <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージ管理</div>
@@ -4059,19 +4075,164 @@ function applyTemplate(text) {
   document.getElementById('compose-body').focus();
 }
 
+// ═══════════════════════════════════════════
+// [マイテンプレ機能 v3.0] DB連携(group_templates)
+// チャッピー第100回判定 GO
+// ・連絡メッセージのみ(kind='contact')・最大6件
+// ・閲覧=承認済みメンバー全員 / 書込=管理者(isCreator)のみ(RLSで担保)
+// ・更新反映=アプリ再起動/画面表示時にDB取得(リアルタイム同期なし)
+// ・初期値=未登録時のみ業種別TEMPLATESを初期表示(編集済みは上書きしない)
+// ═══════════════════════════════════════════
+const TEMPLATE_MAX_SLOTS = 6;        // 1グループあたりの上限(現行文例数に合わせ6)
+const TEMPLATE_BODY_MAXLEN = 500;    // 本文の最大文字数(スマホ可読性のため)
+let _groupTemplatesCache = [];       // 現グループの連絡テンプレ本文配列(呼び出しUI用)
+
+// 現グループの連絡テンプレをDBから取得し、呼び出しUI用キャッシュを更新
+async function loadGroupTemplates() {
+  _groupTemplatesCache = [];
+  if (!currentGroup?.id) return _groupTemplatesCache;
+  try {
+    const { data, error } = await supabase
+      .from('group_templates')
+      .select('slot, body')
+      .eq('group_id', currentGroup.id)
+      .eq('kind', 'contact')
+      .order('slot', { ascending: true });
+    if (error) throw error;
+    _groupTemplatesCache = (data || [])
+      .map(r => (r.body || '').trim())
+      .filter(t => t.length > 0);
+  } catch (e) {
+    console.error('[templates] load failed', e);
+    _groupTemplatesCache = [];
+  }
+  return _groupTemplatesCache;
+}
+
+// メッセージ作成画面のテンプレ呼び出しUIを描画(DBキャッシュ基準)
 function renderTemplates() {
-  const industry = currentGroup?.industry;
   const wrap = document.getElementById('template-section');
   if (!wrap) return;
-  if (!industry || !TEMPLATES[industry] || selectedComposeType === 'handover') {
+  // 引き継ぎタブ・連絡テンプレ未登録時は非表示(一般スタッフは行き止まりを作らない)
+  if (selectedComposeType === 'handover' || !_groupTemplatesCache || _groupTemplatesCache.length === 0) {
     wrap.style.display = 'none';
     return;
   }
   wrap.style.display = 'block';
   const list = document.getElementById('template-list');
-  list.innerHTML = TEMPLATES[industry].map(t =>
-    `<button class="template-btn" onclick="applyTemplate('${t.replace(/'/g, "\\'")}')">📋 ${t}</button>`
+  list.innerHTML = _groupTemplatesCache.map(t =>
+    `<button class="template-btn" onclick="applyTemplate('${t.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">📋 ${escapeHtml(t)}</button>`
   ).join('');
+}
+
+// HTMLエスケープ(テンプレ表示の安全化)
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// ── 管理者向け: テンプレ編集UI(6枠)を描画 ──
+// 未登録(DB空)なら業種別TEMPLATESを初期値として枠に流し込む(編集済みは上書きしない)
+async function renderTemplateEditor() {
+  const section = document.getElementById('template-edit-section');
+  const listEl = document.getElementById('template-edit-list');
+  if (!section || !listEl) return;
+  // 管理者以外には出さない
+  if (isCreator !== true) { section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  // DBから現在の保存内容を取得
+  let rows = [];
+  try {
+    const { data, error } = await supabase
+      .from('group_templates')
+      .select('slot, body')
+      .eq('group_id', currentGroup.id)
+      .eq('kind', 'contact')
+      .order('slot', { ascending: true });
+    if (error) throw error;
+    rows = data || [];
+  } catch (e) {
+    console.error('[templates] editor load failed', e);
+    rows = [];
+  }
+
+  // 初期値の決定: DBに1件もなければ業種別TEMPLATESを初期表示(未保存の初期値)
+  let initial = new Array(TEMPLATE_MAX_SLOTS).fill('');
+  if (rows.length > 0) {
+    // 既存登録あり → DBの内容をそのまま枠へ(編集済みを尊重・上書きしない)
+    rows.forEach(r => { if (r.slot >= 1 && r.slot <= TEMPLATE_MAX_SLOTS) initial[r.slot - 1] = r.body || ''; });
+  } else {
+    // 未登録 → 業種別の初期文例を流し込む(保存するまでDBには入らない)
+    const ind = currentGroup?.industry;
+    const src = (ind && TEMPLATES[ind]) ? TEMPLATES[ind] : [];
+    for (let i = 0; i < TEMPLATE_MAX_SLOTS; i++) initial[i] = src[i] || '';
+  }
+
+  // 6枠のテキストエリアを描画
+  listEl.innerHTML = initial.map((val, i) => `
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label" style="font-size:11px;">テンプレ ${i + 1}</label>
+      <textarea class="form-textarea" id="tmpl-edit-${i}" maxlength="${TEMPLATE_BODY_MAXLEN}"
+        style="min-height:56px;" placeholder="(空欄にすると表示されません)">${escapeHtml(val)}</textarea>
+    </div>
+  `).join('');
+}
+
+// ── 管理者向け: テンプレ6枠を保存(管理者のみ・空欄は行削除) ──
+async function saveGroupTemplates() {
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
+  if (isCreator !== true) { showToast('管理者のみ変更できます'); return; }
+  if (!currentGroup?.id) { showToast('グループ情報が取得できません'); return; }
+
+  // 入力収集(trimして空欄判定)
+  const rowsToUpsert = [];
+  const slotsToDelete = [];
+  for (let i = 0; i < TEMPLATE_MAX_SLOTS; i++) {
+    const el = document.getElementById('tmpl-edit-' + i);
+    const body = ((el?.value) || '').trim();
+    const slot = i + 1;
+    if (body.length > 0) {
+      rowsToUpsert.push({
+        group_id: currentGroup.id,
+        kind: 'contact',
+        slot: slot,
+        body: body,
+        updated_by: u.eo_uid,
+        updated_at: new Date().toISOString()
+      });
+    } else {
+      slotsToDelete.push(slot); // 空欄 → 既存行があれば削除
+    }
+  }
+
+  try {
+    // 空欄枠の既存行を削除(該当があれば)
+    if (slotsToDelete.length > 0) {
+      const { error: delErr } = await supabase
+        .from('group_templates')
+        .delete()
+        .eq('group_id', currentGroup.id)
+        .eq('kind', 'contact')
+        .in('slot', slotsToDelete);
+      if (delErr) throw delErr;
+    }
+    // 本文ありの枠をupsert(group_id,kind,slot のUNIQUEで競合更新)
+    if (rowsToUpsert.length > 0) {
+      const { error: upErr } = await supabase
+        .from('group_templates')
+        .upsert(rowsToUpsert, { onConflict: 'group_id,kind,slot' });
+      if (upErr) throw upErr;
+    }
+    showToast('テンプレを保存しました');
+    // 呼び出しUI用キャッシュも更新
+    await loadGroupTemplates();
+  } catch (e) {
+    console.error('[templates] save failed', e);
+    showToast('保存に失敗しました。');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -4102,7 +4263,7 @@ function applyComposeType(type) {
   document.getElementById('ctype-handover').classList.toggle('active', !isMsgActive);
   document.getElementById('section-msg-priority').style.display = isMsgActive ? '' : 'none';
   document.getElementById('section-handover-priority').style.display = isMsgActive ? 'none' : '';
-  document.getElementById('template-section').style.display = (!isMsgActive || !currentGroup?.industry) ? 'none' : '';
+  document.getElementById('template-section').style.display = (!isMsgActive || !_groupTemplatesCache || _groupTemplatesCache.length === 0) ? 'none' : '';
   const label = document.getElementById('compose-body-label');
   if (label) label.textContent = isMsgActive ? 'メッセージ内容 / Message' : '引き継ぎ内容 / Handover Content';
   const placeholder = document.getElementById('compose-body');
@@ -5676,6 +5837,15 @@ function showProfile() {
   // サイネージURL表示（管理者のみ・非同期）
   if (isCreator) updateSignageUrlDisplay();
 
+  // [マイテンプレ機能 v3.0] 連絡テンプレ編集UI(管理者のみ・非同期)
+  // 未登録なら業種別TEMPLATESを初期値表示、登録済みならDB内容を表示(上書きしない)
+  if (isCreator) {
+    renderTemplateEditor();
+  } else {
+    const tEdit = document.getElementById('template-edit-section');
+    if (tEdit) tEdit.style.display = 'none';
+  }
+
   // 超管理者ボタン表示チェック
   checkSuperAdmin();
   showScreen('screen-profile');
@@ -5949,7 +6119,7 @@ function showScreen(id) {
       });
     }
     if (id === 'screen-handover') loadHandoverNotes();
-    if (id === 'screen-compose') { selectedPriority = 'info'; selectPriority('info'); renderTemplates(); selectedComposeType = 'msg'; applyComposeType('msg'); selectedHandoverPriority = 'action'; applyHandoverPriorityUI('action'); }
+    if (id === 'screen-compose') { selectedPriority = 'info'; selectPriority('info'); selectedComposeType = 'msg'; applyComposeType('msg'); selectedHandoverPriority = 'action'; applyHandoverPriorityUI('action'); loadGroupTemplates().then(() => { renderTemplates(); applyComposeType(selectedComposeType); }); }
   }
 }
 function hideLoading() { document.getElementById('loading').style.display = 'none'; }
