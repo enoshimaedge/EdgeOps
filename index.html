@@ -2157,6 +2157,7 @@ async function sendImageMessage() {
       body: body,
       group_session_id: String(currentGroup?.id || ''),
       context: context, // 'message' | 'handover'
+      priority: (context === 'handover') ? selectedHandoverPriority : selectedPriority, // [2026/6/15] 画像付きでも優先度を保存
       image_mode: 'expandable' // ST版デフォルト(タップで全画面拡大)
     };
 
