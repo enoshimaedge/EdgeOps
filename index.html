@@ -353,6 +353,14 @@
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* [第107/108回] 上品な細リングローディング(既存.spinnerは非変更・本クラスのみ追加) */
+  .spinner-elegant {
+    width: 38px; height: 38px;
+    border: 2.5px solid rgba(15,30,53,0.12);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
 
   .group-id-box {
     background: var(--navy); color: white;
@@ -704,9 +712,9 @@
 <!-- ══ [Phase 4-2D] 画像処理中モーダル(圧縮中のUI待機オーバーレイ) ══ -->
 <div id="image-processing-modal" style="display:none; position:fixed; inset:0; background:rgba(15,30,53,0.55); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
   <div style="background:white; padding:24px 28px; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.2); text-align:center; max-width:300px;">
-    <div class="spinner" style="margin:0 auto 12px;"></div>
-    <div style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">画像を準備中...</div>
-    <div style="font-size:12px; color:var(--text-light); line-height:1.5;">この処理には数秒かかる場合があります</div>
+    <div class="spinner spinner-elegant" style="margin:0 auto 14px;"></div>
+    <div id="image-processing-modal-title" style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px;">画像を準備中...</div>
+    <div id="image-processing-modal-sub" style="font-size:12px; color:var(--text-light); line-height:1.5;">この処理には数秒かかる場合があります</div>
   </div>
 </div>
 
@@ -1945,6 +1953,42 @@ function _showImageProcessingModal(show) {
   if (sendBtn) sendBtn.disabled = !!show;
 }
 
+// ═══════════════════════════════════════════
+// [チャッピー第107/108回判定] 遅延ローディング共通ヘルパー
+//   - 投稿処理が800msを超えた時だけ既存オーバーレイを表示(チラつき防止)
+//   - 速い投稿では一度も表示しない
+//   - 成功/失敗/例外いずれの終了経路でも .stop() で必ずタイマー解除+非表示
+//   - 署名URL/Edge Function/DB/認証には一切非接触(待ち時間の見せ方のみ)
+//   - 送信ボタンのdisabledは各投稿経路の既存処理に委ね、本ヘルパーでは触らない
+// ═══════════════════════════════════════════
+const LOADING_DELAY_MS = 800; // チャッピー第108回推奨しきい値
+function startDelayedLoading(title, sub) {
+  let shown = false;
+  const timer = setTimeout(() => {
+    const modal = document.getElementById('image-processing-modal');
+    if (!modal) return;
+    const titleEl = document.getElementById('image-processing-modal-title');
+    const subEl = document.getElementById('image-processing-modal-sub');
+    if (titleEl) titleEl.textContent = title || '送信中…';
+    if (subEl) subEl.textContent = sub || '通信状況により数秒かかる場合があります';
+    modal.style.display = 'flex';
+    __imageProcessingModalShown = true;
+    shown = true;
+  }, LOADING_DELAY_MS);
+
+  return {
+    stop() {
+      clearTimeout(timer);
+      if (shown) {
+        const modal = document.getElementById('image-processing-modal');
+        if (modal) modal.style.display = 'none';
+        __imageProcessingModalShown = false;
+        shown = false;
+      }
+    }
+  };
+}
+
 function _resetPendingImage() {
   window.__pendingImageFile = null;
   const previewWrap = document.getElementById('compose-image-preview-wrap');
@@ -2147,6 +2191,9 @@ async function sendImageMessage() {
   const sendBtn = document.getElementById('compose-send-btn');
   if (sendBtn) sendBtn.disabled = true;
 
+  // [第107/108回] 800ms超で処理中表示(画像は通常超えるためほぼ常時表示)
+  const __loading = startDelayedLoading('画像を送信中…', '通信状況により数秒かかる場合があります');
+
   try {
     showToast('画像を送信中...');
 
@@ -2256,6 +2303,7 @@ async function sendImageMessage() {
     //         通常sendMessageへのフォールバックは絶対に「しない」
     console.error('[Phase 4-2E] 画像送信失敗:', code, e);
   } finally {
+    __loading.stop();
     if (sendBtn) sendBtn.disabled = false;
   }
 }
@@ -4349,6 +4397,7 @@ async function sendMessage() {
 
   if (selectedComposeType === 'handover') {
     // 引き継ぎノート投稿
+    const __loading = startDelayedLoading('投稿中…', '通信状況により数秒かかる場合があります');
     try {
       showToast('投稿中...');
       const { error } = await supabase.from('handover_notes').insert({
@@ -4365,9 +4414,11 @@ async function sendMessage() {
       showScreen('screen-home');
       showToast('引き継ぎを投稿しました！');
     } catch (e) { console.error(e); showToast('投稿に失敗: ' + (e.message || JSON.stringify(e))); }
+    finally { __loading.stop(); }
     return;
   }
 
+  const __loading = startDelayedLoading('送信中…', '通信状況により数秒かかる場合があります');
   try {
     showToast('送信中...');
     // 送信時点の受信者数を固定保存（後からメンバーが増えても分母が変わらないようにする）
@@ -4416,6 +4467,7 @@ async function sendMessage() {
     if (dlInput) dlInput.value = '';
     await loadMessages(); showScreen('screen-home'); showToast(isSurvey ? 'アンケートを送信しました！' : '送信しました！');
   } catch (e) { console.error(e); showToast('送信に失敗しました。'); }
+  finally { __loading.stop(); }
 }
 
 // ═══════════════════════════════════════════
