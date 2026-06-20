@@ -641,16 +641,22 @@
     .screen {
       max-width: none;
     }
+    /* [2026/6/20] MEGAPAD等のサイネージ/タブレット横画面で左右余白が出る問題に対応。
+     * 従来は本文を max-width:900px に制限して中央寄せしていたため、900pxを超える
+     * 画面（27インチ・将来の32インチ・未知の高解像度すべて）で左右に余白が出ていた。
+     * 上限を外し画面幅いっぱいに広げる。解像度を問わず余白が出ない。
+     * 左右の内側パディング(24px)は維持し、端ピッタリにはしない。
+     * スマホ縦(別メディアクエリ)には一切影響しない。 */
     .content {
-      max-width: 900px;
-      margin: 0 auto;
+      max-width: none;
+      margin: 0;
       padding: 24px;
       width: 100%;
       box-sizing: border-box;
     }
     .header {
-      padding-left: max(16px, calc((100vw - 900px) / 2 + 16px));
-      padding-right: max(16px, calc((100vw - 900px) / 2 + 16px));
+      padding-left: 16px;
+      padding-right: 16px;
     }
   }
 
@@ -4650,8 +4656,12 @@ async function showHandoverDetail(handoverId) {
     if (!hw) return;
     currentHandoverId = handoverId;
 
-    const pLabels = { action: '🔴 重要', check: '🟡 通常', done: '🟢 確認要' };
-    document.getElementById('hw-detail-title').textContent = pLabels[hw.priority] || '引き継ぎ詳細';
+    // [2026/6/20] 帯の表示を連絡メッセージ側と統一：色アイコン＋本文冒頭20文字を表示する。
+    // （従来は「🟢 確認要」等のラベルのみで内容が分からなかった）
+    const hwIcons = { action: '🔴', check: '🟡', done: '🟢' };
+    const hwIcon = hwIcons[hw.priority] || '🟢';
+    const hwTitleText = getMessageTitle(hw.content || '', 20);
+    document.getElementById('hw-detail-title').textContent = hwTitleText ? `${hwIcon} ${hwTitleText}` : `${hwIcon} 引き継ぎ詳細`;
     document.getElementById('hw-detail-meta').textContent = `${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}`;
     document.getElementById('hw-detail-body').innerHTML = linkify(hw.content || '');
     // [Phase 4-2F] 引き継ぎ画像表示
@@ -4726,7 +4736,11 @@ async function showHandoverDetail(handoverId) {
     const isSender = hw.sender_eo_uid === currentUser.eo_uid;
     const myMember = allMembers.find(m => m.eo_uid === currentUser.eo_uid);
     const canWrite = wasMemberAtItemCreated(myMember, hw.created_at);
-    if (isSender) {
+    if (myMember?.is_signage === true) {
+      // サイネージ端末は表示専用。引き継ぎの確認・対応操作の主体ではないため、
+      // 操作エリアには何も表示しない（「参加前/参加後」の概念自体が当てはまらない）。
+      confirmArea.innerHTML = '';
+    } else if (isSender) {
       confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #66bb6a; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#2e7d32; margin-bottom:10px;">📋 自分が投稿した引き継ぎです</div>`;
     } else if (!canWrite) {
       // 送信時点で未参加だった新規参加者
@@ -4865,7 +4879,11 @@ async function showDetail(messageId) {
   const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
   const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
-  document.getElementById('detail-title').textContent = getMessageTitle(msg.body, 20);
+  // [2026/6/20] 帯の表示を統一：色アイコン＋本文冒頭20文字。
+  // 色は優先度（urgent=🔴 / normal=🟡 / その他=🟢）。一覧の pLabel と同じ対応。
+  const msgIcon = (msg.priority === 'urgent') ? '🔴' : (msg.priority === 'normal') ? '🟡' : '🟢';
+  const msgTitleText = getMessageTitle(msg.body, 20);
+  document.getElementById('detail-title').textContent = msgTitleText ? `${msgIcon} ${msgTitleText}` : `${msgIcon} メッセージ詳細`;
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
   // [Phase 4-2F] 画像表示(画像ありメッセージのみ・サムネを即時取得)
