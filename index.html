@@ -641,22 +641,16 @@
     .screen {
       max-width: none;
     }
-    /* [2026/6/20] MEGAPAD等のサイネージ/タブレット横画面で左右余白が出る問題に対応。
-     * 従来は本文を max-width:900px に制限して中央寄せしていたため、900pxを超える
-     * 画面（27インチ・将来の32インチ・未知の高解像度すべて）で左右に余白が出ていた。
-     * 上限を外し画面幅いっぱいに広げる。解像度を問わず余白が出ない。
-     * 左右の内側パディング(24px)は維持し、端ピッタリにはしない。
-     * スマホ縦(別メディアクエリ)には一切影響しない。 */
     .content {
-      max-width: none;
-      margin: 0;
+      max-width: 900px;
+      margin: 0 auto;
       padding: 24px;
       width: 100%;
       box-sizing: border-box;
     }
     .header {
-      padding-left: 16px;
-      padding-right: 16px;
+      padding-left: max(16px, calc((100vw - 900px) / 2 + 16px));
+      padding-right: max(16px, calc((100vw - 900px) / 2 + 16px));
     }
   }
 
@@ -692,16 +686,22 @@
     .screen {
       max-width: none;
     }
+    /* [2026/6/20] MEGAPAD縦置き等の大画面・縦画面で左右余白が出る問題に対応。
+     * 従来は本文を max-width:600px に制限して中央寄せしていたため、600pxを超える
+     * 縦画面（MEGAPAD縦・27/32インチ・未知の高解像度すべて）で左右に余白が出ていた。
+     * 上限を外し画面幅いっぱいに広げる。解像度を問わず余白が出ない。
+     * 左右の内側パディング(24px)は維持し、端ピッタリにはしない。
+     * 横画面(landscape・別メディアクエリ)とスマホ縦には一切影響しない。 */
     .content {
-      max-width: 600px;
-      margin: 0 auto;
+      max-width: none;
+      margin: 0;
       padding: 24px;
       width: 100%;
       box-sizing: border-box;
     }
     .header {
-      padding-left: max(16px, calc((100vw - 600px) / 2 + 16px));
-      padding-right: max(16px, calc((100vw - 600px) / 2 + 16px));
+      padding-left: 16px;
+      padding-right: 16px;
     }
   }
 </style>
