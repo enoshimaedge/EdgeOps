@@ -3173,7 +3173,7 @@ async function init() {
       // 既存 restoreExistingMembershipIfAny()(第22回承認済み)を起動時にも呼ぶだけ。
       // 復帰できなければ従来どおり screen-start を表示。
       const restored = await restoreExistingMembershipIfAny();
-      if (restored) return;
+      if (restored) { hideLoading(); return; }
       hideLoading(); showScreen('screen-start');
     }
   } catch (e) {
