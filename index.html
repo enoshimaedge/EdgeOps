@@ -3168,6 +3168,12 @@ async function init() {
     if (savedMemberId && savedGroupId) {
       await restoreSession(savedMemberId, savedGroupId);
     } else {
+      // [チャッピー第113回判定GO・2026-06-26] 機種変更・別端末・キャッシュクリアで
+      // localStorage が空でも、DB上に approved 所属があれば最新1件へ自動復帰する。
+      // 既存 restoreExistingMembershipIfAny()(第22回承認済み)を起動時にも呼ぶだけ。
+      // 復帰できなければ従来どおり screen-start を表示。
+      const restored = await restoreExistingMembershipIfAny();
+      if (restored) return;
       hideLoading(); showScreen('screen-start');
     }
   } catch (e) {
