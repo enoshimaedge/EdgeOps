@@ -3814,6 +3814,10 @@ async function loadMessages() {
       (allMembersForJoinedAt || []).forEach(m => {
         memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
       });
+      // [receiver_count NULL フォールバック対応 / 2026-06-29]
+      //   描画側(renderMessages)の分母フォールバックで送信後参加者を除外するため、
+      //   参加時刻マップを window 経由で共有する（既存 window._hwConfirmMap と同方式）。
+      window._memberJoinedAt = memberJoinedAt;
 
       const realReadMap = {};
       (receipts || []).forEach(r => {
@@ -3832,6 +3836,9 @@ async function loadMessages() {
         ...m,
         read_count: realReadMap[m.id] !== undefined ? realReadMap[m.id] : m.read_count
       }));
+    } else {
+      // メッセージ0件のときは参加時刻マップを空に初期化（グループ切替時の残留防止）
+      window._memberJoinedAt = new Map();
     }
 
     // ホーム画面でも引き継ぎの確認状態を正しく表示するためconfirmationsを取得
@@ -4001,10 +4008,30 @@ function renderMessages() {
 
     msgs.forEach(msg => {
       // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
-      // NULLの場合（旧メッセージ）は現在のメンバーからサイネージを除いて計算
-      const receiverCount = msg.receiver_count != null
-        ? msg.receiver_count
-        : members.filter(m => m.eo_uid !== msg.sender_eo_uid && !m.is_signage).length;
+      // ════════════════════════════════════════════════════════════
+      // [receiver_count NULL フォールバック修正 / チャッピー第114回相当 GO / 2026-06-29]
+      //   保存済み(テキスト等)は従来どおり保存値をそのまま使用し、挙動を変えない。
+      //   NULL(主に過去の画像メッセージ)の場合のみ、分子と同じ思想で分母を算出する：
+      //     ・サイネージ端末を除外
+      //     ・送信者を除外
+      //     ・送信後に参加したメンバー(joinedAt > msg.created_at)を除外
+      //   これにより、新規参加者が増えても過去メッセージの分母が増えず、
+      //   緑→オレンジに変わる不具合を解消する（既存NULL行も救済）。
+      // ════════════════════════════════════════════════════════════
+      let receiverCount;
+      if (msg.receiver_count != null) {
+        receiverCount = msg.receiver_count;
+      } else {
+        const _joinedAtMap = window._memberJoinedAt || new Map();
+        const _msgCreatedAtMs = new Date(msg.created_at).getTime();
+        receiverCount = members.filter(m => {
+          if (m.eo_uid === msg.sender_eo_uid) return false; // 送信者除外
+          if (m.is_signage) return false;                   // サイネージ除外
+          const _joinedAt = _joinedAtMap.get(m.eo_uid);
+          if (_joinedAt !== undefined && _joinedAt > _msgCreatedAtMs) return false; // 送信後参加を除外
+          return true;
+        }).length;
+      }
       const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
       const unreadCount = Math.max(0, receiverCount - (msg.read_count || 0));
       const senderName = getMemberName(msg.sender_eo_uid);
