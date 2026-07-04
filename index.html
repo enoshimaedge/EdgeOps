@@ -33,6 +33,7 @@
      ■ JavaScript 主要領域（═══バナーの語 / 代表関数で検索）
         ▼js/ui-helpers.js       UI補助関数30個（Phase 2分離）escHtml / formatTime / linkify 等
         ▼js/image.js            画像モジュール32関数（Phase 3-a分離）_loadImageFromFile / compressImageForUpload / openFullImageViewer 等
+        ▼js/templates.js        マイテンプレ4関数（Phase 3-b-1分離）applyTemplate / loadGroupTemplates / renderTemplateEditor / saveGroupTemplates
         ▼環境設定             prod/staging/dev 分岐・detectEnvironment
         ▼LIFF外アクセス       assertLiffEnvironment / ensureCurrentUser
         ▼グローバル状態        currentUser / currentGroup 等
@@ -899,6 +900,7 @@
 
 <script src="js/ui-helpers.js?v=20260704-2"></script>
 <script src="js/image.js"></script>
+<script src="js/templates.js"></script>
 <script>
 // ═══════════════════════════════════════════
 // ロゴ設定
@@ -2225,11 +2227,6 @@ const TEMPLATES = {
   ],
 };
 
-function applyTemplate(text) {
-  document.getElementById('compose-body').value = text;
-  document.getElementById('compose-body').focus();
-}
-
 // ═══════════════════════════════════════════
 // [マイテンプレ機能 v3.0] DB連携(group_templates)
 // チャッピー第100回判定 GO
@@ -2243,134 +2240,13 @@ const TEMPLATE_BODY_MAXLEN = 500;    // 本文の最大文字数(スマホ可読
 let _groupTemplatesCache = [];       // 現グループの連絡テンプレ本文配列(呼び出しUI用)
 
 // 現グループの連絡テンプレをDBから取得し、呼び出しUI用キャッシュを更新
-async function loadGroupTemplates() {
-  _groupTemplatesCache = [];
-  if (!currentGroup?.id) return _groupTemplatesCache;
-  try {
-    const { data, error } = await supabase
-      .from('group_templates')
-      .select('slot, body')
-      .eq('group_id', currentGroup.id)
-      .eq('kind', 'contact')
-      .order('slot', { ascending: true });
-    if (error) throw error;
-    _groupTemplatesCache = (data || [])
-      .map(r => (r.body || '').trim())
-      .filter(t => t.length > 0);
-  } catch (e) {
-    console.error('[templates] load failed', e);
-    _groupTemplatesCache = [];
-  }
-  return _groupTemplatesCache;
-}
-
 // メッセージ作成画面のテンプレ呼び出しUIを描画(DBキャッシュ基準)
 
 // HTMLエスケープ(テンプレ表示の安全化)
 
 // ── 管理者向け: テンプレ編集UI(6枠)を描画 ──
 // 未登録(DB空)なら業種別TEMPLATESを初期値として枠に流し込む(編集済みは上書きしない)
-async function renderTemplateEditor() {
-  const section = document.getElementById('template-edit-section');
-  const listEl = document.getElementById('template-edit-list');
-  if (!section || !listEl) return;
-  // 管理者以外には出さない
-  if (isCreator !== true) { section.style.display = 'none'; return; }
-  section.style.display = '';
-
-  // DBから現在の保存内容を取得
-  let rows = [];
-  try {
-    const { data, error } = await supabase
-      .from('group_templates')
-      .select('slot, body')
-      .eq('group_id', currentGroup.id)
-      .eq('kind', 'contact')
-      .order('slot', { ascending: true });
-    if (error) throw error;
-    rows = data || [];
-  } catch (e) {
-    console.error('[templates] editor load failed', e);
-    rows = [];
-  }
-
-  // 初期値の決定: DBに1件もなければ業種別TEMPLATESを初期表示(未保存の初期値)
-  let initial = new Array(TEMPLATE_MAX_SLOTS).fill('');
-  if (rows.length > 0) {
-    // 既存登録あり → DBの内容をそのまま枠へ(編集済みを尊重・上書きしない)
-    rows.forEach(r => { if (r.slot >= 1 && r.slot <= TEMPLATE_MAX_SLOTS) initial[r.slot - 1] = r.body || ''; });
-  } else {
-    // 未登録 → 業種別の初期文例を流し込む(保存するまでDBには入らない)
-    const ind = currentGroup?.industry;
-    const src = (ind && TEMPLATES[ind]) ? TEMPLATES[ind] : [];
-    for (let i = 0; i < TEMPLATE_MAX_SLOTS; i++) initial[i] = src[i] || '';
-  }
-
-  // 6枠のテキストエリアを描画
-  listEl.innerHTML = initial.map((val, i) => `
-    <div class="form-group" style="margin-bottom:0;">
-      <label class="form-label" style="font-size:11px;">テンプレ ${i + 1}</label>
-      <textarea class="form-textarea" id="tmpl-edit-${i}" maxlength="${TEMPLATE_BODY_MAXLEN}"
-        style="min-height:56px;" placeholder="(空欄にすると表示されません)">${escapeHtml(val)}</textarea>
-    </div>
-  `).join('');
-}
-
 // ── 管理者向け: テンプレ6枠を保存(管理者のみ・空欄は行削除) ──
-async function saveGroupTemplates() {
-  const u = await ensureCurrentUser();
-  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
-  if (isCreator !== true) { showToast('管理者のみ変更できます'); return; }
-  if (!currentGroup?.id) { showToast('グループ情報が取得できません'); return; }
-
-  // 入力収集(trimして空欄判定)
-  const rowsToUpsert = [];
-  const slotsToDelete = [];
-  for (let i = 0; i < TEMPLATE_MAX_SLOTS; i++) {
-    const el = document.getElementById('tmpl-edit-' + i);
-    const body = ((el?.value) || '').trim();
-    const slot = i + 1;
-    if (body.length > 0) {
-      rowsToUpsert.push({
-        group_id: currentGroup.id,
-        kind: 'contact',
-        slot: slot,
-        body: body,
-        updated_by: u.eo_uid,
-        updated_at: new Date().toISOString()
-      });
-    } else {
-      slotsToDelete.push(slot); // 空欄 → 既存行があれば削除
-    }
-  }
-
-  try {
-    // 空欄枠の既存行を削除(該当があれば)
-    if (slotsToDelete.length > 0) {
-      const { error: delErr } = await supabase
-        .from('group_templates')
-        .delete()
-        .eq('group_id', currentGroup.id)
-        .eq('kind', 'contact')
-        .in('slot', slotsToDelete);
-      if (delErr) throw delErr;
-    }
-    // 本文ありの枠をupsert(group_id,kind,slot のUNIQUEで競合更新)
-    if (rowsToUpsert.length > 0) {
-      const { error: upErr } = await supabase
-        .from('group_templates')
-        .upsert(rowsToUpsert, { onConflict: 'group_id,kind,slot' });
-      if (upErr) throw upErr;
-    }
-    showToast('テンプレを保存しました');
-    // 呼び出しUI用キャッシュも更新
-    await loadGroupTemplates();
-  } catch (e) {
-    console.error('[templates] save failed', e);
-    showToast('保存に失敗しました。');
-  }
-}
-
 // ═══════════════════════════════════════════
 // メッセージ送信・詳細
 // ═══════════════════════════════════════════
