@@ -289,30 +289,6 @@ function renderHandoverInline(container) {
   try { observeImageThumbnails(container); } catch (_) {}
 }
 
-const renderRow = (m, type) => {
-      const readMark = m.read
-        ? '<span style="font-size:11px; color:#047a37;">✅ 既読</span>'
-        : '<span style="font-size:11px; color:#c62828;">❌ 未読</span>';
-      let bottomLine = '';
-      if (type === 'answered' && m.response) {
-        const updated = m.response.updated_at ? formatTime(m.response.updated_at) : '';
-        bottomLine = `<div style="font-size:13px; margin-top:4px; padding:6px 8px; background:#f0fff4; border-left:3px solid #06C755; border-radius:4px;">${escHtml(m.response.response_text || '')}</div>`
-                   + `<div style="font-size:10px; color:var(--text-light); margin-top:2px;">回答日時: ${updated}</div>`;
-      } else if (type === 'na' && m.response) {
-        const updated = m.response.updated_at ? formatTime(m.response.updated_at) : '';
-        bottomLine = `<div style="font-size:11px; color:var(--text-light); margin-top:4px;">該当なし選択 (${updated})</div>`;
-      }
-      return `
-        <div style="padding:10px 4px; border-bottom:1px solid var(--border);">
-          <div style="display:flex; align-items:center; justify-content:space-between;">
-            <div style="font-size:14px; font-weight:500;">${escHtml(m.display_name)}${m.is_creator ? ' <span style="font-size:10px;background:var(--green);color:white;border-radius:3px;padding:1px 5px;">管理者</span>' : ''}</div>
-            ${readMark}
-          </div>
-          ${bottomLine}
-        </div>
-      `;
-    };
-
 function updateSurveyButtonState() {
   const input = document.getElementById('detail-survey-input');
   const submitBtn = document.getElementById('detail-survey-submit');
