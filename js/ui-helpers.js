@@ -51,7 +51,7 @@ function renderImageThumbnailHtml(item) {
          alt="画像読込中..."
          loading="lazy"
          style="max-width:160px; max-height:120px; border-radius:6px; background:#e4e8f0; object-fit:cover; display:block; cursor:zoom-in; image-orientation:from-image;"
-         onclick="event.stopPropagation(); openFullImageViewer('${fullPath}')">
+         onclick="event.stopPropagation(); openFullImageViewer(this.dataset.fullPath)">
   </div>`;
 }
 
@@ -378,13 +378,25 @@ function updateSignageUrlDisplay() {
 function copySignageUrl() {
   if (!currentGroup?.signage_token) return;
   const url = `https://app.edgeops.jp/signage.html?token=${currentGroup.signage_token}`;
-  navigator.clipboard?.writeText(url).then(() => showToast('URLをコピーしました'));
+  const p = navigator.clipboard?.writeText?.(url);
+  if (!p) {
+    showToast('この環境ではコピーできません');
+    return;
+  }
+  p.then(() => showToast('URLをコピーしました'))
+   .catch(() => showToast('コピーに失敗しました'));
 }
 
 function copyGroupId() {
   const id = currentGroup?.group_id;
   if (!id) return;
-  navigator.clipboard?.writeText(id).then(() => showToast('グループIDをコピーしました'));
+  const p = navigator.clipboard?.writeText?.(id);
+  if (!p) {
+    showToast('この環境ではコピーできません');
+    return;
+  }
+  p.then(() => showToast('グループIDをコピーしました'))
+   .catch(() => showToast('コピーに失敗しました'));
 }
 
 function generateGroupId() {
