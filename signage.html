@@ -678,6 +678,76 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // (anon キー経由の DB 直接アクセスを完全に廃止 = L3 認可基盤層との両立)
 const SIGNAGE_FETCH_URL = SUPABASE_URL + '/functions/v1/signage-fetch';
 
+// ═══════════════════════════════════════════
+// signage_token の localStorage 復元 (チャッピー第2回判定 GO)
+// ═══════════════════════════════════════════
+// 目的: Fully Kiosk の startURL は token なし
+//   (https://app.edgeops.jp/signage.html) のまま維持し、
+//   WebView 更新再起動・定期リロード後も端末保存の token で自動復帰する。
+//   - startURL に token を直書きしない (トークン再生成のたびの現地再設定を回避=運用8原則⑥維持)
+//   - URL に token を出し続けない (URLから即座に除去=原則④⑤維持)
+const SIGNAGE_TOKEN_STORAGE_KEY = 'signage_token';
+
+// token 取得の単一窓口:
+//   ① URL パラメータに token があれば → localStorage に保存し、URL から除去して返す
+//   ② URL に無ければ → localStorage の保存済み token を復元して返す
+//   ③ どちらも無ければ null
+function getSignageToken() {
+  let token = null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    token = params.get('token');
+  } catch (e) {
+    token = null;
+  }
+
+  if (token) {
+    // ① URL 由来 token を保存し、URL から token を消す (画面・履歴に残さない)
+    try {
+      localStorage.setItem(SIGNAGE_TOKEN_STORAGE_KEY, token);
+    } catch (e) {
+      // localStorage 不可環境でも認証自体は URL token で続行
+      console.warn('[getSignageToken] localStorage write failed:', e?.message);
+    }
+    try {
+      history.replaceState(null, '', window.location.pathname);
+    } catch (e) {
+      console.warn('[getSignageToken] history.replaceState failed:', e?.message);
+    }
+    return token;
+  }
+
+  // ② URL に無ければ localStorage から復元
+  try {
+    const saved = localStorage.getItem(SIGNAGE_TOKEN_STORAGE_KEY);
+    if (saved) return saved;
+  } catch (e) {
+    console.warn('[getSignageToken] localStorage read failed:', e?.message);
+  }
+  return null;
+}
+
+// 保存済み token を破棄 (明示的な INVALID_TOKEN / EXPIRED 応答時のみ呼ぶ)
+function clearSignageToken() {
+  try {
+    localStorage.removeItem(SIGNAGE_TOKEN_STORAGE_KEY);
+  } catch (e) {
+    console.warn('[clearSignageToken] localStorage remove failed:', e?.message);
+  }
+}
+
+// signage-fetch の応答が「明示的なトークン無効」かどうかを判定する単一窓口。
+//   true  → 無効画面へ落とし、localStorage の token も破棄する対象
+//           (INVALID_TOKEN=401 / EXPIRED=403 … signage-fetch が明示的に返すコード)
+//   false → 一時障害 (INTERNAL_ERROR=500 / 5xx / NETWORK_ERROR / タイムアウト /
+//           不明な error_code / エラーJSON) とみなし、現在表示を維持してリトライ
+// ※ allowlist 方式: 明示的な無効コードだけを無効扱いにし、それ以外は決して無効画面に落とさない。
+//   これにより Supabase 一時障害・ホテル側ネットワーク障害で誤って無効化されない。
+function isExplicitTokenInvalid(data) {
+  if (!data) return false;
+  return data.error_code === 'INVALID_TOKEN' || data.error_code === 'EXPIRED';
+}
+
 // 地域→座標マッピング
 const REGION_COORDS = {
   // 北海道・東北
@@ -945,8 +1015,8 @@ function toDateStr(date) {
 // チャッピー第68回判定 v2 反映:全 DB アクセスを Edge Function 経由に統一
 // service_role キーで認証バイパスし、L3 RLS 完遂後も動作する設計
 async function fetchSignageData() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
+  // token は getSignageToken() で URL / localStorage の両対応 (第2回判定 GO)
+  const token = getSignageToken();
   if (!token) {
     return { ok: false, error_code: 'NO_TOKEN' };
   }
@@ -960,7 +1030,20 @@ async function fetchSignageData() {
       },
       body: JSON.stringify({ token })
     });
-    const data = await res.json();
+
+    // ─── レスポンス JSON 解析 (5xx で HTML が返る等、JSON でない場合も一時障害扱い) ───
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      // JSON パース不能 (502/503/504 の HTML 等) は一時障害として表示維持
+      console.warn('[fetchSignageData] non-JSON response, status:', res.status);
+      return { ok: false, error_code: 'SERVER_ERROR', http_status: res.status };
+    }
+
+    // signage-fetch は明示無効時 error_code を返す (INVALID_TOKEN=401 / EXPIRED=403)。
+    // ただし INTERNAL_ERROR=500 等の一時障害コードはそのまま通し、
+    // 呼び出し側 (isExplicitTokenInvalid) で allowlist 判定させる。
     return data;
   } catch (e) {
     console.warn('[fetchSignageData] network error:', e?.message);
@@ -972,11 +1055,14 @@ async function fetchSignageData() {
 // 認証チェック（3段階）
 // ═══════════════════════════════════════════
 async function authenticate() {
-  // ① クエリパラメータ確認（tokenのみ必須・gidは不要）
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
+  // ① token 確認 (URL パラメータ or localStorage 復元・第2回判定 GO)
+  //    URL に token があれば localStorage に保存し URL から除去、
+  //    無ければ localStorage の保存済み token を復元する。
+  const token = getSignageToken();
 
   if (!token) {
+    // URL にも localStorage にも token が無い = 一度も正規起動していない端末。
+    // この場合のみ「URL 無効」を表示 (LINE のサイネージボタンからの起動が必要)。
     showError(
       'サイネージURLが無効です',
       'URLにトークンが含まれていません。\nグループ管理者にお問い合わせください。'
@@ -988,36 +1074,79 @@ async function authenticate() {
   try {
     const data = await fetchSignageData();
 
-    // ─── NETWORK_ERROR は「接続エラー」として別表示 (チャッピー最終確認 修正必須) ───
-    // 一時的な通信エラーで「サイネージ無効」と誤認させない
-    if (data?.error_code === 'NETWORK_ERROR') {
+    // ─── (A) 明示的なトークン無効 (INVALID_TOKEN / EXPIRED) のみ無効画面へ ───
+    //     このときだけ localStorage の token も破棄する
+    //     (トークン再生成・退職者/譲渡端末の締め出しはここで成立)
+    if (isExplicitTokenInvalid(data)) {
+      clearSignageToken();
       showError(
-        '接続エラー',
-        'サーバーへの接続に失敗しました。\nネットワークをご確認ください。'
-      );
-      return false;
-    }
-
-    if (!data || !data.ok || !data.group) {
-      // INVALID_TOKEN / EXPIRED すべて統一文言で表示
-      showError(
-        'サイネージが無効です',
+        'サイネージが無効になりました',
         'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。'
       );
       return false;
     }
 
-    // ③ 認証成功 - グループデータ + 全データをキャッシュ
-    currentGroupData = data.group;
-    _globalSignageData = data;
-    return true;
-  } catch (e) {
+    // ─── (B) 認証成功 ───
+    if (data && data.ok && data.group) {
+      currentGroupData = data.group;
+      _globalSignageData = data;
+      return true;
+    }
+
+    // ─── (C) それ以外はすべて一時障害扱い ───
+    //     INTERNAL_ERROR=500 / SERVER_ERROR / NETWORK_ERROR / 不明 error_code 等。
+    //     token は破棄せず「接続エラー・自動リトライ」表示にとどめ、
+    //     定期リトライ (下の scheduleAuthRetry) でサーバー復旧後に自動復帰する。
+    //     ※ 無効画面には絶対に落とさない (Supabase 一時障害での誤無効化を防止)
+    console.warn('[authenticate] transient failure, will retry:', data?.error_code);
     showError(
-      '認証エラー',
-      'サーバーへの接続に失敗しました。\nネットワークをご確認ください。'
+      '接続エラー',
+      'サーバーへ接続できません。\n自動的に再試行します…'
     );
+    scheduleAuthRetry();
+    return false;
+  } catch (e) {
+    // 例外も一時障害として自動リトライ (無効画面には落とさない)
+    console.warn('[authenticate] exception, will retry:', e?.message);
+    showError(
+      '接続エラー',
+      'サーバーへ接続できません。\n自動的に再試行します…'
+    );
+    scheduleAuthRetry();
     return false;
   }
+}
+
+// ═══════════════════════════════════════════
+// 認証リトライ (一時障害からの自動復帰・第2回判定 GO)
+// ═══════════════════════════════════════════
+// 一時障害 (INTERNAL_ERROR / 5xx / NETWORK_ERROR 等) で認証できなかったとき、
+// 一定間隔で init() を再実行してサーバー復旧後に自動で本表示へ合流する。
+// - 明示無効 (INVALID_TOKEN / EXPIRED) では呼ばれない (無効画面で確定)
+// - 多重起動しないよう単一タイマーで管理
+// - 復旧不能でも 60秒ごとに静かに再試行し続ける (無人サイネージ前提)
+let _authRetryTimer = null;
+const AUTH_RETRY_INTERVAL_MS = 60 * 1000; // 60秒ごと
+
+function scheduleAuthRetry() {
+  if (_authRetryTimer) return; // 既にリトライ予約済みなら二重予約しない
+  _authRetryTimer = setTimeout(async () => {
+    _authRetryTimer = null;
+    console.warn('[scheduleAuthRetry] retrying init...');
+    // オフライン中は無駄打ちを避け、次のインターバルまで待つ
+    if (!navigator.onLine) {
+      scheduleAuthRetry();
+      return;
+    }
+    // init() を再実行。成功すれば hideError→本表示へ合流、
+    // 再び一時障害なら authenticate 内で再度 scheduleAuthRetry() が呼ばれる。
+    try {
+      await init();
+    } catch (e) {
+      console.warn('[scheduleAuthRetry] init retry failed:', e?.message);
+      scheduleAuthRetry();
+    }
+  }, AUTH_RETRY_INTERVAL_MS);
 }
 
 // ═══════════════════════════════════════════
@@ -1946,23 +2075,31 @@ function startPolling() {
     try {
       const data = await fetchSignageData();
 
-      // ─── NETWORK_ERROR は表示を維持 (チャッピー最終確認 修正必須) ───
-      // 5分ポーリング中の一時的な通信エラーで「サイネージ無効」画面に落とさない
-      if (!data || data.error_code === 'NETWORK_ERROR') {
-        console.warn('[startPolling] network error; keep current display');
-        return;
-      }
-
-      if (!data.ok || !data.group) {
-        // トークン無効化されたら即エラー画面へ (INVALID_TOKEN / EXPIRED)
+      // ─── (A) 明示的なトークン無効 (INVALID_TOKEN / EXPIRED) のみ無効画面へ ───
+      //     このときだけ localStorage の token も破棄し、ポーリングを止める
+      if (isExplicitTokenInvalid(data)) {
+        clearSignageToken();
         showError('サイネージが無効になりました', 'グループ管理者がトークンを再生成しました。\n一度グループを退出して、再度参加してください。');
         clearInterval(updateTimer);
         return;
       }
+
+      // ─── (B) 一時障害はすべて表示維持 (第2回判定 GO・allowlist 方式) ───
+      //     INTERNAL_ERROR=500 / SERVER_ERROR / NETWORK_ERROR / 不明 error_code 等。
+      //     Supabase 一時障害・ネットワーク障害で「サイネージ無効」に落とさない。
+      //     現在の表示をそのまま維持し、次の 5分後に再検証する。
+      if (!data || !data.ok || !data.group) {
+        console.warn('[startPolling] transient failure; keep current display:', data?.error_code);
+        return;
+      }
+
+      // ─── (C) 正常応答: データ更新 ───
       currentGroupData = data.group;
       _globalSignageData = data;
     } catch (e) {
-      // ネットワークエラーはスキップ（オフラインバナーで通知済み）
+      // 例外も一時障害としてスキップ (表示維持)
+      console.warn('[startPolling] exception; keep current display:', e?.message);
+      return;
     }
     await loadMessage();
     await loadWeather();
@@ -2004,6 +2141,9 @@ function updateExpiryWarningBar() {
 
 // ═══════════════════════════════════════════
 async function init() {
+  // リトライ経由の再入時は予約済みタイマーを解除 (多重 init 防止・第2回判定 GO)
+  if (_authRetryTimer) { clearTimeout(_authRetryTimer); _authRetryTimer = null; }
+
   // ─── Supabase client 生成 (将来用に維持・現状は DB アクセスせず) ───
   // チャッピー第68回判定 v2 反映:
   // 全 DB アクセスは signage-fetch Edge Function 経由に統一されたため、
