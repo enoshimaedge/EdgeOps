@@ -35,6 +35,7 @@
         ▼js/image.js            画像モジュール32関数（Phase 3-a分離）_loadImageFromFile / compressImageForUpload / openFullImageViewer 等
         ▼js/templates.js        マイテンプレ4関数（Phase 3-b-1分離）applyTemplate / loadGroupTemplates / renderTemplateEditor / saveGroupTemplates
         ▼js/survey.js           アンケート7関数（Phase 3-b-2分離）applySurveyVisibility / toggleSurveyMode / applySurveyDetailUI / submitSurveyResponse / submitSurveyNotApplicable / showSurveyList / showSurveyDetail
+        ▼js/report.js           月次レポート3関数（Phase 3-b-3分離）showMonthlyReport / switchReportTab / loadReportData
         ▼環境設定             prod/staging/dev 分岐・detectEnvironment
         ▼LIFF外アクセス       assertLiffEnvironment / ensureCurrentUser
         ▼グローバル状態        currentUser / currentGroup 等
@@ -51,7 +52,7 @@
         ▼メッセージ送信・詳細   sendMessage / showDetail / recordRead
         ▼引き継ぎノート         loadHandoverNotes / confirmHandover
         ▼承認管理             loadApprovals / approveMember / rejectMember
-        ▼月次レポート          showMonthlyReport / loadReportData
+        ▼月次レポート          showMonthlyReport / switchReportTab / loadReportData ※ js/report.js へ移動済（Phase 3-b-3）
         ▼アンケート集計        showSurveyList / showSurveyDetail
         ▼プロフィール          updateGroupName / updateLinkUrl / leaveGroup
         ▼サイネージ            openSignage / generateSignageToken / signage-btn
@@ -903,6 +904,7 @@
 <script src="js/image.js"></script>
 <script src="js/templates.js?v=20260704-3"></script>
 <script src="js/survey.js?v=20260704-4"></script>
+<script src="js/report.js?v=20260705-1"></script>
 <script>
 // ═══════════════════════════════════════════
 // ロゴ設定
@@ -2931,171 +2933,6 @@ async function showMemberList() {
     content.innerHTML = `<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">${memberList.length}人が参加中</div>` + html;
   } catch(e) {
     content.innerHTML = '<div style="text-align:center;color:var(--red);padding:24px;">取得に失敗しました</div>';
-  }
-}
-
-// ═══════════════════════════════════════════
-// アンケート集計機能（管理者のみ）
-// ═══════════════════════════════════════════
-
-// 1階層目：アンケート一覧モーダルを表示
-
-// 2階層目：個別アンケート詳細集計モーダル
-
-async function showMonthlyReport() {
-  document.getElementById('modal-report').style.display = 'block';
-  currentReportTab = 'last';
-  updateReportTabUI();
-  await loadReportData('last');
-}
-
-function switchReportTab(tab) {
-  currentReportTab = tab;
-  updateReportTabUI();
-  loadReportData(tab);
-}
-
-
-async function loadReportData(tab) {
-  const content = document.getElementById('report-content');
-  const periodEl = document.getElementById('report-period');
-  content.innerHTML = '<div class="spinner" style="margin:40px auto;"></div>';
-
-  const now = new Date();
-  // JSTオフセット（+9時間）を考慮
-  const jstOffset = 9 * 60 * 60 * 1000;
-  const nowJST = new Date(now.getTime() + jstOffset);
-  let year, month;
-  if (tab === 'last') {
-    const d = new Date(Date.UTC(nowJST.getUTCFullYear(), nowJST.getUTCMonth() - 1, 1));
-    year = d.getUTCFullYear(); month = d.getUTCMonth();
-  } else {
-    year = nowJST.getUTCFullYear(); month = nowJST.getUTCMonth();
-  }
-  // JSTの月初・月末をUTCに変換してクエリ
-  const start = new Date(Date.UTC(year, month, 1) - jstOffset).toISOString();
-  const end   = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59) - jstOffset).toISOString();
-  const label = `${year}年${month + 1}月`;
-  periodEl.textContent = label;
-
-  try {
-    // メッセージ取得
-    const { data: msgs } = await supabase
-      .from('messages')
-      .select('id, created_at, sender_eo_uid, read_count')
-      .eq('group_session_id', currentGroup.id)
-      .gte('created_at', start).lte('created_at', end)
-      .neq('is_survey', true);
-
-    // 既読レコード取得
-    const msgIds = (msgs || []).map(m => m.id);
-    let receipts = [];
-    if (msgIds.length > 0) {
-      const { data } = await supabase
-        .from('read_receipts')
-        .select('message_id, eo_uid, read_at')
-        .in('message_id', msgIds);
-      receipts = data || [];
-    }
-
-    // メンバー取得
-    const { data: members } = await supabase
-      .from('group_members')
-      .select('id, display_name, eo_uid, is_signage')
-      .eq('group_session_id', currentGroup.id)
-      .eq('status', 'approved');
-    const humanMembers = (members || []).filter(m => !m.is_signage);
-    const memberCount = humanMembers.length;
-    const memberMap = {};
-    humanMembers.forEach(m => { memberMap[m.eo_uid] = m.display_name; });
-
-    // 統計計算
-    const totalMsgs = (msgs || []).length;
-
-    // 平均既読率（送信時点のreceiver_countを使用・メンバー増減の影響を受けない）
-    let totalRate = 0;
-    (msgs || []).forEach(msg => {
-      const msgReceipts = receipts.filter(r => r.message_id === msg.id && r.eo_uid !== msg.sender_eo_uid && memberMap[r.eo_uid]);
-      // receiver_countが保存済みならそれを使う（送信時点で固定）
-      // NULLの場合（旧メッセージ）は現在のサイネージ除外メンバー数から計算
-      const receiverCount = msg.receiver_count != null ? msg.receiver_count : memberCount - 1;
-      totalRate += receiverCount > 0 ? msgReceipts.length / receiverCount : 0;
-    });
-    const avgRate = totalMsgs > 0 ? Math.round(totalRate / totalMsgs * 100) : 0;
-
-    // 最速既読者（全メッセージで最も平均既読時間が短いメンバー）- サイネージ除外
-    const memberReadTimes = {};
-    const memberReadCounts = {};
-    receipts.forEach(r => {
-      if (!memberMap[r.eo_uid]) return; // サイネージまたは退出済みを除外
-      const msg = (msgs || []).find(m => m.id === r.message_id);
-      if (!msg) return;
-      const diff = (new Date(r.read_at) - new Date(msg.created_at)) / 60000;
-      if (!memberReadTimes[r.eo_uid]) { memberReadTimes[r.eo_uid] = 0; memberReadCounts[r.eo_uid] = 0; }
-      memberReadTimes[r.eo_uid] += diff;
-      memberReadCounts[r.eo_uid]++;
-    });
-    let fastestName = '—'; let fastestMin = Infinity;
-    Object.keys(memberReadTimes).forEach(uid => {
-      const avg = memberReadTimes[uid] / memberReadCounts[uid];
-      if (avg < fastestMin) { fastestMin = avg; fastestName = memberMap[uid] || '—'; }
-    });
-    const fastestStr = fastestMin < Infinity
-      ? `${fastestName}（平均${fastestMin < 60 ? Math.round(fastestMin) + '分' : Math.round(fastestMin/60) + '時間'}）`
-      : '—';
-
-    // 要注意スタッフ（既読率50%未満）- サイネージ除外
-    const memberRateMap = {};
-    humanMembers.forEach(m => { memberRateMap[m.eo_uid] = { name: m.display_name, read: 0, total: 0 }; });
-    (msgs || []).forEach(msg => {
-      const msgReceipts = receipts.filter(r => r.message_id === msg.id);
-      humanMembers.forEach(m => {
-        if (m.eo_uid === msg.sender_eo_uid) return; // 送信者は除く
-        memberRateMap[m.eo_uid].total++;
-        if (msgReceipts.find(r => r.eo_uid === m.eo_uid)) memberRateMap[m.eo_uid].read++;
-      });
-    });
-    const caution = Object.values(memberRateMap)
-      .filter(m => m.total > 0 && m.read / m.total < 0.5)
-      .sort((a, b) => (a.read/a.total) - (b.read/b.total)); // 既読率が低い順
-
-    // レポートHTML生成
-    const rateColor = avgRate >= 80 ? 'var(--green)' : avgRate >= 60 ? '#f59e0b' : 'var(--red)';
-    content.innerHTML = `
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
-        <div style="background:var(--green-light); border-radius:12px; padding:14px; text-align:center;">
-          <div style="font-size:11px; color:var(--text-mid); margin-bottom:4px;">送信メッセージ数</div>
-          <div style="font-size:28px; font-weight:700; color:var(--green);">${totalMsgs}</div>
-          <div style="font-size:11px; color:var(--text-light);">件</div>
-        </div>
-        <div style="background:#f0f8ff; border-radius:12px; padding:14px; text-align:center;">
-          <div style="font-size:11px; color:var(--text-mid); margin-bottom:4px;">平均既読率</div>
-          <div style="font-size:28px; font-weight:700; color:${rateColor};">${avgRate}</div>
-          <div style="font-size:11px; color:var(--text-light);">%</div>
-        </div>
-      </div>
-      <div style="background:#fffde7; border-radius:12px; padding:14px; margin-bottom:10px;">
-        <div style="font-size:11px; font-weight:700; color:#f57f17; margin-bottom:6px;">⚡ 最速既読者</div>
-        <div style="font-size:14px; font-weight:600; color:var(--text);">${fastestStr}</div>
-      </div>
-      <div style="background:#ffeaea; border-radius:12px; padding:14px;">
-        <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:6px;">⚠️ 要注意スタッフ（既読率50%未満）</div>
-        ${caution.length === 0
-          ? '<div style="font-size:13px; color:var(--text-light);">該当者なし 🎉</div>'
-          : caution.map(m => {
-              const r = m.total > 0 ? Math.round(m.read / m.total * 100) : 0;
-              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
-                <span style="font-size:13px; font-weight:500;">${escHtml(m.name)}</span>
-                <span style="font-size:13px; font-weight:700; color:var(--red);">${r}%</span>
-              </div>`;
-            }).join('')
-        }
-      </div>
-      ${totalMsgs === 0 ? '<div style="text-align:center; color:var(--text-light); font-size:13px; margin-top:16px;">この月のメッセージはありません</div>' : ''}
-    `;
-  } catch(e) {
-    console.error(e);
-    content.innerHTML = '<div style="text-align:center; color:var(--red); padding:20px;">データの取得に失敗しました</div>';
   }
 }
 
