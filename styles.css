@@ -12,6 +12,68 @@
   --text: #1a2f4a;
   --text-mid: #4a6080;
   --text-light: #9aa5b8;
+  /* ========================================================================
+     EdgeOps Design System v1.12 — Design Tokens
+     判定: EO-DEC-0116 / EO-DEC-0117
+     Step 1: 定義のみ。この時点ではどこからも参照しない（見た目は変わらない）
+     ======================================================================== */
+
+  /* --- Brand / Accent ---------------------------------------------------- */
+  --eo-accent:            #0F6B63;
+  --eo-accent-hover:      #0C564F;
+  --eo-accent-weak:       #E6F0EF;
+
+  /* --- Header ------------------------------------------------------------ */
+  --eo-header-bg:         #1B2A3A;
+  --eo-header-fg:         #FFFFFF;
+
+  /* --- Priority（人間が送った投稿にのみ使用） ------------------------------ */
+  /* DB列 priority の値（urgent / normal / info）は変更しない */
+  --eo-priority-urgent:   #C62828;
+  --eo-priority-caution:  #B7791F;
+  --eo-priority-notice:   #2E7D32;
+
+  /* --- System notice（種別3色を使わない。グレーの沈んだ面） ---------------- */
+  --eo-system-bg:         #EDEDEA;
+  --eo-system-fg:         #55555A;
+  --eo-system-border:     #DFE3E8;
+
+  /* --- Surface / Text ---------------------------------------------------- */
+  --eo-surface:           #FFFFFF;
+  --eo-surface-sunken:    #F5F6F8;
+  --eo-surface-dark:      #1E2A2A;
+  --eo-border:            #ECECEA;
+  --eo-text:              #1C1C1E;
+  --eo-text-muted:        #6E6E73;
+  --eo-text-disabled:     #A5ADB6;
+
+  /* --- Radius（全要素9pxで統一） ------------------------------------------ */
+  --eo-radius:            9px;
+
+  /* --- Priority bar（左端3px縦帯） ---------------------------------------- */
+  --eo-bar-width:         3px;
+
+  /* --- Shadow（極薄1段のみ） ---------------------------------------------- */
+  --eo-shadow:            0 1px 2px rgba(28, 28, 30, 0.06);
+
+  /* --- Typography（明朝は禁止） ------------------------------------------- */
+  --eo-font:              'Noto Sans JP', -apple-system, BlinkMacSystemFont,
+                          'Helvetica Neue', Arial, sans-serif;
+  --eo-font-mono:         ui-monospace, 'SF Mono', monospace;
+  --eo-font-size-base:    16px;
+
+  /* --- Spacing ----------------------------------------------------------- */
+  --eo-space-1:           4px;
+  --eo-space-2:           8px;
+  --eo-space-3:           12px;
+  --eo-space-4:           16px;
+  --eo-space-5:           24px;
+  --eo-space-6:           32px;
+
+  /* --- Motion ------------------------------------------------------------ */
+  --eo-motion-fast:       120ms;
+  --eo-motion-base:       200ms;
+  --eo-ease:              cubic-bezier(0, 0, 0.2, 1);
 }
 
 body {
