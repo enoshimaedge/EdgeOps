@@ -80,12 +80,15 @@ body {
   font-family: var(--eo-font);
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  height: 100vh;                 /* body自体はスクロールさせない（スクロールは.contentが担う） */
+  overflow: hidden;
+  overscroll-behavior-y: none;   /* 上端を超えた引っ張りで画面全体が引きずられるのを止める（iOS） */
   max-width: 430px;
   margin: 0 auto;
 }
+html { overscroll-behavior-y: none; }
 
-.screen { display: none; flex-direction: column; min-height: 100vh; }
+.screen { display: none; flex-direction: column; height: 100vh; }
 .screen.active { display: flex; }
 
 /* ── ヘッダー ── */
