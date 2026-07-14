@@ -77,7 +77,7 @@
 }
 
 body {
-  font-family: 'Yu Gothic', 'YuGothic', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-family: var(--eo-font);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -90,7 +90,8 @@ body {
 
 /* ── ヘッダー ── */
 .header {
-  background: var(--green);
+  background: var(--eo-header-bg);
+  color: var(--eo-header-fg);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -143,7 +144,7 @@ body {
   color: white;
   font-size: 10px;
   font-weight: 700;
-  border-radius: 10px;
+  border-radius: var(--eo-radius);
   padding: 1px 5px;
   min-width: 16px;
   text-align: center;
@@ -153,7 +154,7 @@ body {
 
 .card {
   background: var(--white);
-  border-radius: 14px;
+  border-radius: var(--eo-radius);
   border: 1px solid var(--border);
   overflow: hidden;
   margin-bottom: 12px;
@@ -164,7 +165,7 @@ body {
   width: 100%;
   padding: 14px;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--eo-radius);
   font-size: 15px;
   font-weight: 700;
   font-family: inherit;
@@ -223,7 +224,7 @@ body {
 }
 .form-input, .form-textarea {
   width: 100%; padding: 12px 14px;
-  border: 1.5px solid var(--border); border-radius: 12px;
+  border: 1.5px solid var(--border); border-radius: var(--eo-radius);
   font-size: 15px; font-family: inherit; color: var(--text);
   background: white; outline: none;
   transition: border-color 0.15s;
@@ -231,29 +232,69 @@ body {
 .form-input:focus, .form-textarea:focus { border-color: var(--green); }
 .form-textarea { resize: none; min-height: 100px; line-height: 1.6; }
 
-/* ── 優先度バッジ ── */
-.priority-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 700; padding: 2px 8px;
-  border-radius: 10px; margin-bottom: 6px;
-}
-.priority-urgent { background: #ffeaea; color: var(--eo-priority-urgent); border: 1px solid #e53935; }
-.priority-normal { background: #fffde7; color: #f57f17; border: 1px solid #f9a825; }
-.priority-info   { background: #f1f8f4; color: var(--eo-priority-notice); border: 1px solid #66bb6a; }
+/* ── 連絡メッセージ一覧（連続リスト） ── */
+.eo-msg-list { background: var(--eo-surface); }
 
-/* ── メッセージカード ── */
-.msg-card {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+.eo-msg {
+  padding: 14px 16px;                    /* 【条件9】1pxも縮小しない */
+  border-bottom: 1px solid var(--eo-border);
+  position: relative;
   cursor: pointer;
-  transition: background 0.1s;
-  border-left: 4px solid transparent;
 }
-.msg-card.urgent { border-left-color: #e53935; background: #fffafa; }
-.msg-card.normal { border-left-color: #f9a825; background: #fffef5; }
-.msg-card.info   { border-left-color: #66bb6a; background: #f1f8f4; }
-.msg-card:last-child { border-bottom: none; }
-.msg-card:active { background: #f8f9fc; }
+.eo-msg::before {                        /* 【第116回⑤】左端3px縦帯 */
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: var(--eo-bar-width);
+}
+.eo-msg--urgent::before  { background: var(--eo-priority-urgent); }
+.eo-msg--caution::before { background: var(--eo-priority-caution); }
+.eo-msg--notice::before  { background: var(--eo-priority-notice); }
+
+.eo-msg__text {                          /* 【条件5】自動可変・最大2行 */
+  font-size: 14px; line-height: 1.5; margin-bottom: 8px;
+  color: var(--eo-text);
+  display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.eo-msg__meta {                          /* 【条件11】狭い画面で破綻させない */
+  display: flex; flex-wrap: wrap;
+  align-items: center; gap: 6px;
+  font-size: 12px; line-height: 1.4;
+  color: var(--eo-text-muted);
+}
+.eo-msg__kind { font-weight: 500; }      /* 【第116回⑤】色だけに頼らない */
+.eo-msg--urgent  .eo-msg__kind { color: var(--eo-priority-urgent); }
+.eo-msg--caution .eo-msg__kind { color: var(--eo-priority-caution); }
+.eo-msg--notice  .eo-msg__kind { color: var(--eo-priority-notice); }
+.eo-msg__sep  { color: #D8D8D4; }
+
+/* 【条件8】画像・アンケートは無彩色の文字ラベル。3行目を作らない */
+.eo-msg__label {
+  font-size: 11px; color: var(--eo-text-muted);
+  background: var(--eo-system-bg);
+  padding: 1px 6px; border-radius: 4px;
+}
+
+/* 【条件10】「既読 4/11」と文字で。【条件3】赤にしない */
+.eo-msg__read {
+  margin-left: auto;
+  white-space: nowrap;                   /* 【条件11】 */
+  color: var(--eo-text-muted);
+}
+/* 【第119回・修正2】全員既読に「緑」を使ってはならない。
+   赤・黄・緑の3色は、人間が投稿した連絡の重要度にのみ使う（第116回・第118回）。 */
+.eo-msg__read--done {
+  color: var(--eo-text-muted);
+  font-weight: 600;
+}
+
+/* 【条件7】日付見出し */
+.eo-msg-day {
+  padding: 14px 16px 8px;
+  font-size: 12px; font-weight: 500;
+  color: var(--eo-text-muted);
+  background: var(--eo-surface-sunken);
+}
 
 /* ── 月別ヘッダー・アコーディオン ── */
 .month-section { margin-bottom: 4px; }
@@ -278,27 +319,11 @@ body {
 
 /* ── 優先度選択ボタン ── */
 .priority-sel-btn {
-  text-align: center; padding: 10px 4px; border-radius: 10px;
+  text-align: center; padding: 10px 4px; border-radius: var(--eo-radius);
   font-size: 13px; font-weight: 700; border: 2px solid transparent;
   transition: all 0.15s; opacity: 0.45;
 }
 .priority-sel-btn.selected { opacity: 1; transform: scale(1.04); }
-
-.msg-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; line-height: 1.5; word-break: break-all; }
-.msg-meta { font-size: 12px; color: var(--text-light); margin-bottom: 8px; }
-
-.msg-read-bar { display: flex; align-items: center; gap: 8px; }
-.bar { flex: 1; height: 5px; background: #eef0f5; border-radius: 3px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 3px; background: var(--green); transition: width 0.3s; }
-.bar-fill.warn { background: #f59e0b; }
-.read-count { font-size: 12px; color: var(--text-mid); font-weight: 600; white-space: nowrap; }
-
-.unread-names {
-  font-size: 12px; color: var(--red);
-  margin-top: 6px;
-  display: flex; align-items: center; gap: 4px;
-  flex-wrap: wrap;
-}
 
 /* ── 既読詳細 ── */
 .person-row {
@@ -312,11 +337,20 @@ body {
 .check-no { color: var(--red); font-size: 18px; }
 
 .banner {
-  padding: 12px 16px; border-radius: 12px;
+  padding: 12px 16px; border-radius: var(--eo-radius);
   font-size: 13px; margin-bottom: 12px;
   display: flex; align-items: center; gap: 8px;
 }
 .banner-info { background: #e3f2fd; color: #1565c0; }
+
+/* ── システム通知バー（仕様書 第25-3） ── */
+.eo-system-bar {
+  background: var(--eo-system-bg);
+  color: var(--eo-system-fg);
+  border: 1px solid var(--eo-system-border);
+  border-radius: var(--eo-radius);
+  padding: 14px 16px;
+}
 
 .loading {
   display: flex; flex-direction: column;
@@ -342,7 +376,7 @@ body {
 
 .group-id-box {
   background: var(--navy); color: white;
-  border-radius: 12px; padding: 16px;
+  border-radius: var(--eo-radius); padding: 16px;
   text-align: center; margin-bottom: 16px;
 }
 /* ── 削除ボタン ── */
@@ -352,7 +386,7 @@ body {
   background: transparent;
   color: var(--red);
   border: 1.5px solid var(--red);
-  border-radius: 8px;
+  border-radius: var(--eo-radius);
   font-size: 13px;
   font-weight: 600;
   font-family: inherit;
@@ -366,7 +400,7 @@ body {
 .copy-btn {
   margin-top: 10px; padding: 6px 16px;
   background: var(--green); color: white;
-  border: none; border-radius: 8px;
+  border: none; border-radius: var(--eo-radius);
   font-size: 12px; cursor: pointer; font-family: inherit;
 }
 
@@ -379,7 +413,7 @@ body {
 .approval-time { font-size: 12px; color: var(--text-light); }
 .approve-btn {
   padding: 6px 14px; background: var(--green); color: white;
-  border: none; border-radius: 8px; font-size: 13px;
+  border: none; border-radius: var(--eo-radius); font-size: 13px;
   font-weight: 600; cursor: pointer; font-family: inherit;
 }
 
@@ -398,7 +432,7 @@ body {
   padding: 10px 12px;
   background: var(--white);
   border: 1.5px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--eo-radius);
   font-size: 13px;
   font-family: inherit;
   color: var(--text);
@@ -426,7 +460,7 @@ body {
 .handover-badge-bar {
   background: #fff3e0;
   border: 1.5px solid #ffb74d;
-  border-radius: 12px;
+  border-radius: var(--eo-radius);
   padding: 10px 14px;
   margin-bottom: 12px;
   display: flex;
@@ -440,7 +474,7 @@ body {
 .expiry-warning-bar {
   padding: 10px 14px;
   margin-bottom: 12px;
-  border-radius: 12px;
+  border-radius: var(--eo-radius);
   font-size: 13px;
   font-weight: 700;
   text-align: center;
@@ -461,7 +495,7 @@ body {
   color: white;
   font-size: 12px;
   font-weight: 700;
-  border-radius: 12px;
+  border-radius: var(--eo-radius);
   padding: 2px 10px;
   min-width: 28px;
   text-align: center;
@@ -484,10 +518,10 @@ body {
 .handover-priority-badge {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 11px; font-weight: 700; padding: 2px 8px;
-  border-radius: 10px; margin-bottom: 6px;
+  border-radius: var(--eo-radius); margin-bottom: 6px;
 }
 .hw-action { background: #ffeaea; color: #c62828; border: 1px solid #e53935; }
-.hw-check  { background: #fffde7; color: #f57f17; border: 1px solid #f9a825; }
+.hw-check  { background: #fffde7; color: var(--eo-priority-caution); border: 1px solid #f9a825; }
 .hw-done   { background: #f1f8f4; color: #2e7d32; border: 1px solid #66bb6a; }
 
 .handover-confirm-names {
@@ -499,7 +533,7 @@ body {
 }
 
 .hw-confirm-btn {
-  width: 100%; padding: 14px; border: none; border-radius: 12px;
+  width: 100%; padding: 14px; border: none; border-radius: var(--eo-radius);
   font-size: 15px; font-weight: 700; font-family: inherit;
   cursor: pointer; transition: opacity 0.15s; margin-bottom: 10px;
 }
@@ -507,7 +541,7 @@ body {
 .hw-btn-takeover { background: #1565c0; color: white; }
 .hw-btn-done     { background: var(--green); color: white; }
 .hw-confirmed-banner {
-  background: #e8f5e9; border: 1.5px solid #66bb6a; border-radius: 12px;
+  background: #e8f5e9; border: 1.5px solid #66bb6a; border-radius: var(--eo-radius);
   padding: 12px 16px; text-align: center; font-size: 14px;
   font-weight: 700; color: #2e7d32; margin-bottom: 10px;
 }
@@ -515,7 +549,7 @@ body {
 /* 作成画面：引き継ぎトグル */
 .compose-type-toggle {
   display: flex; gap: 0; margin-bottom: 16px;
-  border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden;
+  border: 1.5px solid var(--border); border-radius: var(--eo-radius); overflow: hidden;
 }
 .compose-type-btn {
   flex: 1; padding: 10px 4px; border: none; background: white;
@@ -578,7 +612,7 @@ body {
 .group-card {
   padding: 14px 16px;
   border: 2px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--eo-radius);
   background: white;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -591,14 +625,14 @@ body {
   margin-top: 10px; padding: 6px 14px;
   background: rgba(255,255,255,0.15);
   color: white; border: 1px solid rgba(255,255,255,0.4);
-  border-radius: 8px; font-size: 12px; font-weight: 700;
+  border-radius: var(--eo-radius); font-size: 12px; font-weight: 700;
   cursor: pointer; font-family: inherit;
   display: block; width: 100%; text-align: center;
 }
 .join-new-group-btn {
   width: 100%; padding: 12px 16px;
   background: var(--green); color: white;
-  border: none; border-radius: 10px;
+  border: none; border-radius: var(--eo-radius);
   font-size: 14px; font-weight: 700;
   cursor: pointer; font-family: inherit;
   transition: background 0.15s;
