@@ -759,3 +759,9 @@ html {
     padding-right: 16px;
   }
 }
+
+.lang-btn.selected {
+  background: var(--eo-header-bg);
+  color: #fff;
+  border-color: var(--eo-header-bg);
+}
