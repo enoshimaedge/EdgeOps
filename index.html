@@ -121,7 +121,7 @@
     <img id="full-image-content" alt="" style="max-width:100%; max-height:100%; object-fit:contain; transform-origin:center center; transition:transform 0.15s ease-out; user-select:none; -webkit-user-select:none; pointer-events:auto; image-orientation:from-image;">
   </div>
   <!-- 警告文(2026/5/21 野口さん経営判断・保存・転載抑止) -->
-  <div id="full-image-warning" style="position:absolute; bottom:max(46px, calc(env(safe-area-inset-bottom) + 30px)); left:50%; transform:translateX(-50%); color:#ffeb3b; font-size:12px; font-weight:700; text-align:center; pointer-events:none; padding:6px 12px; background:rgba(0,0,0,0.6); border-radius:6px; max-width:90vw; line-height:1.4;">⚠️ 投稿された画像の保存・転載は管理者の許可を得てください</div>
+  <div id="full-image-warning" style="position:absolute; bottom:max(46px, calc(env(safe-area-inset-bottom) + 30px)); left:50%; transform:translateX(-50%); color:#ffeb3b; font-size:12px; font-weight:700; text-align:center; pointer-events:none; padding:6px 12px; background:rgba(0,0,0,0.6); border-radius:6px; max-width:90vw; line-height:1.4;">投稿された画像の保存・転載は管理者の許可を得てください</div>
   <!-- ヒント -->
   <div id="full-image-hint" style="position:absolute; bottom:max(16px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); color:rgba(255,255,255,0.7); font-size:11px; text-align:center; pointer-events:none;">ピンチで拡縮・ダブルタップで切替・背景タップで閉じる</div>
 </div>
@@ -138,7 +138,6 @@
   </div>
   <div class="content">
     <div style="text-align:center; padding: 48px 0 32px;">
-      <div style="font-size:56px; margin-bottom:16px;">🔒</div>
       <div style="font-size:18px; font-weight:700; margin-bottom:12px;">
         友だち登録が必要です
       </div>
@@ -154,12 +153,12 @@
                 font-size:15px; font-weight:700;
                 text-decoration:none;
                 box-shadow:0 4px 16px rgba(6,199,85,0.4);">
-        ➕ 友だち追加する
+         友だち追加する
       </a>
       <div style="margin-top:24px;">
         <button class="btn btn-secondary" onclick="recheckFriendship()"
                 style="max-width:260px; margin:0 auto;">
-          🔄 登録済みの場合は再確認
+           登録済みの場合は再確認
         </button>
       </div>
     </div>
@@ -176,10 +175,9 @@
   </div>
   <div class="content">
     <div id="start-expiry-notice" style="display:none; background:#fff3e0; border-left:4px solid #f57c00; color:#7c4a00; padding:14px 16px; margin-bottom:16px; border-radius:6px; font-size:14px; line-height:1.6;">
-      ⚠️ グループの有効期限が切れました。<br>新しいグループに参加するか、新規作成してください。
+       グループの有効期限が切れました。<br>新しいグループに参加するか、新規作成してください。
     </div>
     <div style="text-align:center; padding: 32px 0 24px;">
-      <div style="font-size:48px; margin-bottom:12px;">📋</div>
       <div style="font-size:18px; font-weight:700; margin-bottom:8px;">はじめましょう</div>
       <div style="font-size:14px; color:var(--text-light);">グループを作成するか、既存のグループに参加してください
 </div>
@@ -190,7 +188,7 @@
     </div>
     <div style="margin-bottom:16px;">
       <div class="card" style="padding:16px; margin-bottom:10px;">
-        <div style="font-size:13px; font-weight:700; color:var(--text-mid); margin-bottom:10px;">✨ 新しいグループを作る</div>
+        <div style="font-size:13px; font-weight:700; color:var(--text-mid); margin-bottom:10px;">新しいグループを作る</div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label">グループ名（任意） <span style="font-size:11px; color:var(--text-light); font-weight:400;">※後から変更できます</span></label>
           <input class="form-input" id="input-group-name" type="text" placeholder="例：フロントスタッフ・1階ナースステーション" maxlength="30">
@@ -199,12 +197,12 @@
           <label class="form-label">業種を選択</label>
           <select class="form-input" id="input-industry">
             <option value="">-- 業種を選んでください --</option>
-            <option value="hotel">🏨 ホテル・旅館</option>
-            <option value="clinic">🏥 病院・クリニック</option>
-            <option value="care">🏠 介護施設</option>
-            <option value="attraction">🎡 集客施設</option>
-            <option value="freelance">👥 フリーランス集団</option>
-            <option value="club">🏆 部活・クラブ</option>
+            <option value="hotel">ホテル・旅館</option>
+            <option value="clinic">病院・クリニック</option>
+            <option value="care">介護施設</option>
+            <option value="attraction">集客施設</option>
+            <option value="freelance">フリーランス集団</option>
+            <option value="club">部活・クラブ</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
@@ -212,73 +210,73 @@
           <select class="form-input" id="input-region">
             <option value="">-- 地域を選んでください --</option>
             <optgroup label="── 北海道・東北 ──">
-              <option value="hokkaido">📍 北海道</option>
-              <option value="aomori">📍 青森県</option>
-              <option value="iwate">📍 岩手県</option>
-              <option value="miyagi">📍 宮城県</option>
-              <option value="akita">📍 秋田県</option>
-              <option value="yamagata">📍 山形県</option>
-              <option value="fukushima">📍 福島県</option>
+              <option value="hokkaido">北海道</option>
+              <option value="aomori">青森県</option>
+              <option value="iwate">岩手県</option>
+              <option value="miyagi">宮城県</option>
+              <option value="akita">秋田県</option>
+              <option value="yamagata">山形県</option>
+              <option value="fukushima">福島県</option>
             </optgroup>
             <optgroup label="── 関東 ──">
-              <option value="ibaraki">📍 茨城県</option>
-              <option value="tochigi">📍 栃木県</option>
-              <option value="gunma">📍 群馬県</option>
-              <option value="saitama">📍 埼玉県</option>
-              <option value="chiba">📍 千葉県</option>
-              <option value="tokyo">📍 東京都</option>
-              <option value="yokohama">📍 神奈川県（横浜）</option>
-              <option value="fujisawa">📍 神奈川県（藤沢・湘南）</option>
-              <option value="kamakura">📍 神奈川県（鎌倉）</option>
-              <option value="hakone">📍 神奈川県（箱根）</option>
+              <option value="ibaraki">茨城県</option>
+              <option value="tochigi">栃木県</option>
+              <option value="gunma">群馬県</option>
+              <option value="saitama">埼玉県</option>
+              <option value="chiba">千葉県</option>
+              <option value="tokyo">東京都</option>
+              <option value="yokohama">神奈川県（横浜）</option>
+              <option value="fujisawa">神奈川県（藤沢・湘南）</option>
+              <option value="kamakura">神奈川県（鎌倉）</option>
+              <option value="hakone">神奈川県（箱根）</option>
             </optgroup>
             <optgroup label="── 中部 ──">
-              <option value="niigata">📍 新潟県</option>
-              <option value="toyama">📍 富山県</option>
-              <option value="ishikawa">📍 石川県</option>
-              <option value="fukui">📍 福井県</option>
-              <option value="yamanashi">📍 山梨県</option>
-              <option value="nagano">📍 長野県</option>
-              <option value="gifu">📍 岐阜県</option>
-              <option value="shizuoka">📍 静岡県</option>
-              <option value="aichi">📍 愛知県</option>
+              <option value="niigata">新潟県</option>
+              <option value="toyama">富山県</option>
+              <option value="ishikawa">石川県</option>
+              <option value="fukui">福井県</option>
+              <option value="yamanashi">山梨県</option>
+              <option value="nagano">長野県</option>
+              <option value="gifu">岐阜県</option>
+              <option value="shizuoka">静岡県</option>
+              <option value="aichi">愛知県</option>
             </optgroup>
             <optgroup label="── 近畿 ──">
-              <option value="mie">📍 三重県</option>
-              <option value="shiga">📍 滋賀県</option>
-              <option value="kyoto">📍 京都府</option>
-              <option value="osaka">📍 大阪府</option>
-              <option value="hyogo">📍 兵庫県</option>
-              <option value="nara">📍 奈良県</option>
-              <option value="wakayama">📍 和歌山県</option>
+              <option value="mie">三重県</option>
+              <option value="shiga">滋賀県</option>
+              <option value="kyoto">京都府</option>
+              <option value="osaka">大阪府</option>
+              <option value="hyogo">兵庫県</option>
+              <option value="nara">奈良県</option>
+              <option value="wakayama">和歌山県</option>
             </optgroup>
             <optgroup label="── 中国 ──">
-              <option value="tottori">📍 鳥取県</option>
-              <option value="shimane">📍 島根県</option>
-              <option value="okayama">📍 岡山県</option>
-              <option value="hiroshima">📍 広島県</option>
-              <option value="yamaguchi">📍 山口県</option>
+              <option value="tottori">鳥取県</option>
+              <option value="shimane">島根県</option>
+              <option value="okayama">岡山県</option>
+              <option value="hiroshima">広島県</option>
+              <option value="yamaguchi">山口県</option>
             </optgroup>
             <optgroup label="── 四国 ──">
-              <option value="tokushima">📍 徳島県</option>
-              <option value="kagawa">📍 香川県</option>
-              <option value="ehime">📍 愛媛県</option>
-              <option value="kochi">📍 高知県</option>
+              <option value="tokushima">徳島県</option>
+              <option value="kagawa">香川県</option>
+              <option value="ehime">愛媛県</option>
+              <option value="kochi">高知県</option>
             </optgroup>
             <optgroup label="── 九州・沖縄 ──">
-              <option value="fukuoka">📍 福岡県</option>
-              <option value="saga">📍 佐賀県</option>
-              <option value="nagasaki">📍 長崎県</option>
-              <option value="kumamoto">📍 熊本県</option>
-              <option value="oita">📍 大分県</option>
-              <option value="miyazaki">📍 宮崎県</option>
-              <option value="kagoshima">📍 鹿児島県</option>
-              <option value="okinawa">📍 沖縄県</option>
+              <option value="fukuoka">福岡県</option>
+              <option value="saga">佐賀県</option>
+              <option value="nagasaki">長崎県</option>
+              <option value="kumamoto">熊本県</option>
+              <option value="oita">大分県</option>
+              <option value="miyazaki">宮崎県</option>
+              <option value="kagoshima">鹿児島県</option>
+              <option value="okinawa">沖縄県</option>
             </optgroup>
           </select>
         </div>
         <button class="btn btn-primary" onclick="createGroup()">
-          ✨ 新しいグループを作る
+           新しいグループを作る
         </button>
       </div>
       <div style="text-align:center; color:var(--text-light); font-size:13px; margin-bottom:10px;">または</div>
@@ -292,11 +290,11 @@
         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:10px 12px; background:#f8fff9; border-radius:10px; border:1.5px solid var(--border);">
           <input type="checkbox" id="join-is-signage"
             style="width:18px; height:18px; accent-color:var(--green); cursor:pointer; flex-shrink:0;">
-          <span style="font-size:14px; color:var(--text);">📺 サイネージとして利用する</span>
+          <span style="font-size:14px; color:var(--text);">サイネージとして利用する</span>
         </label>
       </div>
       <button class="btn btn-secondary" onclick="joinGroup()">
-        🔗 グループに参加する
+         グループに参加する
       </button>
     </div>
     <div style="text-align:center; padding: 16px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
@@ -314,13 +312,12 @@
 <div class="screen" id="screen-join-only">
   <div class="header">
     <div>
-      <div class="header-title">📋 他のグループに参加</div>
+      <div class="header-title">他のグループに参加</div>
       <div class="header-sub">既存グループはそのまま保持されます</div>
     </div>
   </div>
   <div class="content">
     <div style="text-align:center; padding: 24px 0 16px;">
-      <div style="font-size:44px; margin-bottom:8px;">🔗</div>
       <div style="font-size:16px; font-weight:700; margin-bottom:6px;">参加したいグループのIDを入力してください</div>
       <div style="font-size:13px; color:var(--text-light);">グループの管理者から共有されたIDを入力します
 </div>
@@ -339,7 +336,7 @@
       <button class="btn btn-primary" onclick="submitJoinOnly()" style="flex:2;">参加申請する</button>
     </div>
     <div style="margin-top:24px; padding:12px; background:var(--bg); border-radius:8px; font-size:12px; color:var(--text-light); line-height:1.6;">
-      💡 <strong>新規グループの作成について</strong><br>
+       <strong>新規グループの作成について</strong><br>
       新しいグループを作成したい場合は、いったん EdgeOps を終了して、起動画面から「新しいグループを作る」を選んでください。
     </div>
   </div>
@@ -363,10 +360,10 @@
       <div style="font-size:18px; font-weight:700; letter-spacing:2px; margin-top:6px;" id="pending-group-id"></div>
     </div>
     <button class="btn btn-secondary" onclick="checkApproval()" style="margin-top:16px;">
-      🔄 承認状況を確認する
+       承認状況を確認する
     </button>
     <button class="btn" onclick="cancelRequest()" style="margin-top:12px; background:#fff; color:#e53935; border:1.5px solid #e53935;">
-      ✕ 申請を取り消す
+       申請を取り消す
     </button>
   </div>
 </div>
@@ -451,15 +448,15 @@
     <!-- 引き継ぎ未確認バッジ -->
     <div id="handover-badge-bar" style="display:none;" class="handover-badge-bar" onclick="showScreen('screen-handover')">
       <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:16px;">📋</span>
+        <span style="font-size:16px;"></span>
         <span id="handover-badge-msg" style="font-size:13px; font-weight:700; color:#e65100;"></span>
       </div>
       <span class="handover-badge-count" id="handover-badge-count">0</span>
     </div>
     <!-- フィルター -->
     <div class="home-filter-toggle">
-      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')">💬 連絡</button>
-      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')">📋 引き継ぎ</button>
+      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')">連絡</button>
+      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')">引き継ぎ</button>
       <button class="filter-chip" id="filter-chip-all" onclick="setHomeFilter('all')">すべて</button>
     </div>
     <div id="home-messages"></div>
@@ -480,8 +477,8 @@
   <div class="content">
     <!-- タイプ切替 -->
     <div class="compose-type-toggle" style="margin-bottom:16px;">
-      <button class="compose-type-btn active" id="ctype-msg" onclick="selectComposeType('msg')">💬 通常メッセージ</button>
-      <button class="compose-type-btn" id="ctype-handover" onclick="selectComposeType('handover')">📋 引き継ぎノート</button>
+      <button class="compose-type-btn active" id="ctype-msg" onclick="selectComposeType('msg')">通常メッセージ</button>
+      <button class="compose-type-btn" id="ctype-handover" onclick="selectComposeType('handover')">引き継ぎノート</button>
     </div>
     <!-- 通常メッセージ優先度 -->
     <div id="section-msg-priority" class="form-group">
@@ -489,15 +486,15 @@
       <div style="display:flex; gap:8px; margin-bottom:4px;">
         <label style="flex:1; cursor:pointer;">
           <input type="radio" name="priority" value="info" checked style="display:none;">
-          <div class="priority-sel-btn priority-info" id="psel-info" onclick="selectPriority('info')">🟢 連絡</div>
+          <div class="priority-sel-btn priority-info" id="psel-info" onclick="selectPriority('info')">連絡</div>
         </label>
         <label style="flex:1; cursor:pointer;">
           <input type="radio" name="priority" value="normal" style="display:none;">
-          <div class="priority-sel-btn priority-normal" id="psel-normal" onclick="selectPriority('normal')">🟡 通常</div>
+          <div class="priority-sel-btn priority-normal" id="psel-normal" onclick="selectPriority('normal')">通常</div>
         </label>
         <label style="flex:1; cursor:pointer;">
           <input type="radio" name="priority" value="urgent" style="display:none;">
-          <div class="priority-sel-btn priority-urgent" id="psel-urgent" onclick="selectPriority('urgent')">🔴 緊急</div>
+          <div class="priority-sel-btn priority-urgent" id="psel-urgent" onclick="selectPriority('urgent')">緊急</div>
         </label>
       </div>
     </div>
@@ -506,18 +503,18 @@
       <label class="form-label">引き継ぎ種別</label>
       <div style="display:flex; gap:8px; margin-bottom:4px;">
         <label style="flex:1; cursor:pointer;">
-          <div class="priority-sel-btn hw-action" id="hwsel-action" onclick="selectHandoverPriority('action')" style="opacity:1; transform:scale(1.04);">🔴 重要</div>
+          <div class="priority-sel-btn hw-action" id="hwsel-action" onclick="selectHandoverPriority('action')" style="opacity:1; transform:scale(1.04);">重要</div>
         </label>
         <label style="flex:1; cursor:pointer;">
-          <div class="priority-sel-btn hw-check" id="hwsel-check" onclick="selectHandoverPriority('check')" style="opacity:0.45;">🟡 通常</div>
+          <div class="priority-sel-btn hw-check" id="hwsel-check" onclick="selectHandoverPriority('check')" style="opacity:0.45;">通常</div>
         </label>
         <label style="flex:1; cursor:pointer;">
-          <div class="priority-sel-btn hw-done" id="hwsel-done" onclick="selectHandoverPriority('done')" style="opacity:0.45;">🟢 確認要</div>
+          <div class="priority-sel-btn hw-done" id="hwsel-done" onclick="selectHandoverPriority('done')" style="opacity:0.45;">確認要</div>
         </label>
       </div>
     </div>
     <div id="template-section" style="display:none; margin-bottom:16px;">
-      <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">📋 テンプレートから選ぶ</div>
+      <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">テンプレートから選ぶ</div>
       <div id="template-list" style="display:flex; flex-direction:column; gap:6px;"></div>
     </div>
     <div class="form-group">
@@ -532,10 +529,10 @@
     <div class="form-group" id="compose-image-area" style="margin-bottom:16px;">
       <div id="compose-image-btn-wrap" style="display:flex; gap:8px; flex-wrap:wrap;">
         <button type="button" id="compose-image-btn-camera" onclick="onComposeImageButtonClickCamera()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
-          📷 写真を撮る
+           写真を撮る
         </button>
         <button type="button" id="compose-image-btn-library" onclick="onComposeImageButtonClickLibrary()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
-          🖼️ 写真を選ぶ
+           写真を選ぶ
         </button>
       </div>
       <!-- [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18] 残量表示エリア -->
@@ -546,16 +543,16 @@
           <img id="compose-image-preview-img" alt="プレビュー" style="width:80px; height:80px; object-fit:cover; border-radius:6px; background:#e4e8f0; image-orientation:from-image;">
           <div style="flex:1; min-width:0;">
             <div id="compose-image-preview-info" style="font-size:12px; color:var(--text-mid); margin-bottom:6px; word-break:break-all;">画像準備完了</div>
-            <button type="button" onclick="onComposeImageCancel()" style="padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">✕ 取り消し</button>
+            <button type="button" onclick="onComposeImageCancel()" style="padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">取り消し</button>
           </div>
         </div>
       </div>
     </div>
     <!-- ══ アンケート機能(管理者のみ表示・通常メッセージ時のみ表示) ══ -->
-    <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#f0fff4; border:1px solid #06C755; border-radius:8px; box-sizing:border-box;">
+    <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#E6F0EF; border:1px solid #0F6B63; border-radius:8px; box-sizing:border-box;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600;">
         <input type="checkbox" id="survey-checkbox" onclick="toggleSurveyMode()" style="width:18px; height:18px; cursor:pointer;">
-        <span>📊 このメッセージをアンケートとして送信</span>
+        <span>このメッセージをアンケートとして送信</span>
       </label>
       <div id="survey-deadline-wrap" style="display:none; margin-top:10px; width:100%; box-sizing:border-box; overflow:hidden;">
         <label class="form-label" style="font-size:12px;">締切日(任意・空欄で締切なし)</label>
@@ -563,7 +560,7 @@
         <div style="font-size:11px; color:var(--text-light); margin-top:4px;">※締切は当日の23:59まで有効</div>
       </div>
     </div>
-    <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()">📢 送信する</button>
+    <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()">送信する</button>
   </div>
 </div>
 
@@ -580,17 +577,17 @@
       <!-- [Phase 4-2F] 画像表示エリア(画像ありメッセージ時のみ表示) -->
       <div id="detail-image-wrap" style="display:none; margin-top:12px;">
         <img id="detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer; image-orientation:from-image;">
-        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">⚠️ 投稿された画像の保存・転載は管理者の許可を得てください</div>
+        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">投稿された画像の保存・転載は管理者の許可を得てください</div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
           <div id="detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
           <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
-          <button type="button" id="detail-image-delete-btn" onclick="deleteImageOnly(window.__currentDetailMessageId, 'message')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">🗑️ 画像を削除</button>
+          <button type="button" id="detail-image-delete-btn" onclick="deleteImageOnly(window.__currentDetailMessageId, 'message')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">画像を削除</button>
         </div>
       </div>
     </div>
     <!-- ══ アンケート回答UI(アンケートメッセージのみ表示) ══ -->
-    <div id="detail-survey-wrap" class="card" style="display:none; padding:16px; margin-bottom:12px; background:#f0fff4; border:1px solid #06C755;">
-      <div style="font-size:13px; font-weight:700; color:#047a37; margin-bottom:8px;">📊 アンケートに回答</div>
+    <div id="detail-survey-wrap" class="card" style="display:none; padding:16px; margin-bottom:12px; background:#E6F0EF; border:1px solid #0F6B63;">
+      <div style="font-size:13px; font-weight:700; color:#0F6B63; margin-bottom:8px;">アンケートに回答</div>
       <div id="detail-survey-deadline" style="font-size:12px; color:var(--text-mid); margin-bottom:10px;"></div>
       <div id="detail-survey-answer-area">
         <div class="form-group" style="margin-bottom:10px;">
@@ -620,15 +617,15 @@
       </div>
     </div>
     <div class="card">
-      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);">✅ 既読（名前・時刻）</div>
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);">既読（名前・時刻）</div>
       <div id="detail-read-list"></div>
     </div>
     <div class="card" style="margin-top:12px;">
-      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);">❌ 未読</div>
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);">未読</div>
       <div id="detail-unread-list"></div>
     </div>
     <div id="detail-delete-wrap" style="display:none; margin-top:12px;">
-      <button class="delete-msg-btn" onclick="deleteMessage()">🗑️ このメッセージを削除する</button>
+      <button class="delete-msg-btn" onclick="deleteMessage()">このメッセージを削除する</button>
     </div>
   </div>
 </div>
@@ -640,9 +637,9 @@
     <div><div class="header-title">引き継ぎノート</div></div>
   </div>
   <div class="content" style="padding-bottom:80px;">
-    <div style="padding:8px 16px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:12px; color:#e65100; font-weight:600;">⏰ メッセージ送信後72時間で非表示になります</div>
+    <div style="padding:8px 16px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:12px; color:#e65100; font-weight:600;">メッセージ送信後72時間で非表示になります</div>
     <div id="handover-list-container">
-      <div class="empty"><div class="empty-icon">📋</div><div class="empty-text">引き継ぎノートはまだありません</div></div>
+      <div class="empty"><div class="empty-text">引き継ぎノートはまだありません</div></div>
     </div>
   </div>
   <button class="new-msg-btn" onclick="showScreen('screen-compose'); selectComposeType('handover')">
@@ -664,11 +661,11 @@
       <!-- [Phase 4-2F] 引き継ぎ画像表示エリア -->
       <div id="hw-detail-image-wrap" style="display:none; margin-top:12px;">
         <img id="hw-detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer; image-orientation:from-image;">
-        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">⚠️ 投稿された画像の保存・転載は管理者の許可を得てください</div>
+        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">投稿された画像の保存・転載は管理者の許可を得てください</div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
           <div id="hw-detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
           <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
-          <button type="button" id="hw-detail-image-delete-btn" onclick="deleteImageOnly(window.__currentHandoverId, 'handover')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">🗑️ 画像を削除</button>
+          <button type="button" id="hw-detail-image-delete-btn" onclick="deleteImageOnly(window.__currentHandoverId, 'handover')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">画像を削除</button>
         </div>
       </div>
     </div>
@@ -676,11 +673,11 @@
     <div id="hw-confirm-area"></div>
     <!-- 確認者リスト -->
     <div class="card" style="margin-top:12px;">
-      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);">✅ 確認済みメンバー</div>
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);">確認済みメンバー</div>
       <div id="hw-confirmed-list"></div>
     </div>
     <div class="card" style="margin-top:12px;">
-      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);">❌ 未確認メンバー</div>
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);">未確認メンバー</div>
       <div id="hw-unconfirmed-list"></div>
     </div>
   </div>
@@ -693,7 +690,7 @@
     <div><div class="header-title">参加申請の承認</div></div>
   </div>
   <div class="content">
-    <div class="banner banner-info">ℹ️ グループへの参加申請が届いています<br>承認すると参加できます</div>
+    <div class="banner banner-info">ℹ グループへの参加申請が届いています<br>承認すると参加できます</div>
     <div class="card" id="approval-list">
       <div class="empty" style="padding:40px;">
         <div class="empty-text">承認待ちのメンバーはいません</div>
@@ -710,25 +707,25 @@
   </div>
   <div class="content">
     <div class="card" style="padding:20px; text-align:center; margin-bottom:16px;">
-      <div id="profile-avatar" style="width:72px;height:72px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;overflow:hidden;border:3px solid var(--green);">👤</div>
+      <div id="profile-avatar" style="width:72px;height:72px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;overflow:hidden;border:3px solid var(--green);"></div>
       <div style="font-size:18px; font-weight:700;" id="profile-name">---</div>
       <div style="font-size:12px; color:var(--text-light); margin-top:4px;" id="profile-line-name"></div>
-      <div style="font-size:11px; color:var(--text-light); margin-top:6px; font-family:monospace; padding:4px 8px; background:var(--bg); border-radius:4px; display:inline-block;" id="profile-eo-uid" title="EdgeOps Universal ID">🔑 ---</div>
+      <div style="font-size:11px; color:var(--text-light); margin-top:6px; font-family:monospace; padding:4px 8px; background:var(--bg); border-radius:4px; display:inline-block;" id="profile-eo-uid" title="EdgeOps Universal ID">---</div>
     </div>
     <div class="group-id-box">
       <div class="group-id-label">あなたのグループID</div>
       <div class="group-id-value" id="profile-group-id">---</div>
       <button class="copy-btn" onclick="copyGroupId()">コピー</button>
       <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
-        <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-expires">📅 有効期限：取得中...</div>
-        <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-members">👥 参加中：取得中...</div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-expires">有効期限：取得中...</div>
+        <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-members">参加中：取得中...</div>
       </div>
-      <button class="group-switch-btn" id="group-switch-btn" onclick="showGroupSwitcher()">📋 他のグループに切替 (...)</button>
+      <button class="group-switch-btn" id="group-switch-btn" onclick="showGroupSwitcher()">他のグループに切替 (...)</button>
       <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:6px;" id="profile-group-name-display"></div>
     </div>
     <div id="profile-admin-section" style="display:none;">
       <div class="card" style="padding:16px; margin-bottom:12px;">
-        <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:10px; letter-spacing:0.5px;">👑 グループ管理者メニュー</div>
+        <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:10px; letter-spacing:0.5px;">グループ管理者メニュー</div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label">グループ名を変更</label>
           <input class="form-input" id="profile-group-name" type="text" placeholder="例：フロントスタッフ" maxlength="30">
@@ -738,26 +735,26 @@
           <label class="form-label">業種を変更</label>
           <select class="form-input" id="profile-industry">
             <option value="">-- 選択してください --</option>
-            <option value="hotel">🏨 ホテル・旅館</option>
-            <option value="clinic">🏥 病院・クリニック</option>
-            <option value="care">🏠 介護施設</option>
-            <option value="attraction">🎡 集客施設</option>
-            <option value="freelance">👥 フリーランス集団</option>
-            <option value="club">🏆 部活・クラブ</option>
+            <option value="hotel">ホテル・旅館</option>
+            <option value="clinic">病院・クリニック</option>
+            <option value="care">介護施設</option>
+            <option value="attraction">集客施設</option>
+            <option value="freelance">フリーランス集団</option>
+            <option value="club">部活・クラブ</option>
           </select>
         </div>
         <button class="btn btn-secondary" onclick="updateIndustry()" style="margin-bottom:12px;">業種を更新</button>
         <!-- 月次レポートボタン -->
         <button class="btn btn-secondary" onclick="showMonthlyReport()" style="margin-top:4px; background:#f0f8ff; border-color:#4a90d9; color:#1a5fa8;">
-          📊 月次レポートを見る
+           月次レポートを見る
         </button>
         <!-- メンバー一覧ボタン -->
-        <button class="btn btn-secondary" onclick="showMemberList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
-          👥 メンバー一覧
+        <button class="btn btn-secondary" onclick="showMemberList()" style="margin-top:8px; background:#E6F0EF; border-color:#0F6B63; color:#0F6B63;">
+           メンバー一覧
         </button>
         <!-- アンケート集計ボタン -->
-        <button class="btn btn-secondary" onclick="showSurveyList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
-          📊 アンケート集計結果
+        <button class="btn btn-secondary" onclick="showSurveyList()" style="margin-top:8px; background:#E6F0EF; border-color:#0F6B63; color:#0F6B63;">
+           アンケート集計結果
         </button>
         <!-- [UI改善② LINKボタン設定] チャッピー第50回判定準拠
              - グループ管理者が自グループ用URLを設定・変更・削除
@@ -765,7 +762,7 @@
              - 空文字は NULL に正規化
              - 超管理者は関与しない(初期ST版方針) -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">🔗 カスタムLINK</div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">カスタムLINK</div>
           <div style="font-size:11px; color:var(--text-light); margin-bottom:8px; line-height:1.5;">
             グループ専用の外部リンクを設定できます。設定すると、ホーム画面のヘッダーに「LINK」ボタンが表示され、メンバー全員がアクセスできます。
           </div>
@@ -776,8 +773,8 @@
           <div style="display:flex; gap:8px;">
             <!-- [2026/5/23 修正] 保存ボタンと削除ボタンを同サイズに(flex:1 で半々)
                  過剰 padding を削除して .btn のデフォルト padding を継承させる -->
-            <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">💾 保存</button>
-            <button class="btn" onclick="removeLinkUrl()" style="flex:1; background:#fff; color:#e53935; border:1.5px solid #e53935;">🗑️ 削除</button>
+            <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">保存</button>
+            <button class="btn" onclick="removeLinkUrl()" style="flex:1; background:#fff; color:#e53935; border:1.5px solid #e53935;">削除</button>
           </div>
         </div>
         <!-- ══ [マイテンプレ機能 v3.0] 連絡メッセージ テンプレ編集(管理者のみ) ══
@@ -788,22 +785,22 @@
              - 初期値: 未登録時のみ業種別TEMPLATESを初期表示(編集済みは上書きしない)
              - 一般スタッフにはこのUIを出さない(プロフィール画面自体が管理者導線) -->
         <div id="template-edit-section" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:none;">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📋 連絡メッセージ テンプレ</div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">連絡メッセージ テンプレ</div>
           <div style="font-size:11px; color:var(--text-light); margin-bottom:10px; line-height:1.5;">
             よく使う連絡文を最大6件まで登録できます。ここで登録した文は、メンバー全員がメッセージ作成時に呼び出せます。現場に合わせて自由に編集・削除してください。空欄にした枠は表示されません。
           </div>
           <div id="template-edit-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
-          <button class="btn btn-secondary" onclick="saveGroupTemplates()" style="width:100%;">💾 テンプレを保存</button>
+          <button class="btn btn-secondary" onclick="saveGroupTemplates()" style="width:100%;">テンプレを保存</button>
         </div>
 
         <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📺 サイネージ管理</div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">サイネージ管理</div>
           <div id="signage-url-display" style="font-size:12px; margin-bottom:8px; min-height:16px;"></div>
           <button class="btn btn-secondary" onclick="generateSignageToken()" style="font-size:13px; padding:10px 8px;">
-            🔑 トークンを再生成する
+             トークンを再生成する
           </button>
-          <div style="font-size:11px; color:#e53935; margin-top:6px;">⚠️ 再生成すると旧URLは即無効化されます</div>
+          <div style="font-size:11px; color:#e53935; margin-top:6px;">再生成すると旧URLは即無効化されます</div>
         </div>
       </div>
     </div>
@@ -812,7 +809,7 @@
     <div id="modal-report" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; overflow-y:auto;">
       <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-          <div style="font-size:16px; font-weight:700;">📊 月次レポート</div>
+          <div style="font-size:16px; font-weight:700;">月次レポート</div>
           <div onclick="document.getElementById('modal-report').style.display='none'"
                style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
         </div>
@@ -833,7 +830,7 @@
     <div id="modal-members" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; overflow-y:auto;">
       <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-          <div style="font-size:16px; font-weight:700;">👥 メンバー一覧</div>
+          <div style="font-size:16px; font-weight:700;">メンバー一覧</div>
           <div onclick="document.getElementById('modal-members').style.display='none'" style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
         </div>
         <div id="member-list-content">
@@ -845,7 +842,7 @@
     <div id="modal-survey-list" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; overflow-y:auto;">
       <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-          <div style="font-size:16px; font-weight:700;">📊 アンケート集計結果</div>
+          <div style="font-size:16px; font-weight:700;">アンケート集計結果</div>
           <div onclick="document.getElementById('modal-survey-list').style.display='none'" style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
         </div>
         <div id="survey-list-content">
@@ -857,7 +854,7 @@
     <div id="modal-survey-detail" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:201; overflow-y:auto;">
       <div style="background:white; margin:20px auto; border-radius:16px; max-width:400px; padding:20px; position:relative;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-          <div style="font-size:16px; font-weight:700;" id="survey-detail-title">📊 アンケート詳細</div>
+          <div style="font-size:16px; font-weight:700;" id="survey-detail-title">アンケート詳細</div>
           <div onclick="document.getElementById('modal-survey-detail').style.display='none'" style="font-size:24px; cursor:pointer; color:var(--text-light); line-height:1;">×</div>
         </div>
         <div id="survey-detail-content">
@@ -873,7 +870,7 @@
       <button class="btn btn-secondary" onclick="updateDisplayName()">表示名を更新</button>
     </div>
     <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;">グループを退出する</button>
-    <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;">⚙️ 超管理者ダッシュボード</button></div>
+    <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;">超管理者ダッシュボード</button></div>
     <div style="text-align:center; padding: 20px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
          style="color:var(--green); text-decoration:none;">利用規約</a>
@@ -887,7 +884,7 @@
   <div class="group-switcher-overlay" id="group-switcher-overlay" onclick="closeBottomSheet()"></div>
   <div class="group-switcher-sheet" id="group-switcher-sheet">
     <div class="group-switcher-handle"></div>
-    <div class="group-switcher-title">📋 グループを切り替える</div>
+    <div class="group-switcher-title">グループを切り替える</div>
     <div class="group-switcher-list" id="group-switcher-list">
       <div class="spinner" style="margin:20px auto;"></div>
     </div>
@@ -976,7 +973,7 @@ const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
       const div = document.createElement('div');
       div.id = 'liff-outside-error';
       div.style.cssText = 'position:fixed; inset:0; z-index:99999; background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; font-family:sans-serif;';
-      div.innerHTML = '<div style="font-size:48px; margin-bottom:24px;">⚠️</div>' +
+      div.innerHTML = 
         '<div style="font-size:20px; font-weight:bold; margin-bottom:16px;">この画面はLINEアプリ内でのみ使用できます</div>' +
         '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#ddd;">LINEアプリのトークルームから「EdgeOpsを開く」をタップしてご利用ください。<br><br>Chrome や Safari などのブラウザから直接 app.edgeops.jp にアクセスすることはセキュリティ上できません。</div>' +
         '<div style="font-size:12px; margin-top:24px; color:#888;">(理由: ' + (reason || '不明') + ')</div>';
@@ -1753,7 +1750,7 @@ async function loadHome() {
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
   // [Phase 0 追加機能] eo_uid 表示
   const eoUidEl = document.getElementById('profile-eo-uid');
-  if (eoUidEl) eoUidEl.textContent = '🔑 ' + (currentUser.eo_uid || '---');
+  if (eoUidEl) eoUidEl.textContent = (currentUser.eo_uid || '---');
 
   // グループ期限警告バー表示(ST版=SL-で始まるグループのみ、残り30日以下で表示)
   updateExpiryWarningBar();
@@ -1972,7 +1969,7 @@ async function loadMessages() {
     }
 
     renderMessages();
-    preloadMessageImageUrls(messages); // ★ 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
+    preloadMessageImageUrls(messages); // 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
     const badge = document.getElementById('approval-badge');
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
     else { badge.style.display = 'none'; }
@@ -2318,7 +2315,7 @@ function applyComposeType(type) {
   const placeholder = document.getElementById('compose-body');
   if (placeholder) placeholder.placeholder = isMsgActive ? '連絡内容を入力してください...' : '引き継ぎ事項を入力してください（例：〇〇様のご対応をお願いします）...';
   const sendBtn = document.getElementById('compose-send-btn');
-  if (sendBtn) sendBtn.textContent = isMsgActive ? '📢 送信する' : '📋 引き継ぎを投稿する';
+  if (sendBtn) sendBtn.textContent = isMsgActive ? '送信する' : '引き継ぎを投稿する';
   // アンケートセクションは「通常メッセージ」かつ「グループ管理者」のときのみ表示
   applySurveyVisibility(isMsgActive);
   // [Phase 4-2C] タイプ切替時に画像ボタン表示制御＆選択中画像をクリア(context変更で画像保持は不自然)
@@ -2463,7 +2460,7 @@ async function loadHandoverNotes() {
 
     const container = document.getElementById('handover-list-container');
     if (handoverNotes.length === 0) {
-      container.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">引き継ぎノートはまだありません<br>右下の「＋」から追加できます</div></div>';
+      container.innerHTML = '<div class="empty"><div class="empty-text">引き継ぎノートはまだありません<br>右下の「＋」から追加できます</div></div>';
       return;
     }
 
@@ -2482,7 +2479,7 @@ async function loadHandoverNotes() {
     });
     html += '</div>';
     container.innerHTML = html;
-    preloadMessageImageUrls(handoverNotes); // ★ 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
+    preloadMessageImageUrls(handoverNotes); // 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
   } catch(e) { console.error(e); }
 }
 
@@ -2497,8 +2494,8 @@ async function showHandoverDetail(handoverId) {
 
     // [2026/6/20] 帯の表示を連絡メッセージ側と統一：色アイコン＋本文冒頭20文字を表示する。
     // （従来は「🟢 確認要」等のラベルのみで内容が分からなかった）
-    const hwIcons = { action: '🔴', check: '🟡', done: '🟢' };
-    const hwIcon = hwIcons[hw.priority] || '🟢';
+    const hwIcons = { action: '重要', check: '通常', done: '確認要' };
+    const hwIcon = hwIcons[hw.priority] || '確認要';
     const hwTitleText = getMessageTitle(hw.content || '', 20);
     document.getElementById('hw-detail-title').textContent = hwTitleText ? `${hwIcon} ${hwTitleText}` : `${hwIcon} 引き継ぎ詳細`;
     document.getElementById('hw-detail-meta').textContent = `${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}`;
@@ -2580,21 +2577,21 @@ async function showHandoverDetail(handoverId) {
       // 操作エリアには何も表示しない（「参加前/参加後」の概念自体が当てはまらない）。
       confirmArea.innerHTML = '';
     } else if (isSender) {
-      confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #66bb6a; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#2e7d32; margin-bottom:10px;">📋 自分が投稿した引き継ぎです</div>`;
+      confirmArea.innerHTML = `<div style="background:#E6F0EF; border:1.5px solid #0F6B63; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#0F6B63; margin-bottom:10px;">自分が投稿した引き継ぎです</div>`;
     } else if (!canWrite) {
       // 送信時点で未参加だった新規参加者
-      confirmArea.innerHTML = `<div style="background:#f1f8f4; border:1.5px solid #90caf9; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#1565c0; margin-bottom:10px;">📋 あなたの参加前の引き継ぎです<br><span style="font-size:11px; color:#1976d2;">内容は確認できますが、確認・対応操作の対象外です。</span></div>`;
+      confirmArea.innerHTML = `<div style="background:#E6F0EF; border:1.5px solid #90caf9; border-radius:12px; padding:12px 16px; text-align:center; font-size:13px; color:#1565c0; margin-bottom:10px;">あなたの参加前の引き継ぎです<br><span style="font-size:11px; color:#1976d2;">内容は確認できますが、確認・対応操作の対象外です。</span></div>`;
     } else if (isCompleted) {
       // 誰かが完了済み→ボタンをロック・完了済みバナーを表示
       const completedLabel = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
-      confirmArea.innerHTML = `<div class="hw-confirmed-banner">🔒 ${escHtml(completedConf.display_name)}が「${completedLabel}」（${formatTime(completedConf.confirmed_at)}）</div>`;
+      confirmArea.innerHTML = `<div class="hw-confirmed-banner">${escHtml(completedConf.display_name)}が「${completedLabel}」（${formatTime(completedConf.confirmed_at)}）</div>`;
     } else if (myConf) {
       const actionLabel = myConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
-      confirmArea.innerHTML = `<div class="hw-confirmed-banner">✅ ${actionLabel}（${formatTime(myConf.confirmed_at)}）</div>`;
+      confirmArea.innerHTML = `<div class="hw-confirmed-banner">${actionLabel}（${formatTime(myConf.confirmed_at)}）</div>`;
     } else {
       confirmArea.innerHTML = `
-        <button class="hw-confirm-btn hw-btn-takeover" onclick="confirmHandover('takeover')">🔄 引き継ぎました</button>
-        <button class="hw-confirm-btn hw-btn-done" onclick="confirmHandover('done')">✅ 対応しました</button>
+        <button class="hw-confirm-btn hw-btn-takeover" onclick="confirmHandover('takeover')">引き継ぎました</button>
+        <button class="hw-confirm-btn hw-btn-done" onclick="confirmHandover('done')">対応しました</button>
       `;
     }
 
@@ -2602,7 +2599,7 @@ async function showHandoverDetail(handoverId) {
     const confirmedUids = new Set(validConfs.map(c => c.eo_uid));
     if (validConfs.length > 0) {
       confirmedList.innerHTML = validConfs.map(c =>
-        `<div class="person-row"><div><div class="person-name">${escHtml(c.display_name)}</div><div class="person-time">${c.action === 'takeover' ? '引き継ぎました' : '対応しました'}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(c.confirmed_at)}</div><div class="check-yes">✅</div></div></div>`
+        `<div class="person-row"><div><div class="person-name">${escHtml(c.display_name)}</div><div class="person-time">${c.action === 'takeover' ? '引き継ぎました' : '対応しました'}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(c.confirmed_at)}</div><div class="check-yes">既読</div></div></div>`
       ).join('');
     } else {
       confirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も確認していません</div>';
@@ -2616,7 +2613,7 @@ async function showHandoverDetail(handoverId) {
       unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">確認対象のメンバーがいません</div>';
     } else if (unconfirmed.length > 0) {
       unconfirmedList.innerHTML = unconfirmed.map(m =>
-        `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`
+        `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">未読</div></div>`
       ).join('');
     } else {
       // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
@@ -2657,7 +2654,7 @@ async function confirmHandover(action) {
     if (error && error.code === '23505') { showToast('すでに確認済みです'); return; }
     if (error) throw error;
     const label = action === 'takeover' ? '引き継ぎました' : '対応しました';
-    showToast(`✅ ${label}`);
+    showToast(`${label}`);
     await showHandoverDetail(currentHandoverId);
     await updateHandoverBadge();
   } catch(e) { console.error(e); showToast('確認に失敗しました'); }
@@ -2720,7 +2717,7 @@ async function showDetail(messageId) {
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
   // [2026/6/20] 帯の表示を統一：色アイコン＋本文冒頭20文字。
   // 色は優先度（urgent=🔴 / normal=🟡 / その他=🟢）。一覧の pLabel と同じ対応。
-  const msgIcon = (msg.priority === 'urgent') ? '🔴' : (msg.priority === 'normal') ? '🟡' : '🟢';
+  const msgIcon = (msg.priority === 'urgent') ? '至急' : (msg.priority === 'normal') ? '注意' : '連絡';
   const msgTitleText = getMessageTitle(msg.body, 20);
   document.getElementById('detail-title').textContent = msgTitleText ? `${msgIcon} ${msgTitleText}` : `${msgIcon} メッセージ詳細`;
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
@@ -2752,7 +2749,7 @@ async function showDetail(messageId) {
     readListEl.innerHTML = receiverReads.map(r => {
       const member = members.find(m => m.eo_uid === r.eo_uid);
       if (!member) return ''; // 退出済みは表示しない
-      return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">✅</div></div></div>`;
+      return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">既読</div></div></div>`;
     }).join('');
   } else {
     readListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も読んでいません</div>';
@@ -2763,7 +2760,7 @@ async function showDetail(messageId) {
     // 未読対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
     unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">未読対象のメンバーがいません</div>';
   } else if (unreadMembers.length > 0) {
-    unreadListEl.innerHTML = unreadMembers.map(m => `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">❌</div></div>`).join('');
+    unreadListEl.innerHTML = unreadMembers.map(m => `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">未読</div></div>`).join('');
   } else {
     // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
     unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未読のメンバーはいません</div>';
@@ -2957,7 +2954,7 @@ async function showMemberList() {
     // [2026/5/27 課題③修正] is_signage=true メンバーに📺バッジ表示
     const html = memberList.map((m, i) => {
       const adminBadge = m.is_creator ? ' <span style="font-size:11px;background:var(--green);color:white;border-radius:4px;padding:1px 6px;">管理者</span>' : '';
-      const signageBadge = m.is_signage ? ' <span style="font-size:11px;background:#5c6bc0;color:white;border-radius:4px;padding:1px 6px;">📺サイネージ</span>' : '';
+      const signageBadge = m.is_signage ? ' <span style="font-size:11px;background:#5c6bc0;color:white;border-radius:4px;padding:1px 6px;">サイネージ</span>' : '';
       return `<div style="display:flex;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">`
            + `<div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-right:10px;flex-shrink:0;">${i+1}</div>`
            + `<div style="font-size:14px;font-weight:500;">${escHtml(m.display_name)}${adminBadge}${signageBadge}</div>`
@@ -3027,7 +3024,7 @@ async function updateLinkUrl() {
   const raw = (inputEl.value || '').trim();
   // 空文字なら削除扱いに誘導(明示的にremoveLinkUrlを呼ぶよう促す)
   if (raw === '') {
-    showToast('URLを削除するには「🗑️ 削除」ボタンを押してください');
+    showToast('URLを削除するには「削除」ボタンを押してください');
     return;
   }
   // クライアントサイドバリデーション(DB CHECK制約と同一ロジック)
@@ -3108,7 +3105,7 @@ async function deleteMessage() {
   // [2026/5/20 訂正] image_mode は 'attached' ではなく 'expandable' のため依存をやめる
   const hasImage = !!(msg.image_url || msg.thumbnail_url);
   const confirmMsg = hasImage
-    ? 'このメッセージを削除しますか?\n既読データも削除されます。\n\n⚠️ 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)'
+    ? 'このメッセージを削除しますか?\n既読データも削除されます。\n\n 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)'
     : 'このメッセージを削除しますか?\n既読データも削除されます。';
   if (!confirm(confirmMsg)) return;
   try {
@@ -3141,7 +3138,7 @@ function showProfile() {
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
   // [Phase 0 追加機能] eo_uid 表示
   const eoUidEl2 = document.getElementById('profile-eo-uid');
-  if (eoUidEl2) eoUidEl2.textContent = '🔑 ' + (currentUser.eo_uid || '---');
+  if (eoUidEl2) eoUidEl2.textContent = (currentUser.eo_uid || '---');
   document.getElementById('profile-group-id').textContent = currentGroup?.group_id || '---';
   const gnDisplayEl = document.getElementById('profile-group-name-display');
   if (gnDisplayEl) gnDisplayEl.textContent = currentGroup?.group_name || '';
@@ -3167,7 +3164,7 @@ function showProfile() {
       avatarEl.innerHTML = `<img src="${currentUser.picture_url}" alt="プロフィール画像"
         style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
     } else {
-      avatarEl.innerHTML = '👤';
+      avatarEl.innerHTML = '';
     }
   }
   // 有効期限表示
@@ -3181,7 +3178,7 @@ function showProfile() {
     if (daysLeft <= 7) color = '#ff5252';
     else if (daysLeft <= 30) color = '#ffab40';
     expiresEl.style.color = color;
-    expiresEl.textContent = `📅 有効期限：${dateStr}（残り${daysLeft}日）`;
+    expiresEl.textContent = `有効期限：${dateStr}（残り${daysLeft}日）`;
   }
 
   // 参加人数表示（非同期）
@@ -3506,7 +3503,7 @@ async function showGroupSwitcher() {
 
   const listHtml = myGroups.map(g => {
     const roleLabel = g.is_creator ? '管理者' : 'メンバー';
-    const icon = g.is_current ? '✅' : '🔄';
+    const icon = g.is_current ? '●' : '';
     const cardClass = g.is_current ? 'group-card current' : 'group-card';
     const onclick = g.is_current ? '' :
       `onclick="switchGroup('${g.group_session_id}','${g.member_id}')"`;

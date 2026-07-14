@@ -1,9 +1,9 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 :root {
-  --green: #06C755;
-  --green-dark: #04a044;
-  --green-light: #e6f9ee;
+  --green: #0F6B63;
+  --green-dark: #0C564F;
+  --green-light: #E6F0EF;
   --navy: #0f1e35;
   --bg: #f2f3f7;
   --white: #ffffff;
@@ -511,7 +511,7 @@ body {
 }
 .handover-card.priority-action { border-left-color: #e53935; background: #fffafa; }
 .handover-card.priority-check  { border-left-color: #f9a825; background: #fffef5; }
-.handover-card.priority-done   { border-left-color: #43a047; background: #f1f8f4; }
+.handover-card.priority-done   { border-left-color: #0F6B63; background: #E6F0EF; }
 .handover-card:last-child { border-bottom: none; }
 .handover-card:active { background: #f8f9fc; }
 
@@ -522,7 +522,7 @@ body {
 }
 .hw-action { background: #ffeaea; color: #c62828; border: 1px solid #e53935; }
 .hw-check  { background: #fffde7; color: var(--eo-priority-caution); border: 1px solid #f9a825; }
-.hw-done   { background: #f1f8f4; color: #2e7d32; border: 1px solid #66bb6a; }
+.hw-done   { background: #E6F0EF; color: #0F6B63; border: 1px solid #0F6B63; }
 
 .handover-confirm-names {
   font-size: 11px; color: var(--green); margin-top: 6px;
@@ -541,9 +541,9 @@ body {
 .hw-btn-takeover { background: #1565c0; color: white; }
 .hw-btn-done     { background: var(--green); color: white; }
 .hw-confirmed-banner {
-  background: #e8f5e9; border: 1.5px solid #66bb6a; border-radius: var(--eo-radius);
+  background: #E6F0EF; border: 1.5px solid #0F6B63; border-radius: var(--eo-radius);
   padding: 12px 16px; text-align: center; font-size: 14px;
-  font-weight: 700; color: #2e7d32; margin-bottom: 10px;
+  font-weight: 700; color: #0F6B63; margin-bottom: 10px;
 }
 
 /* 作成画面：引き継ぎトグル */
