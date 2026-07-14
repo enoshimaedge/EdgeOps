@@ -177,7 +177,7 @@ body {
   gap: 8px;
 }
 .btn:active { opacity: 0.8; }
-.btn-primary { background: var(--green); color: white; }
+.btn-primary { background: var(--eo-header-bg); color: white; }
 .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
 .btn-danger { background: var(--red); color: white; }
 
@@ -187,10 +187,10 @@ body {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--green);
+  background: var(--eo-header-bg);
   color: white;
   border: none;
-  border-radius: 28px;
+  border-radius: var(--eo-radius);
   padding: 14px 28px;
   font-size: 15px;
   font-weight: 700;
