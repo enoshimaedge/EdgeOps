@@ -2001,12 +2001,13 @@ async function setHomeFilter(f) {
 }
 
 function getDayLabel(createdAt) {
+  const MS_PER_DAY = 86400000;
   const d = new Date(createdAt);
   const now = new Date();
 
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = Math.round((today - target) / 86400000);
+  const diff = Math.round((today - target) / MS_PER_DAY);
 
   if (diff === 0) return '今日';
   if (diff === 1) return '昨日';
@@ -2095,13 +2096,17 @@ function renderMessages() {
     </div>`;
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
 
+    const KIND = { urgent: '至急', normal: '注意', info: '連絡' };
+    const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
     let currentDayLabel = null;
+    let isListOpen = false;
     msgs.forEach(msg => {
       const dayLabel = getDayLabel(msg.created_at);
       if (dayLabel !== currentDayLabel) {
-        if (currentDayLabel !== null) html += `</div>`;
+        if (isListOpen) html += `</div>`;
         html += `<div class="eo-msg-day">${dayLabel}</div><div class="eo-msg-list">`;
         currentDayLabel = dayLabel;
+        isListOpen = true;
       }
       // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
       // ════════════════════════════════════════════════════════════
@@ -2136,8 +2141,6 @@ function renderMessages() {
       const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
-      const KIND = { urgent: '至急', normal: '注意', info: '連絡' };
-      const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
       const kindJa = KIND[p] || '連絡';
       const kindCls = CLS[p] || 'notice';
       // ── アンケートメッセージ判定（is_survey が true のときのみ） ──
@@ -2180,7 +2183,7 @@ function renderMessages() {
           </div>
         </div>`;
     });
-    if (currentDayLabel !== null) html += `</div>`;
+    if (isListOpen) html += `</div>`;
 
     html += `</div></div>`;
   });
