@@ -2034,6 +2034,8 @@ function renderMessages() {
     return;
   }
   const priorityOrder = { urgent: 0, normal: 1, info: 2 };
+  const KIND = { urgent: '至急', normal: '注意', info: '連絡' };
+  const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
 
   // 月別グループ化
   const monthMap = {};
@@ -2096,8 +2098,6 @@ function renderMessages() {
     </div>`;
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
 
-    const KIND = { urgent: '至急', normal: '注意', info: '連絡' };
-    const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
     let currentDayLabel = null;
     let isListOpen = false;
     msgs.forEach(msg => {
