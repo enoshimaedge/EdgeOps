@@ -2000,6 +2000,23 @@ async function setHomeFilter(f) {
   renderMessages();
 }
 
+function getDayLabel(createdAt) {
+  const MS_PER_DAY = 86400000;
+  const d = new Date(createdAt);
+  const now = new Date();
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((today - target) / MS_PER_DAY);
+
+  if (diff === 0) return '今日';
+  if (diff === 1) return '昨日';
+  if (d.getFullYear() !== now.getFullYear()) {
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
 function renderMessages() {
   const container = document.getElementById('home-messages');
 
@@ -2013,10 +2030,12 @@ function renderMessages() {
   const showHandover = homeFilter === 'all';
 
   if (messages.length === 0 && (!showHandover || handoverNotes.length === 0)) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">まだメッセージがありません / No messages yet<br>下の「＋新しい連絡」から送信してください</div></div>`;
+    container.innerHTML = `<div class="empty"><div class="empty-text">まだメッセージがありません / No messages yet<br>下の「＋新しい連絡」から送信してください</div></div>`;
     return;
   }
   const priorityOrder = { urgent: 0, normal: 1, info: 2 };
+  const KIND = { urgent: '至急', normal: '注意', info: '連絡' };
+  const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
 
   // 月別グループ化
   const monthMap = {};
@@ -2035,7 +2054,7 @@ function renderMessages() {
   // all表示の場合は引き継ぎを最上部に表示
   if (showHandover && handoverNotes.length > 0) {
     html += `<div class="card" style="margin-bottom:12px;">`;
-    html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">📋 引き継ぎノート（72時間で非表示）</div>`;
+    html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">引き継ぎノート（72時間で非表示）</div>`;
 
     // 引き継ぎノート画面と同じソート順で表示
     const hwConfirmMap = window._hwConfirmMap || {};
@@ -2079,7 +2098,16 @@ function renderMessages() {
     </div>`;
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
 
+    let currentDayLabel = null;
+    let isListOpen = false;
     msgs.forEach(msg => {
+      const dayLabel = getDayLabel(msg.created_at);
+      if (dayLabel !== currentDayLabel) {
+        if (isListOpen) html += `</div>`;
+        html += `<div class="eo-msg-day">${dayLabel}</div><div class="eo-msg-list">`;
+        currentDayLabel = dayLabel;
+        isListOpen = true;
+      }
       // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
       // ════════════════════════════════════════════════════════════
       // [receiver_count NULL フォールバック修正 / チャッピー第114回相当 GO / 2026-06-29]
@@ -2105,12 +2133,16 @@ function renderMessages() {
           return true;
         }).length;
       }
-      const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
-      const unreadCount = Math.max(0, receiverCount - (msg.read_count || 0));
+      const readCount = Math.min(msg.read_count || 0, receiverCount);
+      const isDone = readCount >= receiverCount;
+      const readHtml = isDone
+        ? `<span class="eo-msg__read eo-msg__read--done">全員既読</span>`
+        : `<span class="eo-msg__read">既読 ${readCount}/${receiverCount}</span>`;
       const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
-      const pLabel = p === 'urgent' ? '🔴 緊急' : p === 'normal' ? '🟡 通常' : '🟢 連絡';
+      const kindJa = KIND[p] || '連絡';
+      const kindCls = CLS[p] || 'notice';
       // ── アンケートメッセージ判定（is_survey が true のときのみ） ──
       const isSurvey = msg.is_survey === true;
       // 分母：送信者を含む現メンバー（サイネージ除外）
@@ -2124,31 +2156,34 @@ function renderMessages() {
         const deadline = new Date(msg.survey_deadline);
         const nowTime = Date.now();
         if (deadline.getTime() < nowTime) {
-          surveyDeadlineLabel = `<span class="priority-badge" style="background:#ffeaea; color:#c62828; border:1px solid #ef9a9a; margin-left:6px;">📅 回答締切済</span>`;
+          surveyDeadlineLabel = `<span class="eo-msg__label">締切済み</span>`;
         } else {
           const dateStr = `${deadline.getMonth() + 1}月${deadline.getDate()}日`;
-          surveyDeadlineLabel = `<span class="priority-badge" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-left:6px;">📅 ${dateStr}</span>`;
+          surveyDeadlineLabel = `<span class="eo-msg__label">締切 ${dateStr}</span>`;
         }
       }
       const surveyLabel = isSurvey
-        ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>${surveyDeadlineLabel}`
+        ? `<span class="eo-msg__label">アンケート ${surveyAnsweredCount}/${surveyDenominator}</span>${surveyDeadlineLabel}`
         : '';
       // [チャッピー第60-3回判定 解釈β] 連絡サムネ廃止・📷画像ありバッジ(priority-badge右横・サイネージと同配置)
       const imageLabel = (msg.image_url || msg.thumbnail_url)
-        ? `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`
+        ? `<span class="eo-msg__label">画像</span>`
         : '';
       html += `
-        <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
-          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}${imageLabel}
-          <div class="msg-title">${getMessageTitle(msg.body, 40)}</div>
-          <div class="msg-meta">${senderName}　${timeStr}</div>
-          <div class="msg-read-bar">
-            <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
-            <div class="read-count">${Math.min(msg.read_count || 0, receiverCount)}/${receiverCount}人既読</div>
+        <div class="eo-msg eo-msg--${kindCls}" onclick="showDetail('${msg.id}')" aria-label="重要度：${kindJa}">
+          <div class="eo-msg__text">${getMessageTitle(msg.body, 40)}</div>
+          <div class="eo-msg__meta">
+            <span class="eo-msg__kind">${kindJa}</span>
+            <span class="eo-msg__sep">·</span>
+            <span class="eo-msg__who">${senderName}</span>
+            <span class="eo-msg__sep">·</span>
+            <span class="eo-msg__time">${timeStr}</span>
+            ${surveyLabel}${imageLabel}
+            ${readHtml}
           </div>
-          ${unreadCount > 0 ? `<div class="unread-names">❌ 未読 ${unreadCount}名</div>` : ''}
         </div>`;
     });
+    if (isListOpen) html += `</div>`;
 
     html += `</div></div>`;
   });
