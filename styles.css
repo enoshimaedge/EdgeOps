@@ -322,8 +322,31 @@ body {
   text-align: center; padding: 10px 4px; border-radius: var(--eo-radius);
   font-size: 13px; font-weight: 700; border: 2px solid transparent;
   transition: all 0.15s; opacity: 0.45;
+  cursor: pointer;
 }
 .priority-sel-btn.selected { opacity: 1; transform: scale(1.04); }
+
+/* 【第116回⑤】種別3色。DB列 priority の値（urgent/normal/info）は変更しない */
+.priority-sel-btn.priority-urgent {
+  background: #FCEBEB; color: var(--eo-priority-urgent); border-color: var(--eo-priority-urgent);
+}
+.priority-sel-btn.priority-normal {
+  background: #FBF3E5; color: var(--eo-priority-caution); border-color: var(--eo-priority-caution);
+}
+.priority-sel-btn.priority-info {
+  background: #EAF3EB; color: var(--eo-priority-notice); border-color: var(--eo-priority-notice);
+}
+
+/* 引き継ぎ種別（同じ3色に統一） */
+.priority-sel-btn.hw-action {
+  background: #FCEBEB; color: var(--eo-priority-urgent); border-color: var(--eo-priority-urgent);
+}
+.priority-sel-btn.hw-check {
+  background: #FBF3E5; color: var(--eo-priority-caution); border-color: var(--eo-priority-caution);
+}
+.priority-sel-btn.hw-done {
+  background: #EAF3EB; color: var(--eo-priority-notice); border-color: var(--eo-priority-notice);
+}
 
 /* ── 既読詳細 ── */
 .person-row {
@@ -520,9 +543,9 @@ body {
   font-size: 11px; font-weight: 700; padding: 2px 8px;
   border-radius: var(--eo-radius); margin-bottom: 6px;
 }
-.hw-action { background: #ffeaea; color: #c62828; border: 1px solid #e53935; }
-.hw-check  { background: #fffde7; color: var(--eo-priority-caution); border: 1px solid #f9a825; }
-.hw-done   { background: #E6F0EF; color: #0F6B63; border: 1px solid #0F6B63; }
+.hw-action { background: #FCEBEB; color: var(--eo-priority-urgent); border: 1px solid var(--eo-priority-urgent); }
+.hw-check  { background: #FBF3E5; color: var(--eo-priority-caution); border: 1px solid var(--eo-priority-caution); }
+.hw-done   { background: #EAF3EB; color: var(--eo-priority-notice); border: 1px solid var(--eo-priority-notice); }
 
 .handover-confirm-names {
   font-size: 11px; color: var(--green); margin-top: 6px;
