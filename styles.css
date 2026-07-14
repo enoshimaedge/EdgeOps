@@ -111,27 +111,30 @@ body {
   width: 32px; display: flex; align-items: center; justify-content: center;
 }
 
-/* ── ヘッダーアイコンボタン ── */
+/* ── ヘッダーアイコンボタン ──
+   Design System v1.13: 丸の囲みは持たない。アイコンのみを並べる。
+   Material Symbols Outlined 準拠のインラインSVG（CDN・npm不使用） */
 .header-icon-btn {
   width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.2);
+  border-radius: var(--eo-radius);
+  background: transparent;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: opacity var(--eo-motion-fast) var(--eo-ease);
   position: relative;
+  opacity: 0.9;
 }
-.header-icon-btn:active { background: rgba(255,255,255,0.35); }
+.header-icon-btn:active { opacity: 0.55; }
 
 .header-icon-btn svg {
-  width: 20px;
-  height: 20px;
-  stroke: white;
+  width: 22px;
+  height: 22px;
+  stroke: var(--eo-header-fg);
   fill: none;
-  stroke-width: 2;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }

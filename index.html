@@ -381,55 +381,18 @@
     <div style="display:flex; gap:8px; align-items:center;">
       <!-- エリア混雑度ボタン（藤沢グループのみ表示） -->
       <!-- サイネージボタン（is_signage=trueのメンバーのみ表示） -->
-      <div id="signage-btn" style="display:none;">
-        <button onclick="openSignage()" title="サイネージを開く" style="
-          display:flex; align-items:center; gap:4px;
-          background:rgba(255,255,255,0.18); border:1.5px solid rgba(255,255,255,0.6);
-          border-radius:20px; padding:5px 10px;
-          color:white; font-size:11px; font-weight:700;
-          cursor:pointer; font-family:inherit;
-          white-space:nowrap;
-        ">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
-          </svg>
-          サイネージ
-        </button>
+      <div class="header-icon-btn" id="signage-btn" style="display:none;" onclick="openSignage()" role="button" tabindex="0" aria-label="サイネージを開く" title="サイネージを開く">
+        <svg viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
       </div>
       <!-- [UI改善② LINKボタン] チャッピー第50回判定準拠
            - グループ管理者が profile 画面から URL 設定 → 表示
            - currentGroup.link_url が NULL または空ならボタン非表示
            - 押下時は noopener,noreferrer で別タブ起動 -->
-      <div id="link-btn" style="display:none;">
-        <button onclick="openCustomLink()" title="カスタムリンク" style="
-          display:flex; align-items:center; gap:4px;
-          background:rgba(255,255,255,0.18); border:1.5px solid rgba(255,255,255,0.6);
-          border-radius:20px; padding:5px 10px;
-          color:white; font-size:11px; font-weight:700;
-          cursor:pointer; font-family:inherit;
-          white-space:nowrap; transition:background 0.15s;
-        " onmouseenter="this.style.background='rgba(255,255,255,0.3)'" onmouseleave="this.style.background='rgba(255,255,255,0.18)'">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-          </svg>
-          LINK
-        </button>
+      <div class="header-icon-btn" id="link-btn" style="display:none;" onclick="openCustomLink()" role="button" tabindex="0" aria-label="カスタムリンク" title="カスタムリンク">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       </div>
-      <div id="vacan-btn" style="display:none;">
-        <button onclick="openVacanMap()" title="エリア混雑度" style="
-          display:flex; align-items:center; gap:4px;
-          background:rgba(255,255,255,0.18); border:1.5px solid rgba(255,255,255,0.6);
-          border-radius:20px; padding:5px 10px;
-          color:white; font-size:11px; font-weight:700;
-          cursor:pointer; font-family:inherit;
-          white-space:nowrap; transition:background 0.15s;
-        " onmouseenter="this.style.background='rgba(255,255,255,0.3)'" onmouseleave="this.style.background='rgba(255,255,255,0.18)'">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-          </svg>
-          混雑度
-        </button>
+      <div class="header-icon-btn" id="vacan-btn" style="display:none;" onclick="openVacanMap()" role="button" tabindex="0" aria-label="エリア混雑度" title="エリア混雑度">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="10" r="2.5"/><path d="M12 2.5C8.4 2.5 5.5 5.4 5.5 9c0 4.9 6.5 12.5 6.5 12.5S18.5 13.9 18.5 9c0-3.6-2.9-6.5-6.5-6.5z"/></svg>
       </div>
       <!-- 承認アイコン -->
       <div class="header-icon-btn" id="approval-btn" onclick="showScreen('screen-approval')" title="参加申請">
