@@ -34,7 +34,7 @@ function renderImageThumbnailHtml(item) {
   if (item.image_mode === 'deleted') {
     return `<div class="msg-thumb-wrap" style="margin-top:8px;">
       <div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:12px;">
-        🗑️ 画像は削除されました
+         画像は削除されました
       </div>
     </div>`;
   }
@@ -75,7 +75,7 @@ async function updateImageQuotaUI() {
   const ctx = (typeof selectedComposeType === 'string' && selectedComposeType === 'handover') ? 'handover' : 'message';
   const { remaining, limit } = await getRemainingQuota(ctx);
   if (remaining > 0) {
-    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--text-light);">📊 あと <strong style="color:#06C755;">${remaining}</strong> 回投稿できます</span>`;
+    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--text-light);">あと <strong style="color:#0F6B63;">${remaining}</strong>回投稿できます</span>`;
     // [チャッピー第59-2回判定] btn.disabled は使わず opacity/cursor/aria-disabled のみで視覚演出
     btnCamera.style.opacity = '1';
     btnCamera.style.cursor = 'pointer';
@@ -84,7 +84,7 @@ async function updateImageQuotaUI() {
     btnLibrary.style.cursor = 'pointer';
     btnLibrary.setAttribute('aria-disabled', 'false');
   } else {
-    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--red);">⛔ 本日の上限(${limit}回)に達しました・明日0時にリセット</span>`;
+    quotaEl.innerHTML = `<span style="font-size:11px; color:var(--red);">本日の上限(${limit}回)に達しました・明日0時にリセット</span>`;
     btnCamera.style.opacity = '0.4';
     btnCamera.style.cursor = 'not-allowed';
     btnCamera.setAttribute('aria-disabled', 'true');
@@ -98,10 +98,10 @@ function renderHandoverImageLabel(item) {
   // [チャッピー第60-3回判定 解釈β] サイネージと同配置・priority-badge右横にインライン
   if (!item) return '';
   if (item.image_mode === 'deleted') {
-    return `<span class="priority-badge" style="background:#f5f5f5; color:#888; border:1px solid #bbb; margin-left:6px;">🗑️ 削除済</span>`;
+    return `<span class="priority-badge" style="background:#f5f5f5; color:#888; border:1px solid #bbb; margin-left:6px;">削除済</span>`;
   }
   if (item.image_url || item.thumbnail_url) {
-    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`;
+    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">画像あり</span>`;
   }
   return '';
 }
@@ -129,9 +129,9 @@ function updateExpiryWarningBar() {
   bar.classList.remove('warning', 'danger');
   bar.classList.add(daysLeft <= 7 ? 'danger' : 'warning');
   if (daysLeft <= 0) {
-    bar.textContent = '⚠️ このグループは有効期限を過ぎています';
+    bar.textContent = 'このグループは有効期限を過ぎています';
   } else {
-    bar.textContent = `⚠️ あと${daysLeft}日でこのグループは使用できなくなります`;
+    bar.textContent = `あと${daysLeft}日でこのグループは使用できなくなります`;
   }
   bar.style.display = 'block';
 }
@@ -147,7 +147,7 @@ function renderTemplates() {
   wrap.style.display = 'block';
   const list = document.getElementById('template-list');
   list.innerHTML = _groupTemplatesCache.map(t =>
-    `<button class="template-btn" onclick="applyTemplate('${t.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">📋 ${escapeHtml(t)}</button>`
+    `<button class="template-btn" onclick="applyTemplate('${t.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">${escapeHtml(t)}</button>`
   ).join('');
 }
 
@@ -228,7 +228,7 @@ async function updateHandoverBadge() {
 }
 
 function renderHandoverCardHtml(hw, confs, myConf) {
-  const pLabels = { action: '🔴 重要', check: '🟡 通常', done: '🟢 確認要' };
+  const pLabels = { action: '重要', check: '通常', done: '確認要' };
   const pClass  = { action: 'hw-action', check: 'hw-check', done: 'hw-done' };
   const p = hw.priority || 'check';
   const confirmNames = (confs || []).map(c => c.display_name).join('・');
@@ -241,19 +241,19 @@ function renderHandoverCardHtml(hw, confs, myConf) {
   if (isSender) {
     if (isCompleted) {
       const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿（🔒 ${escHtml(completedConf.display_name)}が${cl}）</div>`;
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">自分が投稿（ ${escHtml(completedConf.display_name)}が${cl}）</div>`;
     } else if (confirmNames) {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-confirm-names">✅ 確認済み：${escHtml(confirmNames)}</div>`;
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">自分が投稿</div><div class="handover-confirm-names">確認済み：${escHtml(confirmNames)}</div>`;
     } else {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">📋 自分が投稿</div><div class="handover-unconfirmed">⚠️ 未確認</div>`;
+      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">自分が投稿</div><div class="handover-unconfirmed">未確認</div>`;
     }
   } else if (isCompleted) {
     const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
-    statusHtml = `<div class="handover-confirm-names">🔒 ${escHtml(completedConf.display_name)}が${cl}</div>`;
+    statusHtml = `<div class="handover-confirm-names">${escHtml(completedConf.display_name)}が${cl}</div>`;
   } else if (confirmedByMe) {
-    statusHtml = `<div class="handover-confirm-names">✅ 確認済み${confirmNames ? '：' + escHtml(confirmNames) : ''}</div>`;
+    statusHtml = `<div class="handover-confirm-names">確認済み${confirmNames ? '：'+ escHtml(confirmNames) : ''}</div>`;
   } else {
-    statusHtml = `<div class="handover-unconfirmed">⚠️ 未確認${confirmNames ? '（確認済：' + escHtml(confirmNames) + '）' : ''}</div>`;
+    statusHtml = `<div class="handover-unconfirmed">未確認${confirmNames ? '（確認済：'+ escHtml(confirmNames) + '）': ''}</div>`;
   }
   // [チャッピー第60-3回判定 解釈β] 引き継ぎ側も📷画像あり配置をサイネージと統一(priority-badge右横)
   return `
@@ -267,7 +267,7 @@ function renderHandoverCardHtml(hw, confs, myConf) {
 
 function renderHandoverInline(container) {
   if (handoverNotes.length === 0) {
-    container.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">引き継ぎノートはまだありません</div></div>';
+    container.innerHTML = '<div class="empty"><div class="empty-icon"></div><div class="empty-text">引き継ぎノートはまだありません</div></div>';
     return;
   }
   // 引き継ぎノート画面と同じソート順：新しい順のみ
@@ -323,10 +323,10 @@ function updateReportTabUI() {
   const lastBtn = document.getElementById('tab-lastmonth');
   const thisBtn = document.getElementById('tab-thismonth');
   if (currentReportTab === 'last') {
-    lastBtn.style.background = 'var(--green)'; lastBtn.style.borderColor = 'var(--green)'; lastBtn.style.color = 'white';
+    lastBtn.style.background = 'var(--eo-header-bg)'; lastBtn.style.borderColor = 'var(--eo-header-bg)'; lastBtn.style.color = 'white';
     thisBtn.style.background = 'white'; thisBtn.style.borderColor = 'var(--border)'; thisBtn.style.color = 'var(--text-mid)';
   } else {
-    thisBtn.style.background = 'var(--green)'; thisBtn.style.borderColor = 'var(--green)'; thisBtn.style.color = 'white';
+    thisBtn.style.background = 'var(--eo-header-bg)'; thisBtn.style.borderColor = 'var(--eo-header-bg)'; thisBtn.style.color = 'white';
     lastBtn.style.background = 'white'; lastBtn.style.borderColor = 'var(--border)'; lastBtn.style.color = 'var(--text-mid)';
   }
 }
@@ -353,7 +353,7 @@ async function updateMemberCount() {
     .select('*', { count: 'exact', head: true })
     .eq('group_session_id', currentGroup.id)
     .eq('status', 'approved');
-  membersEl.textContent = `👥 参加中：${count || 0} / ${maxMembers}人`;
+  membersEl.textContent = `参加中：${count || 0} / ${maxMembers}人`;
 }
 
 function updateSignageUrlDisplay() {
@@ -361,11 +361,11 @@ function updateSignageUrlDisplay() {
   const copyBtn = document.getElementById('copy-signage-btn');
   if (!el) return;
   if (currentGroup?.signage_token && currentGroup?.signage_enabled) {
-    el.textContent = '✅ サイネージURLが発行済みです';
-    el.style.color = '#2e7d32';
+    el.textContent = 'サイネージURLが発行済みです';
+    el.style.color = '#0F6B63';
     if (copyBtn) copyBtn.style.display = 'block';
   } else if (currentGroup?.signage_token && !currentGroup?.signage_enabled) {
-    el.textContent = '⚠️ サイネージは無効化されています';
+    el.textContent = 'サイネージは無効化されています';
     el.style.color = '#e53935';
     if (copyBtn) copyBtn.style.display = 'none';
   } else {
@@ -436,7 +436,7 @@ function linkify(text) {
 // URLかどうか判定してヘッダータイトルを返す
 function getMessageTitle(body, maxLen) {
   if (!body) return '';
-  if (/^https?:\/\//.test(body.trim())) return '🔗 リンクを含むメッセージ';
+  if (/^https?:\/\//.test(body.trim())) return 'リンクを含むメッセージ';
   const s = body.substring(0, maxLen);
   return s + (body.length > maxLen ? '…' : '');
 }
@@ -459,5 +459,5 @@ async function updateGroupSwitcherBtn() {
     .eq('eo_uid', currentUser.eo_uid)
     .eq('status', 'approved');
   const others = Math.max(0, (count || 0) - 1);
-  btn.textContent = `📋 他のグループに切替 (${others})`;
+  btn.textContent = `他のグループに切替 (${others})`;
 }

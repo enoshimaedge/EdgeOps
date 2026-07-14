@@ -82,7 +82,7 @@ async function applySurveyDetailUI(msg) {
       if (myResponse) {
         statusEl.style.display = '';
         if (myResponse.status === 'answered') {
-          statusEl.innerHTML = `<div style="color:#047a37; font-weight:600;">あなたの回答：</div><div style="margin-top:4px;">${escHtml(myResponse.response_text || '')}</div>`;
+          statusEl.innerHTML = `<div style="color:#0F6B63; font-weight:600;">あなたの回答：</div><div style="margin-top:4px;">${escHtml(myResponse.response_text || '')}</div>`;
         } else {
           statusEl.innerHTML = `<div style="color:#666; font-weight:600;">あなたは「該当なし」を選択しました</div>`;
         }
@@ -109,7 +109,7 @@ async function applySurveyDetailUI(msg) {
     if (myResponse) {
       statusEl.style.display = '';
       if (myResponse.status === 'answered') {
-        statusEl.innerHTML = `<div style="color:#047a37; font-weight:600;">✅ 回答済み（再回答可）</div>`;
+        statusEl.innerHTML = `<div style="color:#0F6B63; font-weight:600;">回答済み（再回答可）</div>`;
       } else {
         statusEl.innerHTML = `<div style="color:#666; font-weight:600;">「該当なし」選択中（変更可）</div>`;
       }
@@ -195,7 +195,7 @@ async function showSurveyList() {
       .gte('created_at', cutoff60d)
       .order('created_at', { ascending: false });
     if (!surveys || surveys.length === 0) {
-      content.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:24px;">📭 アンケートはまだありません<br><span style="font-size:12px;">※過去60日以内のアンケートを表示します</span></div>';
+      content.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:24px;">アンケートはまだありません<br><span style="font-size:12px;">※過去60日以内のアンケートを表示します</span></div>';
       return;
     }
     // 各アンケートの回答数を取得
@@ -225,7 +225,7 @@ async function showSurveyList() {
         const m = d.getMonth() + 1;
         const day = d.getDate();
         deadlineHtml = isExpired
-          ? `<div style="font-size:11px; color:#c62828; font-weight:600;">⛔ 締切済み (${m}/${day}(${youbi}))</div>`
+          ? `<div style="font-size:11px; color:#c62828; font-weight:600;">締切済み (${m}/${day}(${youbi}))</div>`
           : `<div style="font-size:11px; color:var(--text-mid);">締切: ${m}/${day}(${youbi}) 23:59</div>`;
       } else {
         deadlineHtml = `<div style="font-size:11px; color:var(--text-light);">締切なし</div>`;
@@ -236,7 +236,7 @@ async function showSurveyList() {
           <div style="font-size:11px; color:var(--text-light); margin-bottom:6px;">${escHtml(senderName)} ・ ${timeStr}</div>
           ${deadlineHtml}
           <div style="display:flex; gap:6px; margin-top:8px; font-size:11px;">
-            <span style="background:#e8f5e9; color:#047a37; padding:2px 8px; border-radius:4px;">✅ 回答 ${counts.answered}</span>
+            <span style="background:#E6F0EF; color:#0F6B63; padding:2px 8px; border-radius:4px;">回答 ${counts.answered}</span>
             <span style="background:#ede7f6; color:#5e35b1; padding:2px 8px; border-radius:4px;">— 該当なし ${counts.na}</span>
             <span style="background:#f5f5f5; color:#666; padding:2px 8px; border-radius:4px;">未回答 ${Math.max(denominator - counts.answered - counts.na, 0)}</span>
           </div>
@@ -260,7 +260,7 @@ async function showSurveyDetail(messageId) {
     const { data: msg } = await supabase.from('messages')
       .select('*').eq('id', messageId).single();
     if (!msg) throw new Error('メッセージが見つかりません');
-    if (titleEl) titleEl.textContent = '📊 ' + getMessageTitle(msg.body, 25);
+    if (titleEl) titleEl.textContent = getMessageTitle(msg.body, 25);
 
     // 現メンバー（サイネージ除外）取得
     const { data: memberList } = await supabase
@@ -306,19 +306,19 @@ async function showSurveyDetail(messageId) {
       const m2 = d.getMonth() + 1;
       const day = d.getDate();
       deadlineHtml = isExpired
-        ? `<div style="font-size:12px; color:#c62828; font-weight:600; margin-bottom:8px;">⛔ 締切済み (${m2}/${day}(${youbi}) 23:59)</div>`
+        ? `<div style="font-size:12px; color:#c62828; font-weight:600; margin-bottom:8px;">締切済み (${m2}/${day}(${youbi}) 23:59)</div>`
         : `<div style="font-size:12px; color:var(--text-mid); margin-bottom:8px;">締切: ${m2}/${day}(${youbi}) 23:59</div>`;
     }
 
     // セクションごとのHTML生成
     const renderRow = (m, type) => {
       const readMark = m.read
-        ? '<span style="font-size:11px; color:#047a37;">✅ 既読</span>'
-        : '<span style="font-size:11px; color:#c62828;">❌ 未読</span>';
+        ? '<span style="font-size:11px; color:#0F6B63;">既読</span>'
+        : '<span style="font-size:11px; color:#c62828;">未読</span>';
       let bottomLine = '';
       if (type === 'answered' && m.response) {
         const updated = m.response.updated_at ? formatTime(m.response.updated_at) : '';
-        bottomLine = `<div style="font-size:13px; margin-top:4px; padding:6px 8px; background:#f0fff4; border-left:3px solid #06C755; border-radius:4px;">${escHtml(m.response.response_text || '')}</div>`
+        bottomLine = `<div style="font-size:13px; margin-top:4px; padding:6px 8px; background:#E6F0EF; border-left:3px solid #0F6B63; border-radius:4px;">${escHtml(m.response.response_text || '')}</div>`
                    + `<div style="font-size:10px; color:var(--text-light); margin-top:2px;">回答日時: ${updated}</div>`;
       } else if (type === 'na' && m.response) {
         const updated = m.response.updated_at ? formatTime(m.response.updated_at) : '';
@@ -337,7 +337,7 @@ async function showSurveyDetail(messageId) {
 
     const sectionUnanswered = `
       <div style="margin-bottom:16px;">
-        <div style="font-size:13px; font-weight:700; color:#666; margin-bottom:6px; padding:6px 10px; background:#f5f5f5; border-radius:6px;">📭 未回答 (${notAnswered.length}人)</div>
+        <div style="font-size:13px; font-weight:700; color:#666; margin-bottom:6px; padding:6px 10px; background:#f5f5f5; border-radius:6px;">未回答 (${notAnswered.length}人)</div>
         ${notAnswered.length === 0 ? '<div style="font-size:12px; color:var(--text-light); padding:8px;">該当なし</div>' : notAnswered.map(m => renderRow(m, 'unanswered')).join('')}
       </div>
     `;
@@ -349,7 +349,7 @@ async function showSurveyDetail(messageId) {
     `;
     const sectionAnswered = `
       <div style="margin-bottom:16px;">
-        <div style="font-size:13px; font-weight:700; color:#047a37; margin-bottom:6px; padding:6px 10px; background:#e8f5e9; border-radius:6px;">✅ 回答済み (${answered.length}人)</div>
+        <div style="font-size:13px; font-weight:700; color:#0F6B63; margin-bottom:6px; padding:6px 10px; background:#E6F0EF; border-radius:6px;">回答済み (${answered.length}人)</div>
         ${answered.length === 0 ? '<div style="font-size:12px; color:var(--text-light); padding:8px;">該当なし</div>' : answered.map(m => renderRow(m, 'answered')).join('')}
       </div>
     `;

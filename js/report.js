@@ -116,38 +116,39 @@ async function loadReportData(tab) {
       .sort((a, b) => (a.read/a.total) - (b.read/b.total)); // 既読率が低い順
 
     // レポートHTML生成
-    const rateColor = avgRate >= 80 ? 'var(--green)' : avgRate >= 60 ? '#f59e0b' : 'var(--red)';
+    // Design System v1.13: カード背景は単色の白。角丸9px。赤は「至急」のみ。
+    const rateColor = avgRate >= 60 ? 'var(--eo-text)' : 'var(--eo-priority-caution)';
     content.innerHTML = `
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
-        <div style="background:var(--green-light); border-radius:12px; padding:14px; text-align:center;">
-          <div style="font-size:11px; color:var(--text-mid); margin-bottom:4px;">送信メッセージ数</div>
-          <div style="font-size:28px; font-weight:700; color:var(--green);">${totalMsgs}</div>
-          <div style="font-size:11px; color:var(--text-light);">件</div>
+        <div style="background:var(--eo-surface); border:1px solid var(--eo-border); border-radius:var(--eo-radius); padding:14px; text-align:center;">
+          <div style="font-size:11px; color:var(--eo-text-muted); margin-bottom:4px;">送信メッセージ数</div>
+          <div style="font-size:28px; font-weight:700; color:var(--eo-text);">${totalMsgs}</div>
+          <div style="font-size:11px; color:var(--eo-text-muted);">件</div>
         </div>
-        <div style="background:#f0f8ff; border-radius:12px; padding:14px; text-align:center;">
-          <div style="font-size:11px; color:var(--text-mid); margin-bottom:4px;">平均既読率</div>
+        <div style="background:var(--eo-surface); border:1px solid var(--eo-border); border-radius:var(--eo-radius); padding:14px; text-align:center;">
+          <div style="font-size:11px; color:var(--eo-text-muted); margin-bottom:4px;">平均既読率</div>
           <div style="font-size:28px; font-weight:700; color:${rateColor};">${avgRate}</div>
-          <div style="font-size:11px; color:var(--text-light);">%</div>
+          <div style="font-size:11px; color:var(--eo-text-muted);">%</div>
         </div>
       </div>
-      <div style="background:#fffde7; border-radius:12px; padding:14px; margin-bottom:10px;">
-        <div style="font-size:11px; font-weight:700; color:#f57f17; margin-bottom:6px;">⚡ 最速既読者</div>
-        <div style="font-size:14px; font-weight:600; color:var(--text);">${fastestStr}</div>
+      <div style="background:var(--eo-surface); border:1px solid var(--eo-border); border-radius:var(--eo-radius); padding:14px; margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:700; color:var(--eo-text-muted); margin-bottom:6px;">最速既読者</div>
+        <div style="font-size:14px; font-weight:600; color:var(--eo-text);">${fastestStr}</div>
       </div>
-      <div style="background:#ffeaea; border-radius:12px; padding:14px;">
-        <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:6px;">⚠️ 要注意スタッフ（既読率50%未満）</div>
+      <div style="background:var(--eo-surface); border:1px solid var(--eo-border); border-radius:var(--eo-radius); padding:14px;">
+        <div style="font-size:11px; font-weight:700; color:var(--eo-text-muted); margin-bottom:6px;">要注意スタッフ（既読率50%未満）</div>
         ${caution.length === 0
-          ? '<div style="font-size:13px; color:var(--text-light);">該当者なし 🎉</div>'
+          ? '<div style="font-size:13px; color:var(--eo-text-muted);">該当者なし</div>'
           : caution.map(m => {
               const r = m.total > 0 ? Math.round(m.read / m.total * 100) : 0;
-              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
-                <span style="font-size:13px; font-weight:500;">${escHtml(m.name)}</span>
-                <span style="font-size:13px; font-weight:700; color:var(--red);">${r}%</span>
+              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--eo-border);">
+                <span style="font-size:13px; font-weight:500; color:var(--eo-text);">${escHtml(m.name)}</span>
+                <span style="font-size:13px; font-weight:700; color:var(--eo-priority-caution);">${r}%</span>
               </div>`;
             }).join('')
         }
       </div>
-      ${totalMsgs === 0 ? '<div style="text-align:center; color:var(--text-light); font-size:13px; margin-top:16px;">この月のメッセージはありません</div>' : ''}
+      ${totalMsgs === 0 ? '<div style="text-align:center; color:var(--eo-text-muted); font-size:13px; margin-top:16px;">この月のメッセージはありません</div>' : ''}
     `;
   } catch(e) {
     console.error(e);

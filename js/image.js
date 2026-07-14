@@ -706,7 +706,7 @@ async function _renderDetailImage(item, wrapId, imgId, statusId) {
     wrap.style.display = 'block';
     img.style.display = 'none';
     if (status) {
-      status.innerHTML = '<div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:13px;">🗑️ 画像は削除されました</div>';
+      status.innerHTML = '<div style="display:inline-flex; align-items:center; gap:6px; padding:10px 14px; background:#f5f5f5; border:1px dashed #bbb; border-radius:6px; color:#888; font-size:13px;">画像は削除されました</div>';
     }
     return;
   }
@@ -768,7 +768,7 @@ function _showImageError(item, img, status, thumbPath, isRetry) {
   status.innerHTML = `
     <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; background:#fff3cd; border:1px solid #ffe082; border-radius:6px;">
       <span style="color:#795548; font-size:13px;">画像を表示できません</span>
-      <button id="_retry-image-btn" type="button" style="padding:4px 10px; background:#1976d2; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">🔄 再読み込み</button>
+      <button id="_retry-image-btn" type="button" style="padding:4px 10px; background:#1976d2; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">再読み込み</button>
     </div>
     <div id="_retry-diag" style="margin-top:4px; min-height:0; display:flex; flex-direction:column; gap:2px;"></div>
   `;
@@ -802,12 +802,12 @@ async function _handleRetryImage(item, img, status, thumbPath, btn, diagArea) {
       refreshOk = !!newToken;
     }
   } catch (_) { refreshOk = false; }
-  _appendDiag(diagArea, refreshOk ? '診断: token更新 ✅' : '診断: refresh失敗', refreshOk ? '#e8f5e9' : '#ffebee', refreshOk ? '#2e7d32' : '#c62828');
+  _appendDiag(diagArea, refreshOk ? '診断: token更新 ': '診断: refresh失敗', refreshOk ? '#E6F0EF': '#ffebee', refreshOk ? '#0F6B63': '#c62828');
   // ② キャッシュバイパス
   try {
     if (typeof __signedUrlCache !== 'undefined' && __signedUrlCache && __signedUrlCache.delete) {
       __signedUrlCache.delete(thumbPath);
-      _appendDiag(diagArea, '診断: キャッシュ削除 ✅', '#e8f5e9', '#2e7d32');
+      _appendDiag(diagArea, '診断: キャッシュ削除 ', '#E6F0EF', '#0F6B63');
     }
   } catch (_) { /* cache 失敗は処理を止めない */ }
   // ③ 再取得
@@ -818,7 +818,7 @@ async function _handleRetryImage(item, img, status, thumbPath, btn, diagArea) {
       img.src = url;
       img.style.background = '';
       img.alt = '';
-      _appendDiag(diagArea, '診断: 再取得成功 ✅', '#e8f5e9', '#2e7d32');
+      _appendDiag(diagArea, '診断: 再取得成功 ', '#E6F0EF', '#0F6B63');
       // 成功時はステータス全体を成功表示に置換(3秒後)
       setTimeout(() => {
         if (status) {
@@ -1120,7 +1120,7 @@ async function deleteImageOnly(itemId, context) {
   }
   // 確認ダイアログ
   // [2026/5/20 野口さん指示] クォータ警告追加(削除しても投稿可能数は戻らない・明日0時リセット)
-  if (!confirm('この画像を削除しますか?\n\n本文は残り、画像のみ削除されます。\n削除した画像は復元できません。\n\n⚠️ 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)')) return;
+  if (!confirm('この画像を削除しますか?\n\n本文は残り、画像のみ削除されます。\n削除した画像は復元できません。\n\n 注意:画像を削除しても、本日の投稿可能数は戻りません。\n(明日0時にリセットされます)')) return;
 
   showToast('削除中...');
   try {
