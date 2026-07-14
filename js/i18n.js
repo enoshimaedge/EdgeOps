@@ -4,9 +4,6 @@
 // index.html から削除した日英対訳の退避ファイル（Step 4）
 
 export const ja = {
-  // ── アプリ共通 ──────────────────────────────────────────────
-  app_sub:                    '業務連絡支援アプリ',
-
   // ── 友だち未登録画面 ─────────────────────────────────────────
   desc_add_friend:            'EdgeOpsを利用するには、まずEEE｜EdgeOpsを友だち登録してください。',
   btn_add_friend:             '友だち追加する',
@@ -102,9 +99,6 @@ export const ja = {
 };
 
 export const en = {
-  // ── アプリ共通 ──────────────────────────────────────────────
-  app_sub:                    'EdgeOperations',
-
   // ── 友だち未登録画面 ─────────────────────────────────────────
   desc_add_friend:            'Please add EEE｜EdgeOps as a friend first.',
   btn_add_friend:             'Add Friend',
@@ -196,5 +190,5 @@ export const en = {
 
   // ── トースト・バリデーションメッセージ（JS） ─────────────────────
   toast_cancel_request:       'Request cancelled',
-  toast_enter_new_name:       'New display name',
+  toast_enter_new_name:       'Please enter a new display name',
 };
