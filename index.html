@@ -145,7 +145,6 @@
       <div style="font-size:14px; color:var(--text-light); line-height:1.8; margin-bottom:32px;">
         EdgeOpsを利用するには、まず<br>
         <strong style="color:var(--text);">EEE｜EdgeOps</strong> を友だち登録してください。<br>
-        <span style="font-size:12px;">Please add EEE｜EdgeOps as a friend first.</span>
       </div>
       <a href="https://line.me/R/ti/p/@918uwtlk"
          target="_blank"
@@ -155,12 +154,12 @@
                 font-size:15px; font-weight:700;
                 text-decoration:none;
                 box-shadow:0 4px 16px rgba(6,199,85,0.4);">
-        ➕ 友だち追加する / Add Friend
+        ➕ 友だち追加する
       </a>
       <div style="margin-top:24px;">
         <button class="btn btn-secondary" onclick="recheckFriendship()"
                 style="max-width:260px; margin:0 auto;">
-          🔄 登録済みの場合は再確認 / Re-check
+          🔄 登録済みの場合は再確認
         </button>
       </div>
     </div>
@@ -181,23 +180,23 @@
     </div>
     <div style="text-align:center; padding: 32px 0 24px;">
       <div style="font-size:48px; margin-bottom:12px;">📋</div>
-      <div style="font-size:18px; font-weight:700; margin-bottom:8px;">はじめましょう / Get Started</div>
+      <div style="font-size:18px; font-weight:700; margin-bottom:8px;">はじめましょう</div>
       <div style="font-size:14px; color:var(--text-light);">グループを作成するか、既存のグループに参加してください
-      <br><span style="font-size:12px;">Create or join a group</span></div>
+</div>
     </div>
     <div class="form-group">
-      <label class="form-label">表示名（本名を入力してください） / Display Name</label>
+      <label class="form-label" data-i18n="form_display_name">表示名（本名を入力してください）</label>
       <input class="form-input" id="input-display-name" type="text" placeholder="例：山田 太郎" maxlength="20">
     </div>
     <div style="margin-bottom:16px;">
       <div class="card" style="padding:16px; margin-bottom:10px;">
-        <div style="font-size:13px; font-weight:700; color:var(--text-mid); margin-bottom:10px;">✨ 新しいグループを作る / Create Group</div>
+        <div style="font-size:13px; font-weight:700; color:var(--text-mid); margin-bottom:10px;">✨ 新しいグループを作る</div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">グループ名（任意） / Group Name <span style="font-size:11px; color:var(--text-light); font-weight:400;">※後から変更できます</span></label>
+          <label class="form-label">グループ名（任意） <span style="font-size:11px; color:var(--text-light); font-weight:400;">※後から変更できます</span></label>
           <input class="form-input" id="input-group-name" type="text" placeholder="例：フロントスタッフ・1階ナースステーション" maxlength="30">
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">業種を選択 / Industry</label>
+          <label class="form-label">業種を選択</label>
           <select class="form-input" id="input-industry">
             <option value="">-- 業種を選んでください --</option>
             <option value="hotel">🏨 ホテル・旅館</option>
@@ -209,7 +208,7 @@
           </select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">地域を選択（任意） / Region</label>
+          <label class="form-label">地域を選択（任意）</label>
           <select class="form-input" id="input-region">
             <option value="">-- 地域を選んでください --</option>
             <optgroup label="── 北海道・東北 ──">
@@ -279,34 +278,34 @@
           </select>
         </div>
         <button class="btn btn-primary" onclick="createGroup()">
-          ✨ 新しいグループを作る / Create Group
+          ✨ 新しいグループを作る
         </button>
       </div>
-      <div style="text-align:center; color:var(--text-light); font-size:13px; margin-bottom:10px;">または / or</div>
+      <div style="text-align:center; color:var(--text-light); font-size:13px; margin-bottom:10px;">または</div>
     </div>
     <div class="card" style="padding:16px;">
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">グループIDを入力して参加 / Join with Group ID</label>
+        <label class="form-label">グループIDを入力して参加</label>
         <input class="form-input" id="input-group-id" type="text" placeholder="例：SL-K9mX2-pQ7r" style="text-transform:uppercase;">
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:10px 12px; background:#f8fff9; border-radius:10px; border:1.5px solid var(--border);">
           <input type="checkbox" id="join-is-signage"
             style="width:18px; height:18px; accent-color:var(--green); cursor:pointer; flex-shrink:0;">
-          <span style="font-size:14px; color:var(--text);">📺 サイネージとして利用する / Use as Signage</span>
+          <span style="font-size:14px; color:var(--text);">📺 サイネージとして利用する</span>
         </label>
       </div>
       <button class="btn btn-secondary" onclick="joinGroup()">
-        🔗 グループに参加する / Join
+        🔗 グループに参加する
       </button>
     </div>
     <div style="text-align:center; padding: 16px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       本サービスを利用することで、以下に同意したものとみなします。<br>
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
-         style="color:var(--green); text-decoration:none; font-weight:600;">利用規約 / Terms of Service</a>
+         style="color:var(--green); text-decoration:none; font-weight:600;">利用規約</a>
       &nbsp;／&nbsp;
       <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank"
-         style="color:var(--green); text-decoration:none; font-weight:600;">プライバシーポリシー / Privacy Policy</a>
+         style="color:var(--green); text-decoration:none; font-weight:600;">プライバシーポリシー</a>
     </div>
   </div>
 </div>
@@ -316,7 +315,7 @@
   <div class="header">
     <div>
       <div class="header-title">📋 他のグループに参加</div>
-      <div class="header-sub">既存グループはそのまま保持されます / Join another group</div>
+      <div class="header-sub">既存グループはそのまま保持されます</div>
     </div>
   </div>
   <div class="content">
@@ -324,15 +323,15 @@
       <div style="font-size:44px; margin-bottom:8px;">🔗</div>
       <div style="font-size:16px; font-weight:700; margin-bottom:6px;">参加したいグループのIDを入力してください</div>
       <div style="font-size:13px; color:var(--text-light);">グループの管理者から共有されたIDを入力します
-      <br><span style="font-size:11px;">Enter the group ID shared by the admin</span></div>
+</div>
     </div>
     <div class="form-group">
-      <label class="form-label">表示名(このグループでの名前) / Display Name in this Group</label>
+      <label class="form-label" data-i18n="form_display_name_group">表示名(このグループでの名前)</label>
       <input class="form-input" id="input-display-name-join-only" type="text" placeholder="例：山田 太郎(夜勤)" maxlength="20">
       <div style="font-size:11px; color:var(--text-light); margin-top:4px;">グループごとに別の表示名を使えます</div>
     </div>
     <div class="form-group">
-      <label class="form-label">グループID / Group ID</label>
+      <label class="form-label">グループID</label>
       <input class="form-input" id="input-group-id-join-only" type="text" placeholder="例：SL-XXXXXX-XXXX" maxlength="20" style="font-family:monospace; text-transform:uppercase;">
     </div>
     <div style="margin-top:24px; display:flex; gap:10px;">
@@ -349,26 +348,25 @@
 <!-- ══ 画面②：参加承認待ち ══ -->
 <div class="screen" id="screen-pending">
   <div class="header">
-    <div class="header-title">参加申請中 / Pending Approval</div>
+    <div class="header-title">参加申請中</div>
   </div>
   <div class="content">
     <div style="text-align:center; padding: 40px 0;">
       <div style="font-size:48px; margin-bottom:16px;">⏳</div>
-      <div style="font-size:16px; font-weight:700; margin-bottom:8px;">承認を待っています / Waiting for Approval</div>
+      <div style="font-size:16px; font-weight:700; margin-bottom:8px;">承認を待っています</div>
       <div style="font-size:14px; color:var(--text-light); line-height:1.6;">
         グループメンバーが承認すると自動的に参加できます
-        <br><span style="font-size:12px;">A member will approve your request</span>
       </div>
     </div>
     <div class="card" style="padding:16px; text-align:center;">
-      <div style="font-size:13px; color:var(--text-mid);">参加申請したグループID / Group ID</div>
+      <div style="font-size:13px; color:var(--text-mid);">参加申請したグループID</div>
       <div style="font-size:18px; font-weight:700; letter-spacing:2px; margin-top:6px;" id="pending-group-id"></div>
     </div>
     <button class="btn btn-secondary" onclick="checkApproval()" style="margin-top:16px;">
-      🔄 承認状況を確認する / Check Status
+      🔄 承認状況を確認する
     </button>
     <button class="btn" onclick="cancelRequest()" style="margin-top:12px; background:#fff; color:#e53935; border:1.5px solid #e53935;">
-      ✕ 申請を取り消す / Cancel Request
+      ✕ 申請を取り消す
     </button>
   </div>
 </div>
@@ -460,16 +458,16 @@
     </div>
     <!-- フィルター -->
     <div class="home-filter-toggle">
-      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')">💬 連絡 / Messages</button>
-      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')">📋 引き継ぎ / Handover</button>
-      <button class="filter-chip" id="filter-chip-all" onclick="setHomeFilter('all')">すべて / All</button>
+      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')">💬 連絡</button>
+      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')">📋 引き継ぎ</button>
+      <button class="filter-chip" id="filter-chip-all" onclick="setHomeFilter('all')">すべて</button>
     </div>
     <div id="home-messages"></div>
   </div>
   <!-- 新しい連絡ボタン -->
   <button class="new-msg-btn" onclick="showCompose()">
     <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    新しい連絡 / New Message
+    新しい連絡
   </button>
 </div>
 
@@ -477,17 +475,17 @@
 <div class="screen" id="screen-compose">
   <div class="header">
     <div class="back-btn" onclick="showScreen('screen-home')">‹</div>
-    <div><div class="header-title">新しい連絡</div><div class="header-sub">New Message</div></div>
+    <div><div class="header-title">新しい連絡</div></div>
   </div>
   <div class="content">
     <!-- タイプ切替 -->
     <div class="compose-type-toggle" style="margin-bottom:16px;">
-      <button class="compose-type-btn active" id="ctype-msg" onclick="selectComposeType('msg')">💬 通常メッセージ / Message</button>
-      <button class="compose-type-btn" id="ctype-handover" onclick="selectComposeType('handover')">📋 引き継ぎノート / Handover</button>
+      <button class="compose-type-btn active" id="ctype-msg" onclick="selectComposeType('msg')">💬 通常メッセージ</button>
+      <button class="compose-type-btn" id="ctype-handover" onclick="selectComposeType('handover')">📋 引き継ぎノート</button>
     </div>
     <!-- 通常メッセージ優先度 -->
     <div id="section-msg-priority" class="form-group">
-      <label class="form-label">優先度 / Priority</label>
+      <label class="form-label">優先度</label>
       <div style="display:flex; gap:8px; margin-bottom:4px;">
         <label style="flex:1; cursor:pointer;">
           <input type="radio" name="priority" value="info" checked style="display:none;">
@@ -505,7 +503,7 @@
     </div>
     <!-- 引き継ぎ優先度 -->
     <div id="section-handover-priority" style="display:none;" class="form-group">
-      <label class="form-label">引き継ぎ種別 / Handover Type</label>
+      <label class="form-label">引き継ぎ種別</label>
       <div style="display:flex; gap:8px; margin-bottom:4px;">
         <label style="flex:1; cursor:pointer;">
           <div class="priority-sel-btn hw-action" id="hwsel-action" onclick="selectHandoverPriority('action')" style="opacity:1; transform:scale(1.04);">🔴 重要</div>
@@ -519,11 +517,11 @@
       </div>
     </div>
     <div id="template-section" style="display:none; margin-bottom:16px;">
-      <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">📋 テンプレートから選ぶ / Templates</div>
+      <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">📋 テンプレートから選ぶ</div>
       <div id="template-list" style="display:flex; flex-direction:column; gap:6px;"></div>
     </div>
     <div class="form-group">
-      <label class="form-label" id="compose-body-label">メッセージ内容 / Message</label>
+      <label class="form-label" id="compose-body-label">メッセージ内容</label>
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
     <!-- ══ [Phase 4-2C] 画像投稿UI(feature_flags=trueの時のみ表示) ══ -->
@@ -534,10 +532,10 @@
     <div class="form-group" id="compose-image-area" style="margin-bottom:16px;">
       <div id="compose-image-btn-wrap" style="display:flex; gap:8px; flex-wrap:wrap;">
         <button type="button" id="compose-image-btn-camera" onclick="onComposeImageButtonClickCamera()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
-          📷 写真を撮る / Take Photo
+          📷 写真を撮る
         </button>
         <button type="button" id="compose-image-btn-library" onclick="onComposeImageButtonClickLibrary()" style="display:none; flex:1 1 140px; align-items:center; justify-content:center; gap:6px; padding:10px 14px; font-size:14px; font-weight:600; color:var(--text); background:white; border:1.5px solid var(--border); border-radius:8px; cursor:pointer;">
-          🖼️ 写真を選ぶ / Choose Photo
+          🖼️ 写真を選ぶ
         </button>
       </div>
       <!-- [⑫クォータ表示UI・チャッピー第58回判定 条件付きGO / 2026-05-18] 残量表示エリア -->
@@ -565,7 +563,7 @@
         <div style="font-size:11px; color:var(--text-light); margin-top:4px;">※締切は当日の23:59まで有効</div>
       </div>
     </div>
-    <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()">📢 送信する / Send</button>
+    <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()">📢 送信する</button>
   </div>
 </div>
 
@@ -630,7 +628,7 @@
       <div id="detail-unread-list"></div>
     </div>
     <div id="detail-delete-wrap" style="display:none; margin-top:12px;">
-      <button class="delete-msg-btn" onclick="deleteMessage()">🗑️ このメッセージを削除する / Delete</button>
+      <button class="delete-msg-btn" onclick="deleteMessage()">🗑️ このメッセージを削除する</button>
     </div>
   </div>
 </div>
@@ -639,7 +637,7 @@
 <div class="screen" id="screen-handover">
   <div class="header">
     <div class="back-btn" onclick="showScreen('screen-home')">‹</div>
-    <div><div class="header-title">引き継ぎノート</div><div class="header-sub">Handover Notes</div></div>
+    <div><div class="header-title">引き継ぎノート</div></div>
   </div>
   <div class="content" style="padding-bottom:80px;">
     <div style="padding:8px 16px; background:#fff8e1; border-bottom:1px solid #ffe082; font-size:12px; color:#e65100; font-weight:600;">⏰ メッセージ送信後72時間で非表示になります</div>
@@ -692,13 +690,13 @@
 <div class="screen" id="screen-approval">
   <div class="header">
     <div class="back-btn" onclick="showScreen('screen-home')">‹</div>
-    <div><div class="header-title">参加申請の承認</div><div class="header-sub">Member Approval</div></div>
+    <div><div class="header-title">参加申請の承認</div></div>
   </div>
   <div class="content">
-    <div class="banner banner-info">ℹ️ グループへの参加申請が届いています / Member approval requests<br>承認すると参加できます / Approve to allow joining</div>
+    <div class="banner banner-info">ℹ️ グループへの参加申請が届いています<br>承認すると参加できます</div>
     <div class="card" id="approval-list">
       <div class="empty" style="padding:40px;">
-        <div class="empty-text">承認待ちのメンバーはいません / No pending requests</div>
+        <div class="empty-text">承認待ちのメンバーはいません</div>
       </div>
     </div>
   </div>
@@ -708,7 +706,7 @@
 <div class="screen" id="screen-profile">
   <div class="header">
     <div class="back-btn" onclick="showScreen('screen-home')">‹</div>
-    <div><div class="header-title">プロフィール・設定</div><div class="header-sub">Profile &amp; Settings</div></div>
+    <div><div class="header-title">プロフィール・設定</div></div>
   </div>
   <div class="content">
     <div class="card" style="padding:20px; text-align:center; margin-bottom:16px;">
@@ -732,12 +730,12 @@
       <div class="card" style="padding:16px; margin-bottom:12px;">
         <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:10px; letter-spacing:0.5px;">👑 グループ管理者メニュー</div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">グループ名を変更 / Group Name</label>
+          <label class="form-label">グループ名を変更</label>
           <input class="form-input" id="profile-group-name" type="text" placeholder="例：フロントスタッフ" maxlength="30">
         </div>
-        <button class="btn btn-secondary" onclick="updateGroupName()" style="margin-bottom:12px;">グループ名を更新 / Update</button>
+        <button class="btn btn-secondary" onclick="updateGroupName()" style="margin-bottom:12px;">グループ名を更新</button>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">業種を変更 / Change Industry</label>
+          <label class="form-label">業種を変更</label>
           <select class="form-input" id="profile-industry">
             <option value="">-- 選択してください --</option>
             <option value="hotel">🏨 ホテル・旅館</option>
@@ -748,18 +746,18 @@
             <option value="club">🏆 部活・クラブ</option>
           </select>
         </div>
-        <button class="btn btn-secondary" onclick="updateIndustry()" style="margin-bottom:12px;">業種を更新 / Update Industry</button>
+        <button class="btn btn-secondary" onclick="updateIndustry()" style="margin-bottom:12px;">業種を更新</button>
         <!-- 月次レポートボタン -->
         <button class="btn btn-secondary" onclick="showMonthlyReport()" style="margin-top:4px; background:#f0f8ff; border-color:#4a90d9; color:#1a5fa8;">
-          📊 月次レポートを見る / Monthly Report
+          📊 月次レポートを見る
         </button>
         <!-- メンバー一覧ボタン -->
         <button class="btn btn-secondary" onclick="showMemberList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
-          👥 メンバー一覧 / Member List
+          👥 メンバー一覧
         </button>
         <!-- アンケート集計ボタン -->
         <button class="btn btn-secondary" onclick="showSurveyList()" style="margin-top:8px; background:#f0fff4; border-color:#06C755; color:#047a37;">
-          📊 アンケート集計結果 / Survey Results
+          📊 アンケート集計結果
         </button>
         <!-- [UI改善② LINKボタン設定] チャッピー第50回判定準拠
              - グループ管理者が自グループ用URLを設定・変更・削除
@@ -778,7 +776,7 @@
           <div style="display:flex; gap:8px;">
             <!-- [2026/5/23 修正] 保存ボタンと削除ボタンを同サイズに(flex:1 で半々)
                  過剰 padding を削除して .btn のデフォルト padding を継承させる -->
-            <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">💾 保存 / Save</button>
+            <button class="btn btn-secondary" onclick="updateLinkUrl()" style="flex:1;">💾 保存</button>
             <button class="btn" onclick="removeLinkUrl()" style="flex:1; background:#fff; color:#e53935; border:1.5px solid #e53935;">🗑️ 削除</button>
           </div>
         </div>
@@ -790,12 +788,12 @@
              - 初期値: 未登録時のみ業種別TEMPLATESを初期表示(編集済みは上書きしない)
              - 一般スタッフにはこのUIを出さない(プロフィール画面自体が管理者導線) -->
         <div id="template-edit-section" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:none;">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📋 連絡メッセージ テンプレ / Templates</div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">📋 連絡メッセージ テンプレ</div>
           <div style="font-size:11px; color:var(--text-light); margin-bottom:10px; line-height:1.5;">
             よく使う連絡文を最大6件まで登録できます。ここで登録した文は、メンバー全員がメッセージ作成時に呼び出せます。現場に合わせて自由に編集・削除してください。空欄にした枠は表示されません。
           </div>
           <div id="template-edit-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
-          <button class="btn btn-secondary" onclick="saveGroupTemplates()" style="width:100%;">💾 テンプレを保存 / Save Templates</button>
+          <button class="btn btn-secondary" onclick="saveGroupTemplates()" style="width:100%;">💾 テンプレを保存</button>
         </div>
 
         <!-- サイネージトークン管理 -->
@@ -869,12 +867,12 @@
     </div>
     <div class="card" style="padding:16px; margin-bottom:16px;">
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">表示名を変更 / Change Display Name</label>
-        <input class="form-input" id="profile-new-name" type="text" placeholder="New display name / 新しい表示名">
+        <label class="form-label">表示名を変更</label>
+        <input class="form-input" id="profile-new-name" type="text" placeholder="新しい表示名">
       </div>
-      <button class="btn btn-secondary" onclick="updateDisplayName()">表示名を更新 / Update Name</button>
+      <button class="btn btn-secondary" onclick="updateDisplayName()">表示名を更新</button>
     </div>
-    <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;">グループを退出する / Leave Group</button>
+    <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;">グループを退出する</button>
     <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;">⚙️ 超管理者ダッシュボード</button></div>
     <div style="text-align:center; padding: 20px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
@@ -1731,7 +1729,7 @@ async function cancelRequest() {
     // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
     clearEdgeOpsLocalStorage();
     currentGroup = null;
-    showToast('申請を取り消しました / Request cancelled');
+    showToast('申請を取り消しました');
     showScreen('screen-start');
   } catch (e) { showToast('取り消し中にエラーが発生しました。'); }
 }
@@ -2000,6 +1998,23 @@ async function setHomeFilter(f) {
   renderMessages();
 }
 
+function getDayLabel(createdAt) {
+  const MS_PER_DAY = 86400000;
+  const d = new Date(createdAt);
+  const now = new Date();
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((today - target) / MS_PER_DAY);
+
+  if (diff === 0) return '今日';
+  if (diff === 1) return '昨日';
+  if (d.getFullYear() !== now.getFullYear()) {
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
 function renderMessages() {
   const container = document.getElementById('home-messages');
 
@@ -2013,10 +2028,12 @@ function renderMessages() {
   const showHandover = homeFilter === 'all';
 
   if (messages.length === 0 && (!showHandover || handoverNotes.length === 0)) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">まだメッセージがありません / No messages yet<br>下の「＋新しい連絡」から送信してください</div></div>`;
+    container.innerHTML = `<div class="empty"><div class="empty-text">まだメッセージがありません<br>下の「＋新しい連絡」から送信してください</div></div>`;
     return;
   }
   const priorityOrder = { urgent: 0, normal: 1, info: 2 };
+  const KIND = { urgent: '至急', normal: '注意', info: '連絡' };
+  const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
 
   // 月別グループ化
   const monthMap = {};
@@ -2035,7 +2052,7 @@ function renderMessages() {
   // all表示の場合は引き継ぎを最上部に表示
   if (showHandover && handoverNotes.length > 0) {
     html += `<div class="card" style="margin-bottom:12px;">`;
-    html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">📋 引き継ぎノート（72時間で非表示）</div>`;
+    html += `<div style="padding:10px 16px; font-size:12px; font-weight:700; color:#e65100; border-bottom:1px solid var(--border);">引き継ぎノート（72時間で非表示）</div>`;
 
     // 引き継ぎノート画面と同じソート順で表示
     const hwConfirmMap = window._hwConfirmMap || {};
@@ -2079,7 +2096,16 @@ function renderMessages() {
     </div>`;
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
 
+    let currentDayLabel = null;
+    let isListOpen = false;
     msgs.forEach(msg => {
+      const dayLabel = getDayLabel(msg.created_at);
+      if (dayLabel !== currentDayLabel) {
+        if (isListOpen) html += `</div>`;
+        html += `<div class="eo-msg-day">${dayLabel}</div><div class="eo-msg-list">`;
+        currentDayLabel = dayLabel;
+        isListOpen = true;
+      }
       // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
       // ════════════════════════════════════════════════════════════
       // [receiver_count NULL フォールバック修正 / チャッピー第114回相当 GO / 2026-06-29]
@@ -2105,12 +2131,16 @@ function renderMessages() {
           return true;
         }).length;
       }
-      const readPct = receiverCount > 0 ? (msg.read_count || 0) / receiverCount * 100 : 0;
-      const unreadCount = Math.max(0, receiverCount - (msg.read_count || 0));
+      const readCount = Math.min(msg.read_count || 0, receiverCount);
+      const isDone = readCount >= receiverCount;
+      const readHtml = isDone
+        ? `<span class="eo-msg__read eo-msg__read--done">全員既読</span>`
+        : `<span class="eo-msg__read">既読 ${readCount}/${receiverCount}</span>`;
       const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
-      const pLabel = p === 'urgent' ? '🔴 緊急' : p === 'normal' ? '🟡 通常' : '🟢 連絡';
+      const kindJa = KIND[p] || '連絡';
+      const kindCls = CLS[p] || 'notice';
       // ── アンケートメッセージ判定（is_survey が true のときのみ） ──
       const isSurvey = msg.is_survey === true;
       // 分母：送信者を含む現メンバー（サイネージ除外）
@@ -2124,31 +2154,34 @@ function renderMessages() {
         const deadline = new Date(msg.survey_deadline);
         const nowTime = Date.now();
         if (deadline.getTime() < nowTime) {
-          surveyDeadlineLabel = `<span class="priority-badge" style="background:#ffeaea; color:#c62828; border:1px solid #ef9a9a; margin-left:6px;">📅 回答締切済</span>`;
+          surveyDeadlineLabel = `<span class="eo-msg__label">締切済み</span>`;
         } else {
           const dateStr = `${deadline.getMonth() + 1}月${deadline.getDate()}日`;
-          surveyDeadlineLabel = `<span class="priority-badge" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-left:6px;">📅 ${dateStr}</span>`;
+          surveyDeadlineLabel = `<span class="eo-msg__label">締切 ${dateStr}</span>`;
         }
       }
       const surveyLabel = isSurvey
-        ? `<span class="priority-badge" style="background:#e8f5e9; color:#2e7d32; border:1px solid #66bb6a; margin-left:6px;">📊 アンケート ${surveyAnsweredCount}/${surveyDenominator}人回答</span>${surveyDeadlineLabel}`
+        ? `<span class="eo-msg__label">アンケート ${surveyAnsweredCount}/${surveyDenominator}</span>${surveyDeadlineLabel}`
         : '';
       // [チャッピー第60-3回判定 解釈β] 連絡サムネ廃止・📷画像ありバッジ(priority-badge右横・サイネージと同配置)
       const imageLabel = (msg.image_url || msg.thumbnail_url)
-        ? `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">📷 画像あり</span>`
+        ? `<span class="eo-msg__label">画像</span>`
         : '';
       html += `
-        <div class="msg-card ${p}" onclick="showDetail('${msg.id}')">
-          <span class="priority-badge priority-${p}">${pLabel}</span>${surveyLabel}${imageLabel}
-          <div class="msg-title">${getMessageTitle(msg.body, 40)}</div>
-          <div class="msg-meta">${senderName}　${timeStr}</div>
-          <div class="msg-read-bar">
-            <div class="bar"><div class="bar-fill${readPct < 70 ? ' warn' : ''}" style="width:${readPct}%"></div></div>
-            <div class="read-count">${Math.min(msg.read_count || 0, receiverCount)}/${receiverCount}人既読</div>
+        <div class="eo-msg eo-msg--${kindCls}" onclick="showDetail('${msg.id}')" aria-label="重要度：${kindJa}">
+          <div class="eo-msg__text">${getMessageTitle(msg.body, 40)}</div>
+          <div class="eo-msg__meta">
+            <span class="eo-msg__kind">${kindJa}</span>
+            <span class="eo-msg__sep">·</span>
+            <span class="eo-msg__who">${senderName}</span>
+            <span class="eo-msg__sep">·</span>
+            <span class="eo-msg__time">${timeStr}</span>
+            ${surveyLabel}${imageLabel}
+            ${readHtml}
           </div>
-          ${unreadCount > 0 ? `<div class="unread-names">❌ 未読 ${unreadCount}名</div>` : ''}
         </div>`;
     });
+    if (isListOpen) html += `</div>`;
 
     html += `</div></div>`;
   });
@@ -2281,11 +2314,11 @@ function applyComposeType(type) {
   document.getElementById('section-handover-priority').style.display = isMsgActive ? 'none' : '';
   document.getElementById('template-section').style.display = (!isMsgActive || !_groupTemplatesCache || _groupTemplatesCache.length === 0) ? 'none' : '';
   const label = document.getElementById('compose-body-label');
-  if (label) label.textContent = isMsgActive ? 'メッセージ内容 / Message' : '引き継ぎ内容 / Handover Content';
+  if (label) label.textContent = isMsgActive ? 'メッセージ内容' : '引き継ぎ内容';
   const placeholder = document.getElementById('compose-body');
   if (placeholder) placeholder.placeholder = isMsgActive ? '連絡内容を入力してください...' : '引き継ぎ事項を入力してください（例：〇〇様のご対応をお願いします）...';
   const sendBtn = document.getElementById('compose-send-btn');
-  if (sendBtn) sendBtn.textContent = isMsgActive ? '📢 送信する / Send' : '📋 引き継ぎを投稿する';
+  if (sendBtn) sendBtn.textContent = isMsgActive ? '📢 送信する' : '📋 引き継ぎを投稿する';
   // アンケートセクションは「通常メッセージ」かつ「グループ管理者」のときのみ表示
   applySurveyVisibility(isMsgActive);
   // [Phase 4-2C] タイプ切替時に画像ボタン表示制御＆選択中画像をクリア(context変更で画像保持は不自然)
@@ -2560,8 +2593,8 @@ async function showHandoverDetail(handoverId) {
       confirmArea.innerHTML = `<div class="hw-confirmed-banner">✅ ${actionLabel}（${formatTime(myConf.confirmed_at)}）</div>`;
     } else {
       confirmArea.innerHTML = `
-        <button class="hw-confirm-btn hw-btn-takeover" onclick="confirmHandover('takeover')">🔄 引き継ぎました / Took Over</button>
-        <button class="hw-confirm-btn hw-btn-done" onclick="confirmHandover('done')">✅ 対応しました / Completed</button>
+        <button class="hw-confirm-btn hw-btn-takeover" onclick="confirmHandover('takeover')">🔄 引き継ぎました</button>
+        <button class="hw-confirm-btn hw-btn-done" onclick="confirmHandover('done')">✅ 対応しました</button>
       `;
     }
 
@@ -2810,15 +2843,15 @@ async function loadApprovals() {
       .eq('group_session_id', currentGroup.id).eq('status', 'pending').order('created_at', { ascending: true });
     const container = document.getElementById('approval-list');
     if (!pending || pending.length === 0) {
-      container.innerHTML = '<div class="empty" style="padding:40px;"><div class="empty-text">承認待ちのメンバーはいません / No pending requests</div></div>';
+      container.innerHTML = '<div class="empty" style="padding:40px;"><div class="empty-text">承認待ちのメンバーはいません</div></div>';
       return;
     }
     container.innerHTML = pending.map(p => `
       <div class="approval-item">
         <div><div class="approval-name">${escHtml(p.display_name)}</div><div class="approval-time">${formatTime(p.created_at)}</div></div>
         <div style="display:flex; gap:8px; flex-shrink:0;">
-          <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認 / Approve</button>
-          <button class="reject-btn" onclick="rejectMember('${p.id}', '${escHtml(p.display_name)}')" style="background:#9e9e9e; color:white; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">却下 / Reject</button>
+          <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認</button>
+          <button class="reject-btn" onclick="rejectMember('${p.id}', '${escHtml(p.display_name)}')" style="background:#9e9e9e; color:white; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">却下</button>
         </div>
       </div>
     `).join('');
@@ -3093,7 +3126,7 @@ async function deleteMessage() {
 
 async function updateDisplayName() {
   const newName = document.getElementById('profile-new-name').value.trim();
-  if (!newName) { showToast('New display name / 新しい表示名を入力してください'); return; }
+  if (!newName) { showToast('新しい表示名を入力してください'); return; }
   try {
     await supabase.from('group_members').update({ display_name: newName }).eq('id', currentMemberId);
     currentUser.display_name = newName;
