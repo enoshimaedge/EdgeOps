@@ -1099,6 +1099,14 @@ let isCreator = false;
 let messages = [];
 let members = [];
 let pollTimer = null;
+
+// ── Step 5：カーソル方式（第119回・EO-DEC-0119） ──
+const PAGE_SIZE = 100;          // 初回100件・追加100件（第115回）
+let oldestLoadedAt = null;      // 読み込み済みの最古 created_at（ISO文字列）
+let oldestLoadedId = null;      // 同時刻タイブレーク用の id
+let hasMore = true;             // 追加取得の余地があるか（条件8）
+let isLoadingMore = false;      // 二重押し防止
+let monthOpenState = {};        // { '2026-07': true, '2026-06': false } 形式（第115回）
 let handoverNotes = [];
 let currentHandoverId = null;
 let homeFilter = 'msg'; // 'msg' | 'handover' | 'all'
@@ -1784,6 +1792,7 @@ function stopPolling() {
 }
 
 async function loadMessages() {
+  const isFirstLoad = (oldestLoadedAt === null);   // ── Step 5：初回判定（第119回）
   try {
     // messages・members・handover_notesを並列取得（起動速度改善）
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
@@ -1796,8 +1805,11 @@ async function loadMessages() {
     ] = await Promise.all([
       supabase.from('messages').select('*')
         .eq('group_session_id', currentGroup.id)
-        .gte('created_at', cutoff60d)
-        .order('created_at', { ascending: false }),
+        .gte('created_at', cutoff60d)                    // 【条件7】60日は維持
+        .gte('created_at', oldestLoadedAt || cutoff60d)  // 【条件1・3】案α：読込済み範囲だけ取り直す
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })               // 【条件2】複合カーソルの安定ソート
+        .limit(oldestLoadedAt ? 1000 : PAGE_SIZE),       // 初回=100件／ポーリング=読込済み範囲
       supabase.from('group_members').select('*')
         .eq('group_session_id', currentGroup.id).eq('status', 'approved'),
       supabase.from('handover_notes').select('*')
@@ -1809,6 +1821,16 @@ async function loadMessages() {
     messages = data || [];
     members = memberData || [];
     handoverNotes = hwData || [];
+
+    // ── Step 5：カーソルを更新（第119回） ──
+    if (messages.length > 0) {
+      const last = messages[messages.length - 1];   // 降順なので最後が最古
+      oldestLoadedAt = last.created_at;
+      oldestLoadedId = last.id;
+    }
+    if (isFirstLoad && messages.length < PAGE_SIZE) {
+      hasMore = false;   // 初回で100件未満 → 追加分は無い
+    }
 
     // read_receiptsを取得してread_countを実態に合わせて補正
     // （サイネージ端末が参加前にread_countが加算されたズレを防ぐ）
@@ -1831,42 +1853,7 @@ async function loadMessages() {
     //    ⑤ signage.html 詳細モーダル                L1239-1290
     // ════════════════════════════════════════════════════════════
     if (messages.length > 0) {
-      const msgIds = messages.map(m => m.id);
-      const { data: receipts } = await supabase.from('read_receipts')
-        .select('message_id, eo_uid').in('message_id', msgIds);
-      const signageUids = new Set(members.filter(m => m.is_signage).map(m => m.eo_uid));
-
-      // ★ 全メンバー（過去含む・status='left'等も含む）の参加時刻マップを作成
-      //    members には status='approved' しか入っていないため、別途全件取得
-      const { data: allMembersForJoinedAt } = await supabase.from('group_members')
-        .select('eo_uid, created_at')
-        .eq('group_session_id', currentGroup.id);
-      const memberJoinedAt = new Map();
-      (allMembersForJoinedAt || []).forEach(m => {
-        memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
-      });
-      // [receiver_count NULL フォールバック対応 / 2026-06-29]
-      //   描画側(renderMessages)の分母フォールバックで送信後参加者を除外するため、
-      //   参加時刻マップを window 経由で共有する（既存 window._hwConfirmMap と同方式）。
-      window._memberJoinedAt = memberJoinedAt;
-
-      const realReadMap = {};
-      (receipts || []).forEach(r => {
-        if (signageUids.has(r.eo_uid)) return;
-        const msg = messages.find(m => m.id === r.message_id);
-        if (!msg) return;
-        if (r.eo_uid === msg.sender_eo_uid) return; // 送信者除外
-        // ★ 送信時に未参加（joinedAt > msg.created_at）のメンバーを除外
-        const joinedAt = memberJoinedAt.get(r.eo_uid);
-        if (joinedAt === undefined) return;
-        if (joinedAt > new Date(msg.created_at).getTime()) return;
-        realReadMap[r.message_id] = (realReadMap[r.message_id] || 0) + 1;
-      });
-      // read_countをrealReadMapで上書き
-      messages = messages.map(m => ({
-        ...m,
-        read_count: realReadMap[m.id] !== undefined ? realReadMap[m.id] : m.read_count
-      }));
+      await applyReadCorrection(messages);
     } else {
       // メッセージ0件のときは参加時刻マップを空に初期化（グループ切替時の残留防止）
       window._memberJoinedAt = new Map();
@@ -1939,6 +1926,122 @@ async function loadMessages() {
     // 引き継ぎ未確認バッジ更新
     await updateHandoverBadge();
   } catch (e) { console.error(e); }
+}
+
+// ────────────────────────────────────────────────────────────
+// 既読補正（既存ロジックをそのまま関数化。中身は変更しない）
+//   [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
+//   A. 分母は送信時点で approved だった人間メンバーのみ
+//   B. サイネージ端末(is_signage=true)は分母・分子から除外
+//   C. 送信者は分母から除外
+//   D. 送信後参加(created_at > item.created_at)は分母から除外
+//   E. 退出済(status='left')は分子から除外
+//   G. created_at が NULL の既存データは「参加済み」として扱う
+// ────────────────────────────────────────────────────────────
+async function applyReadCorrection(targetMessages) {
+  if (!targetMessages || targetMessages.length === 0) return;
+
+  const msgIds = targetMessages.map(m => m.id);
+  const { data: receipts } = await supabase.from('read_receipts')
+    .select('message_id, eo_uid').in('message_id', msgIds);
+  const signageUids = new Set(members.filter(m => m.is_signage).map(m => m.eo_uid));
+
+  // ★ 全メンバー（過去含む・status='left'等も含む）の参加時刻マップを作成
+  //    members には status='approved' しか入っていないため、別途全件取得
+  const { data: allMembersForJoinedAt } = await supabase.from('group_members')
+    .select('eo_uid, created_at')
+    .eq('group_session_id', currentGroup.id);
+  const memberJoinedAt = new Map();
+  (allMembersForJoinedAt || []).forEach(m => {
+    memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+  });
+  // [receiver_count NULL フォールバック対応 / 2026-06-29]
+  //   描画側(renderMessages)の分母フォールバックで送信後参加者を除外するため、
+  //   参加時刻マップを window 経由で共有する（既存 window._hwConfirmMap と同方式）。
+  window._memberJoinedAt = memberJoinedAt;
+
+  const realReadMap = {};
+  (receipts || []).forEach(r => {
+    if (signageUids.has(r.eo_uid)) return;
+    const msg = targetMessages.find(m => m.id === r.message_id);
+    if (!msg) return;
+    if (r.eo_uid === msg.sender_eo_uid) return; // 送信者除外
+    // ★ 送信時に未参加（joinedAt > msg.created_at）のメンバーを除外
+    const joinedAt = memberJoinedAt.get(r.eo_uid);
+    if (joinedAt === undefined) return;
+    if (joinedAt > new Date(msg.created_at).getTime()) return;
+    realReadMap[r.message_id] = (realReadMap[r.message_id] || 0) + 1;
+  });
+
+  // 破壊的に上書きする（呼び出し元の配列をそのまま補正する）
+  targetMessages.forEach(m => {
+    if (realReadMap[m.id] !== undefined) m.read_count = realReadMap[m.id];
+  });
+}
+
+// ────────────────────────────────────────────────────────────
+// Step 5：追加読込（第119回・EO-DEC-0119）
+//   複合カーソル（created_at + id）で、いま持っている最古より
+//   さらに古いものを PAGE_SIZE 件だけ取る。.range() は使わない（条件2）。
+// ────────────────────────────────────────────────────────────
+async function loadMoreMessages() {
+  if (!hasMore || isLoadingMore) return;
+  if (!oldestLoadedAt) return;
+  isLoadingMore = true;
+
+  const btn = document.getElementById('load-more-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '読み込み中...'; }
+
+  try {
+    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+
+    // 【条件2】複合カーソル：
+    //   created_at < oldestLoadedAt
+    //   OR (created_at = oldestLoadedAt AND id < oldestLoadedId)
+    const { data, error } = await supabase.from('messages').select('*')
+      .eq('group_session_id', currentGroup.id)
+      .gte('created_at', cutoff60d)                     // 【条件7】追加取得も60日以内
+      .or(`created_at.lt.${oldestLoadedAt},and(created_at.eq.${oldestLoadedAt},id.lt.${oldestLoadedId})`)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(PAGE_SIZE);
+
+    if (error) throw error;
+
+    const older = data || [];
+
+    // 【条件8】0件なら、もう古いものは無い
+    if (older.length === 0) {
+      hasMore = false;
+      renderMessages();
+      return;
+    }
+
+    // 既読補正を、追加分にも同じロジックで適用する（条件5：集計方法は変えない）
+    await applyReadCorrection(older);
+
+    // 追記（全件置換ではなく末尾に足す）
+    messages = messages.concat(older);
+
+    // カーソルを進める
+    const last = older[older.length - 1];
+    oldestLoadedAt = last.created_at;
+    oldestLoadedId = last.id;
+
+    // 100件未満しか返ってこなかった → もう無い
+    if (older.length < PAGE_SIZE) hasMore = false;
+
+    preloadMessageImageUrls(older);   // 既存関数。追加分だけプリロード
+    renderMessages();
+
+  } catch (e) {
+    console.error('[Step5] loadMoreMessages failed', e);
+    showToast('追加の読み込みに失敗しました');
+  } finally {
+    isLoadingMore = false;
+    const b = document.getElementById('load-more-btn');
+    if (b) { b.disabled = false; b.textContent = 'もっと見る'; }
+  }
 }
 
 async function setHomeFilter(f) {
@@ -2046,7 +2149,10 @@ function renderMessages() {
 
     const isLatest = idx === 0;
     const needAccordion = msgs.length >= 50;
-    const isOpen = isLatest || !needAccordion;
+    // 【第115回】開閉状態を保持する。記録が無ければ従来どおり（最新月は開く）
+    const isOpen = (monthOpenState[monthKey] !== undefined)
+      ? monthOpenState[monthKey]
+      : (isLatest || !needAccordion);
     const maxH = isOpen ? `${msgs.length * 200}px` : '0px';
 
     html += `<div class="month-section card">`;
@@ -2146,6 +2252,16 @@ function renderMessages() {
     html += `</div></div>`;
   });
 
+  // ── Step 5：追加読込ボタン（第119回・条件8） ──
+  if (hasMore && messages.length > 0) {
+    html += `
+      <div style="padding:16px; text-align:center;">
+        <button id="load-more-btn" class="btn btn-secondary"
+                onclick="loadMoreMessages()"
+                style="max-width:260px; margin:0 auto;">もっと見る</button>
+      </div>`;
+  }
+
   container.innerHTML = html;
   // [Phase 4-2F] サムネを IntersectionObserver に登録 (画面内に入った時のみ署名URL取得)
   try { observeImageThumbnails(container); } catch (_) {}
@@ -2157,6 +2273,9 @@ function toggleMonth(id) {
   const toggle = document.getElementById('toggle-' + monthKey);
   if (!body) return;
   const isCollapsed = body.classList.contains('collapsed');
+
+  monthOpenState[monthKey] = isCollapsed;   // 【第115回】開くなら true
+
   if (isCollapsed) {
     body.classList.remove('collapsed');
     body.style.maxHeight = body.scrollHeight + 'px';
@@ -3448,6 +3567,15 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   isCreator = newMember.is_creator || false;
 
   closeBottomSheet();
+
+  // ── Step 5：グループ切替時の初期化（第119回・条件9） ──
+  messages = [];
+  oldestLoadedAt = null;
+  oldestLoadedId = null;
+  hasMore = true;
+  isLoadingMore = false;
+  monthOpenState = {};
+  window._memberJoinedAt = new Map();
 
   await loadHome();
   showScreen('screen-home');
