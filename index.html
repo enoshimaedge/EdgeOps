@@ -3313,7 +3313,7 @@ function showProfile() {
   if (membersEl) membersEl.textContent = t('label_members_loading');
   const gnDisplayEl = document.getElementById('profile-group-name-display');
   if (gnDisplayEl) gnDisplayEl.textContent = currentGroup?.group_name || '';
-  refreshGroupSwitcherButton();
+  updateGroupSwitcherBtn();
   // 管理者セクションの表示切替
   const adminSection = document.getElementById('profile-admin-section');
   if (adminSection) {
@@ -3371,7 +3371,7 @@ function showProfile() {
   showScreen('screen-profile');
 }
 
-async function refreshGroupSwitcherButton() {
+async function updateGroupSwitcherBtn() {
   const btn = document.getElementById('group-switch-btn');
   if (!btn || !currentUser?.eo_uid) return;
   const { count } = await supabase
