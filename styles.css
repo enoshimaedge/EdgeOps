@@ -166,6 +166,11 @@ html {
 .content {
   flex: 1;
   padding: 16px;
+  /* iOS下端のホームバー（セーフエリア）分だけ下パディングを足す。
+     最後の要素（送信ボタン等）がホームバー裏に隠れてスクロールしても
+     届かない問題を解消。env は非対応環境・Androidでは 0 として扱われるため
+     他OS・他画面に影響しない。 */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
   overflow-y: auto;
   overscroll-behavior: contain;        /* 上下端を超えた引っ張りを親へ伝えない（両OS） */
   -webkit-overflow-scrolling: touch;   /* iOS：慣性スクロールと上下のバウンス（Androidにこの挙動は存在しない） */
