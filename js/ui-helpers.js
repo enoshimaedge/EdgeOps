@@ -236,30 +236,43 @@ function renderHandoverCardHtml(hw, confs, myConf) {
   // 誰かがtakeover/doneを押していたら完了済み
   const isCompleted = (confs || []).some(c => c.action === 'takeover' || c.action === 'done');
   const completedConf = (confs || []).find(c => c.action === 'takeover' || c.action === 'done');
+  // Design System: 状況注記は無彩色(.eo-hw-note)へ統一。緑/赤の色分けはやめ、
+  //   「未確認」だけは弱いアクセント(.eo-hw-note--attn)で1トーンだけ差をつける。
   let statusHtml;
   if (isSender) {
     if (isCompleted) {
       const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">自分が投稿（ ${escHtml(completedConf.display_name)}が${cl}）</div>`;
+      statusHtml = `<div class="eo-hw-note">自分が投稿（ ${escHtml(completedConf.display_name)}が${cl}）</div>`;
     } else if (confirmNames) {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">自分が投稿</div><div class="handover-confirm-names">確認済み：${escHtml(confirmNames)}</div>`;
+      statusHtml = `<div class="eo-hw-note">自分が投稿 · 確認済み：${escHtml(confirmNames)}</div>`;
     } else {
-      statusHtml = `<div style="font-size:11px; color:var(--text-light); margin-top:6px;">自分が投稿</div><div class="handover-unconfirmed">未確認</div>`;
+      statusHtml = `<div class="eo-hw-note">自分が投稿</div><div class="eo-hw-note eo-hw-note--attn">未確認</div>`;
     }
   } else if (isCompleted) {
     const cl = completedConf.action === 'takeover' ? '引き継ぎました' : '対応しました';
-    statusHtml = `<div class="handover-confirm-names">${escHtml(completedConf.display_name)}が${cl}</div>`;
+    statusHtml = `<div class="eo-hw-note">${escHtml(completedConf.display_name)}が${cl}</div>`;
   } else if (confirmedByMe) {
-    statusHtml = `<div class="handover-confirm-names">確認済み${confirmNames ? '：'+ escHtml(confirmNames) : ''}</div>`;
+    statusHtml = `<div class="eo-hw-note">確認済み${confirmNames ? '：'+ escHtml(confirmNames) : ''}</div>`;
   } else {
-    statusHtml = `<div class="handover-unconfirmed">未確認${confirmNames ? '（確認済：'+ escHtml(confirmNames) + '）': ''}</div>`;
+    statusHtml = `<div class="eo-hw-note eo-hw-note--attn">未確認${confirmNames ? '（確認済：'+ escHtml(confirmNames) + '）': ''}</div>`;
   }
-  // [チャッピー第60-3回判定 解釈β] 引き継ぎ側も📷画像あり配置をサイネージと統一(priority-badge右横)
+  // Design System v1.13〜: 連絡一覧(.eo-msg)と同一構造へ統一。
+  //   カード/色付き背景/丸枠バッジを廃し、左端3px縦帯＋種別文字＋1px区切りリストにする。
+  //   優先度 action/check/done を urgent/caution/notice の縦帯色へマッピング。
+  const barCls = { action: 'urgent', check: 'caution', done: 'notice' };
+  const kindCls = barCls[p] || 'caution';
+  const imageLabel = renderHandoverImageLabel(hw);
   return `
-    <div class="handover-card priority-${p}" onclick="showHandoverDetail('${hw.id}')">
-      <span class="handover-priority-badge ${pClass[p]}">${pLabels[p]}</span>${renderHandoverImageLabel(hw)}
-      <div class="msg-title">${getMessageTitle(hw.content||'', 40)}</div>
-      <div class="msg-meta">${escHtml(hw.sender_name)}　${formatTime(hw.created_at)}</div>
+    <div class="eo-msg eo-msg--${kindCls}" onclick="showHandoverDetail('${hw.id}')" aria-label="引き継ぎ：${escHtml(pLabels[p]||'')}">
+      <div class="eo-msg__text">${getMessageTitle(hw.content||'', 40)}</div>
+      <div class="eo-msg__meta">
+        <span class="eo-msg__kind">${pLabels[p]}</span>
+        <span class="eo-msg__sep">·</span>
+        <span>${escHtml(hw.sender_name)}</span>
+        <span class="eo-msg__sep">·</span>
+        <span>${formatTime(hw.created_at)}</span>
+        ${imageLabel}
+      </div>
       ${statusHtml}
     </div>`;
 }
@@ -276,7 +289,7 @@ function renderHandoverInline(container) {
   const sorted = [...handoverNotes].sort((a, b) => {
     return new Date(b.created_at) - new Date(a.created_at);
   });
-  let html = '<div class="card">';
+  let html = '<div class="eo-msg-list">';
   sorted.forEach(hw => {
     const confs = hwConfirmMap[hw.id] || [];
     const myConf = confs.find(c => c.eo_uid === myUid);
