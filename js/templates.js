@@ -63,9 +63,9 @@ async function renderTemplateEditor() {
   // 6枠のテキストエリアを描画
   listEl.innerHTML = initial.map((val, i) => `
     <div class="form-group" style="margin-bottom:0;">
-      <label class="form-label" style="font-size:11px;">テンプレ ${i + 1}</label>
+      <label class="form-label" style="font-size:11px;">${t('label_template_n', { n: i + 1 })}</label>
       <textarea class="form-textarea" id="tmpl-edit-${i}" maxlength="${TEMPLATE_BODY_MAXLEN}"
-        style="min-height:56px;" placeholder="(空欄にすると表示されません)">${escapeHtml(val)}</textarea>
+        style="min-height:56px;" placeholder="${t('ph_template_empty')}">${escapeHtml(val)}</textarea>
     </div>
   `).join('');
 }
@@ -115,7 +115,7 @@ async function saveGroupTemplates() {
         .upsert(rowsToUpsert, { onConflict: 'group_id,kind,slot' });
       if (upErr) throw upErr;
     }
-    showToast('テンプレを保存しました');
+    showToast(t('toast_templates_saved'));
     // 呼び出しUI用キャッシュも更新
     await loadGroupTemplates();
   } catch (e) {

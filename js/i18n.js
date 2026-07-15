@@ -174,6 +174,9 @@ window.EdgeOpsI18n = {
     desc_custom_link:           'グループ専用の外部リンクを設定できます。設定すると、ホーム画面のヘッダーに「LINK」ボタンが表示され、メンバー全員がアクセスできます。',
     label_link_url:             'URL(https://〜・最大2048文字)',
     desc_templates:             'よく使う連絡文を最大6件まで登録できます。ここで登録した文は、メンバー全員がメッセージ作成時に呼び出せます。現場に合わせて自由に編集・削除してください。空欄にした枠は表示されません。',
+    label_template_n:           'テンプレ {n}',
+    ph_template_empty:          '(空欄にすると表示されません)',
+    toast_templates_saved:      'テンプレを保存しました',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -348,5 +351,8 @@ window.EdgeOpsI18n = {
     desc_custom_link:           'Set an external link for this group. Once set, a "LINK" button appears in the home header and all members can access it.',
     label_link_url:             'URL (https:// ... , max 2048 chars)',
     desc_templates:             'Register up to 6 frequently used messages. Members can insert them when composing. Edit or delete freely to fit your site. Empty slots are hidden.',
+    label_template_n:           'Template {n}',
+    ph_template_empty:          '(Leave blank to hide)',
+    toast_templates_saved:      'Templates saved',
   }
 };
