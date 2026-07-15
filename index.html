@@ -484,7 +484,7 @@
       <div id="template-list" style="display:flex; flex-direction:column; gap:6px;"></div>
     </div>
     <div class="form-group">
-      <label class="form-label" id="compose-body-label">メッセージ内容</label>
+      <label class="form-label" id="compose-body-label" data-i18n="label_compose_body">メッセージ内容</label>
       <textarea class="form-textarea" id="compose-body" placeholder="連絡内容を入力してください..."></textarea>
     </div>
     <!-- ══ [Phase 4-2C] 画像投稿UI(feature_flags=trueの時のみ表示) ══ -->
@@ -508,8 +508,8 @@
         <div style="display:flex; align-items:flex-start; gap:10px;">
           <img id="compose-image-preview-img" alt="プレビュー" style="width:80px; height:80px; object-fit:cover; border-radius:6px; background:#e4e8f0; image-orientation:from-image;">
           <div style="flex:1; min-width:0;">
-            <div id="compose-image-preview-info" style="font-size:12px; color:var(--text-mid); margin-bottom:6px; word-break:break-all;">画像準備完了</div>
-            <button type="button" onclick="onComposeImageCancel()" style="padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">取り消し</button>
+            <div id="compose-image-preview-info" style="font-size:12px; color:var(--text-mid); margin-bottom:6px; word-break:break-all;" data-i18n="btn_image_ready">画像準備完了</div>
+            <button type="button" onclick="onComposeImageCancel()" style="padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;" data-i18n="btn_image_cancel">取り消し</button>
           </div>
         </div>
       </div>
@@ -518,15 +518,15 @@
     <div id="survey-section" style="display:none; margin-bottom:16px; padding:12px; background:#E6F0EF; border:1px solid #0F6B63; border-radius:8px; box-sizing:border-box;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:14px; font-weight:600;">
         <input type="checkbox" id="survey-checkbox" onclick="toggleSurveyMode()" style="width:18px; height:18px; cursor:pointer;">
-        <span>このメッセージをアンケートとして送信</span>
+        <span data-i18n="label_as_survey">このメッセージをアンケートとして送信</span>
       </label>
       <div id="survey-deadline-wrap" style="display:none; margin-top:10px; width:100%; box-sizing:border-box; overflow:hidden;">
-        <label class="form-label" style="font-size:12px;">締切日(任意・空欄で締切なし)</label>
+        <label class="form-label" style="font-size:12px;" data-i18n="label_deadline">締切日(任意・空欄で締切なし)</label>
         <input type="date" id="survey-deadline-input" class="form-input" style="font-size:14px !important; display:block !important; width:100% !important; min-width:0 !important; max-width:100% !important; box-sizing:border-box !important; -webkit-appearance:none !important; appearance:none !important;">
-        <div style="font-size:11px; color:var(--text-light); margin-top:4px;">※締切は当日の23:59まで有効</div>
+        <div style="font-size:11px; color:var(--text-light); margin-top:4px;" data-i18n="note_deadline">※締切は当日の23:59まで有効</div>
       </div>
     </div>
-    <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()">送信する</button>
+    <button class="btn btn-primary" id="compose-send-btn" onclick="sendMessage()" data-i18n="btn_send_msg">送信する</button>
   </div>
 </div>
 
@@ -543,17 +543,17 @@
       <!-- [Phase 4-2F] 画像表示エリア(画像ありメッセージ時のみ表示) -->
       <div id="detail-image-wrap" style="display:none; margin-top:12px;">
         <img id="detail-image-thumb" alt="画像読込中..." style="max-width:100%; max-height:400px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; cursor:pointer; image-orientation:from-image;">
-        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;">投稿された画像の保存・転載は管理者の許可を得てください</div>
+        <div style="margin-top:6px; padding:6px 10px; background:#fff8e1; border:1px solid #ffe082; border-radius:6px; font-size:11px; color:#795548; line-height:1.4;" data-i18n="note_image_permission">投稿された画像の保存・転載は管理者の許可を得てください</div>
         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
           <div id="detail-image-status" style="font-size:11px; color:var(--text-light);"></div>
           <!-- [Phase 4-2H] 自分が送信者かつ削除フラグONのときのみ表示 -->
-          <button type="button" id="detail-image-delete-btn" onclick="deleteImageOnly(window.__currentDetailMessageId, 'message')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;">画像を削除</button>
+          <button type="button" id="detail-image-delete-btn" onclick="deleteImageOnly(window.__currentDetailMessageId, 'message')" style="display:none; padding:6px 10px; font-size:12px; color:var(--red); background:white; border:1px solid var(--red); border-radius:6px; cursor:pointer;" data-i18n="btn_delete_image">画像を削除</button>
         </div>
       </div>
     </div>
     <!-- ══ アンケート回答UI(アンケートメッセージのみ表示) ══ -->
     <div id="detail-survey-wrap" class="card" style="display:none; padding:16px; margin-bottom:12px; background:#E6F0EF; border:1px solid #0F6B63;">
-      <div style="font-size:13px; font-weight:700; color:#0F6B63; margin-bottom:8px;">アンケートに回答</div>
+      <div style="font-size:13px; font-weight:700; color:#0F6B63; margin-bottom:8px;" data-i18n="heading_survey_answer">アンケートに回答</div>
       <div id="detail-survey-deadline" style="font-size:12px; color:var(--text-mid); margin-bottom:10px;"></div>
       <div id="detail-survey-answer-area">
         <div class="form-group" style="margin-bottom:10px;">
@@ -561,8 +561,8 @@
           <div style="font-size:11px; color:var(--text-light); margin-top:4px;"><span id="detail-survey-char-count">0</span>/20文字</div>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-primary" id="detail-survey-submit" onclick="submitSurveyResponse()" style="flex:1;">アンケート回答</button>
-          <button class="btn btn-secondary" id="detail-survey-na" onclick="submitSurveyNotApplicable()" style="flex:1;">該当なし</button>
+          <button class="btn btn-primary" id="detail-survey-submit" onclick="submitSurveyResponse()" style="flex:1;" data-i18n="label_survey_answer">アンケート回答</button>
+          <button class="btn btn-secondary" id="detail-survey-na" onclick="submitSurveyNotApplicable()" style="flex:1;" data-i18n="btn_survey_na">該当なし</button>
         </div>
       </div>
       <div id="detail-survey-status" style="display:none; margin-top:8px; padding:10px; background:white; border-radius:8px; font-size:13px;"></div>
@@ -571,23 +571,23 @@
     <div style="display:flex; gap:10px; margin-bottom:16px;">
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
         <div style="font-size:28px; font-weight:700; color:var(--green);" id="detail-read-count">0</div>
-        <div style="font-size:12px; color:var(--text-light);">既読</div>
+        <div style="font-size:12px; color:var(--text-light);" id="detail-read-label">既読</div>
       </div>
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
         <div style="font-size:28px; font-weight:700; color:var(--red);" id="detail-unread-count">0</div>
-        <div style="font-size:12px; color:var(--text-light);">未読</div>
+        <div style="font-size:12px; color:var(--text-light);" id="detail-unread-label">未読</div>
       </div>
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
         <div style="font-size:28px; font-weight:700;" id="detail-total-count">0</div>
-        <div style="font-size:12px; color:var(--text-light);">合計</div>
+        <div style="font-size:12px; color:var(--text-light);" id="detail-total-label">合計</div>
       </div>
     </div>
     <div class="card">
-      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);">既読（名前・時刻）</div>
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);" id="detail-read-heading">既読（名前・時刻）</div>
       <div id="detail-read-list"></div>
     </div>
     <div class="card" style="margin-top:12px;">
-      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);">未読</div>
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);" id="detail-unread-heading">未読</div>
       <div id="detail-unread-list"></div>
     </div>
     <div id="detail-delete-wrap" style="display:none; margin-top:12px;">
@@ -659,7 +659,7 @@
     <div class="banner banner-info">ℹ <span data-i18n="banner_approval_request">グループへの参加申請が届いています</span><br><span data-i18n="banner_approval_info">承認すると参加できます</span></div>
     <div class="card" id="approval-list">
       <div class="empty" style="padding:40px;">
-        <div class="empty-text" data-i18n="empty_no_pending">承認待ちのメンバーはいません</div>
+        <div class="empty-text" data-i18n="empty_no_pending_members">承認待ちのメンバーはいません</div>
       </div>
     </div>
   </div>
@@ -679,9 +679,9 @@
       <div style="font-size:11px; color:var(--text-light); margin-top:6px; font-family:monospace; padding:4px 8px; background:var(--bg); border-radius:4px; display:inline-block;" id="profile-eo-uid" title="EdgeOps Universal ID">---</div>
     </div>
     <div class="group-id-box">
-      <div class="group-id-label">あなたのグループID</div>
+      <div class="group-id-label" data-i18n="label_your_group_id">あなたのグループID</div>
       <div class="group-id-value" id="profile-group-id">---</div>
-      <button class="copy-btn" onclick="copyGroupId()">コピー</button>
+      <button class="copy-btn" onclick="copyGroupId()" data-i18n="btn_copy">コピー</button>
       <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
         <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-expires">有効期限：取得中...</div>
         <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-members">参加中：取得中...</div>
@@ -691,7 +691,7 @@
     </div>
     <div id="profile-admin-section" style="display:none;">
       <div class="card" style="padding:16px; margin-bottom:12px;">
-        <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:10px; letter-spacing:0.5px;">グループ管理者メニュー</div>
+        <div style="font-size:11px; font-weight:700; color:var(--green); margin-bottom:10px; letter-spacing:0.5px;" data-i18n="heading_admin_menu">グループ管理者メニュー</div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label" data-i18n="form_change_group_name">グループ名を変更</label>
           <input class="form-input" id="profile-group-name" type="text" placeholder="例：フロントスタッフ" maxlength="30">
@@ -761,12 +761,12 @@
 
         <!-- サイネージトークン管理 -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">サイネージ管理</div>
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;" data-i18n="heading_signage">サイネージ管理</div>
           <div id="signage-url-display" style="font-size:12px; margin-bottom:8px; min-height:16px;"></div>
-          <button class="btn btn-secondary" onclick="generateSignageToken()" style="font-size:13px; padding:10px 8px;">
+          <button class="btn btn-secondary" onclick="generateSignageToken()" style="font-size:13px; padding:10px 8px;" data-i18n="btn_regen_token">
              トークンを再生成する
           </button>
-          <div style="font-size:11px; color:#e53935; margin-top:6px;">再生成すると旧URLは即無効化されます</div>
+          <div style="font-size:11px; color:#e53935; margin-top:6px;" data-i18n="note_regen_token">再生成すると旧URLは即無効化されます</div>
         </div>
       </div>
     </div>
@@ -845,27 +845,27 @@
       <button class="btn btn-secondary" onclick="updateDisplayName()" data-i18n="btn_update_name">表示名を更新</button>
     </div>
     <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;" data-i18n="btn_leave_group">グループを退出する</button>
-    <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;">超管理者ダッシュボード</button></div>
+    <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;"><span data-i18n="btn_super_admin">超管理者ダッシュボード</span></button></div>
     <div style="text-align:center; padding: 20px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
-         style="color:var(--green); text-decoration:none;">利用規約</a>
+         style="color:var(--green); text-decoration:none;" data-i18n="label_terms">利用規約</a>
       &nbsp;／&nbsp;
       <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank"
-         style="color:var(--green); text-decoration:none;">プライバシーポリシー</a>
-      <br><span style="font-size:11px;">© 2026 江の島エッジ合同会社</span>
+         style="color:var(--green); text-decoration:none;" data-i18n="label_privacy">プライバシーポリシー</a>
+      <br><span style="font-size:11px;" data-i18n="label_copyright">© 2026 江の島エッジ合同会社</span>
     </div>
   </div>
   <!-- ══ グループ切替ボトムシート ══ -->
   <div class="group-switcher-overlay" id="group-switcher-overlay" onclick="closeBottomSheet()"></div>
   <div class="group-switcher-sheet" id="group-switcher-sheet">
     <div class="group-switcher-handle"></div>
-    <div class="group-switcher-title">グループを切り替える</div>
+    <div class="group-switcher-title" data-i18n="heading_switch_group">グループを切り替える</div>
     <div class="group-switcher-list" id="group-switcher-list">
       <div class="spinner" style="margin:20px auto;"></div>
     </div>
     <!-- ★ 案C-改: 他のグループに参加するための導線(参加申請のみ・新規作成は含まない) -->
     <div style="padding:12px 16px 20px; border-top:1px solid var(--border);">
-      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ 他のグループに参加</button>
+      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ <span data-i18n="btn_join_other_group">他のグループに参加</span></button>
     </div>
   </div>
 </div>
@@ -2237,7 +2237,7 @@ function renderMessages() {
 
     html += `<div class="month-section card">`;
     html += `<div class="month-header" onclick="toggleMonth('month-${monthKey}')">
-      <div class="month-label">${label}（${msgs.length}件）</div>
+      <div class="month-label">${t('month_card_label', { label, n: msgs.length })}</div>
       ${needAccordion ? `<div class="month-toggle ${isOpen ? 'open' : 'closed'}" id="toggle-${monthKey}">▼</div>` : ''}
     </div>`;
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
@@ -2473,11 +2473,11 @@ function applyComposeType(type) {
   document.getElementById('section-handover-priority').style.display = isMsgActive ? 'none' : '';
   document.getElementById('template-section').style.display = (!isMsgActive || !_groupTemplatesCache || _groupTemplatesCache.length === 0) ? 'none' : '';
   const label = document.getElementById('compose-body-label');
-  if (label) label.textContent = isMsgActive ? t('form_message_body') : t('form_handover_body');
+  if (label) label.textContent = isMsgActive ? t('label_compose_body') : t('form_handover_body');
   const placeholder = document.getElementById('compose-body');
   if (placeholder) placeholder.placeholder = isMsgActive ? '連絡内容を入力してください...' : '引き継ぎ事項を入力してください（例：〇〇様のご対応をお願いします）...';
   const sendBtn = document.getElementById('compose-send-btn');
-  if (sendBtn) sendBtn.textContent = isMsgActive ? t('btn_send') : '引き継ぎを投稿する';
+  if (sendBtn) sendBtn.textContent = isMsgActive ? t('btn_send_msg') : '引き継ぎを投稿する';
   // アンケートセクションは「通常メッセージ」かつ「グループ管理者」のときのみ表示
   applySurveyVisibility(isMsgActive);
   // [Phase 4-2C] タイプ切替時に画像ボタン表示制御＆選択中画像をクリア(context変更で画像保持は不自然)
@@ -2879,9 +2879,9 @@ async function showDetail(messageId) {
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
   // [2026/6/20] 帯の表示を統一：色アイコン＋本文冒頭20文字。
   // 色は優先度（urgent=🔴 / normal=🟡 / その他=🟢）。一覧の pLabel と同じ対応。
-  const msgIcon = (msg.priority === 'urgent') ? '至急' : (msg.priority === 'normal') ? '注意' : '連絡';
+  const msgIcon = (msg.priority === 'urgent') ? t('priority_urgent') : (msg.priority === 'normal') ? t('priority_caution') : t('priority_notice');
   const msgTitleText = getMessageTitle(msg.body, 20);
-  document.getElementById('detail-title').textContent = msgTitleText ? `${msgIcon} ${msgTitleText}` : `${msgIcon} メッセージ詳細`;
+  document.getElementById('detail-title').textContent = msgTitleText ? `${msgIcon} ${msgTitleText}` : `${msgIcon} ${t('detail_title_default')}`;
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
   // [Phase 4-2F] 画像表示(画像ありメッセージのみ・サムネを即時取得)
@@ -2900,6 +2900,11 @@ async function showDetail(messageId) {
   document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
   document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
   document.getElementById('detail-total-count').textContent = totalMembers;
+  document.getElementById('detail-read-label').textContent = t('stat_read');
+  document.getElementById('detail-unread-label').textContent = t('stat_unread');
+  document.getElementById('detail-total-label').textContent = t('stat_total');
+  document.getElementById('detail-read-heading').textContent = t('heading_read_list');
+  document.getElementById('detail-unread-heading').textContent = t('heading_unread_list');
   const readListEl = document.getElementById('detail-read-list');
   // 既読リストから送信者・サイネージ端末を除外
   const receiverReads = validReads.filter(r => {
@@ -2911,21 +2916,21 @@ async function showDetail(messageId) {
     readListEl.innerHTML = receiverReads.map(r => {
       const member = members.find(m => m.eo_uid === r.eo_uid);
       if (!member) return ''; // 退出済みは表示しない
-      return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">既読</div></div></div>`;
+      return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">${t('stat_read')}</div></div></div>`;
     }).join('');
   } else {
-    readListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">まだ誰も読んでいません</div>';
+    readListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">${t('empty_no_read')}</div>`;
   }
   const unreadListEl = document.getElementById('detail-unread-list');
   if (receivers.length === 0) {
     // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
     // 未読対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
-    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">未読対象のメンバーがいません</div>';
+    unreadListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">${t('empty_no_unread_target')}</div>`;
   } else if (unreadMembers.length > 0) {
-    unreadListEl.innerHTML = unreadMembers.map(m => `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">未読</div></div>`).join('');
+    unreadListEl.innerHTML = unreadMembers.map(m => `<div class="person-row"><div class="person-name">${escHtml(m.display_name)}</div><div class="check-no">${t('stat_unread')}</div></div>`).join('');
   } else {
     // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
-    unreadListEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未読のメンバーはいません</div>';
+    unreadListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">${t('empty_no_unread')}</div>`;
   }
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
@@ -3002,15 +3007,15 @@ async function loadApprovals() {
       .eq('group_session_id', currentGroup.id).eq('status', 'pending').order('created_at', { ascending: true });
     const container = document.getElementById('approval-list');
     if (!pending || pending.length === 0) {
-      container.innerHTML = '<div class="empty" style="padding:40px;"><div class="empty-text">承認待ちのメンバーはいません</div></div>';
+      container.innerHTML = `<div class="empty" style="padding:40px;"><div class="empty-text">${t('empty_no_pending_members')}</div></div>`;
       return;
     }
     container.innerHTML = pending.map(p => `
       <div class="approval-item">
         <div><div class="approval-name">${escHtml(p.display_name)}</div><div class="approval-time">${formatTime(p.created_at)}</div></div>
         <div style="display:flex; gap:8px; flex-shrink:0;">
-          <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">承認</button>
-          <button class="reject-btn" onclick="rejectMember('${p.id}', '${escHtml(p.display_name)}')" style="background:#9e9e9e; color:white; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">却下</button>
+          <button class="approve-btn" onclick="approveMember('${p.id}', '${escHtml(p.display_name)}')">${t('btn_approve_member')}</button>
+          <button class="reject-btn" onclick="rejectMember('${p.id}', '${escHtml(p.display_name)}')" style="background:#9e9e9e; color:white; border:none; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;">${t('btn_reject_member')}</button>
         </div>
       </div>
     `).join('');
@@ -3302,9 +3307,13 @@ function showProfile() {
   const eoUidEl2 = document.getElementById('profile-eo-uid');
   if (eoUidEl2) eoUidEl2.textContent = (currentUser.eo_uid || '---');
   document.getElementById('profile-group-id').textContent = currentGroup?.group_id || '---';
+  const expiresEl = document.getElementById('profile-expires');
+  if (expiresEl) expiresEl.textContent = t('label_expires_loading');
+  const membersEl = document.getElementById('profile-members');
+  if (membersEl) membersEl.textContent = t('label_members_loading');
   const gnDisplayEl = document.getElementById('profile-group-name-display');
   if (gnDisplayEl) gnDisplayEl.textContent = currentGroup?.group_name || '';
-  updateGroupSwitcherBtn();
+  refreshGroupSwitcherButton();
   // 管理者セクションの表示切替
   const adminSection = document.getElementById('profile-admin-section');
   if (adminSection) {
@@ -3330,7 +3339,6 @@ function showProfile() {
     }
   }
   // 有効期限表示
-  const expiresEl = document.getElementById('profile-expires');
   if (expiresEl && currentGroup?.expires_at) {
     const exp = new Date(currentGroup.expires_at);
     const now = new Date();
@@ -3361,6 +3369,18 @@ function showProfile() {
   // 超管理者ボタン表示チェック
   checkSuperAdmin();
   showScreen('screen-profile');
+}
+
+async function refreshGroupSwitcherButton() {
+  const btn = document.getElementById('group-switch-btn');
+  if (!btn || !currentUser?.eo_uid) return;
+  const { count } = await supabase
+    .from('group_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('eo_uid', currentUser.eo_uid)
+    .eq('status', 'approved');
+  const others = Math.max(0, (count || 0) - 1);
+  btn.textContent = `${t('btn_switch_group')} (${others})`;
 }
 
 
