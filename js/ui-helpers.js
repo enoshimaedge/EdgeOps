@@ -101,7 +101,7 @@ function renderHandoverImageLabel(item) {
     return `<span class="priority-badge" style="background:#f5f5f5; color:#888; border:1px solid #bbb; margin-left:6px;">削除済</span>`;
   }
   if (item.image_url || item.thumbnail_url) {
-    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">画像あり</span>`;
+    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">${t('label_image_exists')}</span>`;
   }
   return '';
 }
@@ -228,7 +228,7 @@ async function updateHandoverBadge() {
 }
 
 function renderHandoverCardHtml(hw, confs, myConf) {
-  const pLabels = { action: '重要', check: '通常', done: '確認要' };
+  const pLabels = { action: t('hw_action'), check: t('hw_check'), done: t('hw_done') };
   const pClass  = { action: 'hw-action', check: 'hw-check', done: 'hw-done' };
   const p = hw.priority || 'check';
   const confirmNames = (confs || []).map(c => c.display_name).join('・');

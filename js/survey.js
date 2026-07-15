@@ -225,7 +225,7 @@ async function showSurveyList() {
         const m = d.getMonth() + 1;
         const day = d.getDate();
         deadlineHtml = isExpired
-          ? `<div style="font-size:11px; color:#c62828; font-weight:600;">締切済み (${m}/${day}(${youbi}))</div>`
+          ? `<div style="font-size:11px; color:#c62828; font-weight:600;">${t('label_closed')} (${m}/${day}(${youbi}))</div>`
           : `<div style="font-size:11px; color:var(--text-mid);">締切: ${m}/${day}(${youbi}) 23:59</div>`;
       } else {
         deadlineHtml = `<div style="font-size:11px; color:var(--text-light);">締切なし</div>`;
@@ -306,7 +306,7 @@ async function showSurveyDetail(messageId) {
       const m2 = d.getMonth() + 1;
       const day = d.getDate();
       deadlineHtml = isExpired
-        ? `<div style="font-size:12px; color:#c62828; font-weight:600; margin-bottom:8px;">締切済み (${m2}/${day}(${youbi}) 23:59)</div>`
+        ? `<div style="font-size:12px; color:#c62828; font-weight:600; margin-bottom:8px;">${t('label_closed')} (${m2}/${day}(${youbi}) 23:59)</div>`
         : `<div style="font-size:12px; color:var(--text-mid); margin-bottom:8px;">締切: ${m2}/${day}(${youbi}) 23:59</div>`;
     }
 
