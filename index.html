@@ -2219,7 +2219,7 @@ function renderMessages() {
 
   sortedMonths.forEach((monthKey, idx) => {
     const [year, month] = monthKey.split('-');
-    const label = `${year}年${parseInt(month)}月`;
+    const label = `${year}/${parseInt(month)}`;
     const msgs = monthMap[monthKey];
 
     // 月内ソート：新しい順のみ（重要度の色分けは表示側で維持）
