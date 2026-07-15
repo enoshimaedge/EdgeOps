@@ -94,13 +94,13 @@ async function updateImageQuotaUI() {
 }
 
 function renderHandoverImageLabel(item) {
-  // [チャッピー第60-3回判定 解釈β] サイネージと同配置・priority-badge右横にインライン
+  // Design System統一：連絡一覧と同じ無彩色の .eo-msg__label を使う（青の囲み・青文字は廃止）
   if (!item) return '';
   if (item.image_mode === 'deleted') {
-    return `<span class="priority-badge" style="background:#f5f5f5; color:#888; border:1px solid #bbb; margin-left:6px;">削除済</span>`;
+    return `<span class="eo-msg__label">削除済</span>`;
   }
   if (item.image_url || item.thumbnail_url) {
-    return `<span class="priority-badge" style="background:rgba(33,150,243,0.15); color:#1976d2; border:1px solid rgba(144,202,249,0.7); margin-left:6px;">${t('label_image_exists')}</span>`;
+    return `<span class="eo-msg__label">${t('label_image_exists')}</span>`;
   }
   return '';
 }
