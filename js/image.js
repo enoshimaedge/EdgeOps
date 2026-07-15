@@ -2,12 +2,14 @@
 // [Phase 4-2A] クライアント画像圧縮ヘルパー
 // ═══════════════════════════════════════════
 // チャッピー第49回判定(III): Main thread + 処理中モーダル(WebWorkerはPro版以降)
-// 仕様書 v2.5 5-4 準拠: フル1920px品質80% + サムネ400px品質70%
+// 仕様書 v2.5 5-4 準拠 → 第122回判定(EO-DEC-0122・条件付きGO・案B)でフル画像を引き上げ:
+//   フル 1920px品質80% → 2240px品質88% + サムネ400px品質70%(据え置き)
+//   実写換算で1枚あたり約500KB → 約900KB(約2倍・許容範囲)。サムネ・5MB安全弁・DB/RPC/EFは不変更。
 // 出力5MB超過時は SIZE_OVER_5MB エラー
 // ═══════════════════════════════════════════
-const IMAGE_MAX_DIMENSION_FULL = 1920;
+const IMAGE_MAX_DIMENSION_FULL = 2240;
 const IMAGE_MAX_DIMENSION_THUMB = 400;
-const IMAGE_QUALITY_FULL = 0.8;
+const IMAGE_QUALITY_FULL = 0.88;
 const IMAGE_QUALITY_THUMB = 0.7;
 const IMAGE_MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
