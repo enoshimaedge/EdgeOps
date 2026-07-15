@@ -728,12 +728,12 @@
              - 空文字は NULL に正規化
              - 超管理者は関与しない(初期ST版方針) -->
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
-          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;">カスタムLINK</div>
-          <div style="font-size:11px; color:var(--text-light); margin-bottom:8px; line-height:1.5;">
+          <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;" data-i18n="heading_custom_link">カスタムLINK</div>
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:8px; line-height:1.5;" data-i18n="desc_custom_link">
             グループ専用の外部リンクを設定できます。設定すると、ホーム画面のヘッダーに「LINK」ボタンが表示され、メンバー全員がアクセスできます。
           </div>
           <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label">URL(https://〜・最大2048文字)</label>
+            <label class="form-label" data-i18n="label_link_url">URL(https://〜・最大2048文字)</label>
             <input class="form-input" id="profile-link-url" type="url" placeholder="https://example.com/" maxlength="2048" inputmode="url">
           </div>
           <div style="display:flex; gap:8px;">
@@ -752,7 +752,7 @@
              - 一般スタッフにはこのUIを出さない(プロフィール画面自体が管理者導線) -->
         <div id="template-edit-section" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border); display:none;">
           <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;" data-i18n="heading_templates">連絡メッセージ テンプレ</div>
-          <div style="font-size:11px; color:var(--text-light); margin-bottom:10px; line-height:1.5;">
+          <div style="font-size:11px; color:var(--text-light); margin-bottom:10px; line-height:1.5;" data-i18n="desc_templates">
             よく使う連絡文を最大6件まで登録できます。ここで登録した文は、メンバー全員がメッセージ作成時に呼び出せます。現場に合わせて自由に編集・削除してください。空欄にした枠は表示されません。
           </div>
           <div id="template-edit-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
