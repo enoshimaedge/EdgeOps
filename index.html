@@ -2228,7 +2228,7 @@ function renderMessages() {
     });
 
     const isLatest = idx === 0;
-    const needAccordion = msgs.length >= 50;
+    const needAccordion = true;  // 全月に開閉トグル(▼)を表示。以前は msgs.length>=50 の月だけだった
     // 【第115回】開閉状態を保持する。記録が無ければ従来どおり（最新月は開く）
     const isOpen = (monthOpenState[monthKey] !== undefined)
       ? monthOpenState[monthKey]
