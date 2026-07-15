@@ -95,7 +95,7 @@ html {
   overscroll-behavior-y: contain;
 }
 
-.screen { display: none; flex-direction: column; height: 100vh; }
+.screen { display: none; flex-direction: column; height: 100%; }  /* 親body(top:0;bottom:0で実表示領域に固定)に合わせる。100vhはiOSでアドレスバー込みの過大値になり下端(送信ボタン)がはみ出すため使わない */
 .screen.active { display: flex; }
 
 /* ── ヘッダー ── */
