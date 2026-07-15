@@ -19,7 +19,6 @@
 import { corsHeaders, handlePreflight } from '../_shared/cors.ts';
 import {
   resolveEoUid,
-  isApprovedCreator,
   getServiceClient,
 } from '../_shared/auth.ts';
 import {
@@ -186,9 +185,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // ===== Step 4: 認可判定（group_members で is_creator=true・status=approved） =====
-    const isCreator = await isApprovedCreator(supabase, eoUid, groupSessionId);
-    if (!isCreator) {
+    // ===== Step 4: 認可判定（approved かつ 非サイネージ）=====
+    // [第119回] 画像投稿の is_creator 限定を撤回。approved・非サイネージなら投稿可。
+    //   is_creator は不参照（他機能では継続使用）。共通関数 isApprovedCreator は不変更。
+    const { data: posterMember, error: posterError } = await supabase
+      .from('group_members')
+      .select('is_signage, status')
+      .eq('eo_uid', eoUid)
+      .eq('group_session_id', groupSessionId)
+      .eq('status', 'approved')
+      .maybeSingle();
+
+    if (posterError || !posterMember || posterMember.is_signage === true) {
       await logFunction(supabase, {
         requestId,
         functionName: 'upload-image',

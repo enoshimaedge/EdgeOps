@@ -5,14 +5,13 @@
 // ════════════════════════════════════════════════════════════════════
 
 async function applyImageUploadButtonVisibility() {
-  // compose画面の📷/🖼️ボタン表示制御。feature_flagsの状態 + isCreatorロールにより出し分け。
-  // [チャッピー第52回判定 修正1] isCreator !== true の場合は無条件で非表示
+  // compose画面の📷/🖼️ボタン表示制御。feature_flags の状態で出し分け。
   // [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] camera/library 2ボタン対応
   const btnCamera = document.getElementById('compose-image-btn-camera');
   const btnLibrary = document.getElementById('compose-image-btn-library');
   if (!btnCamera || !btnLibrary) return;
   const hideBoth = () => { btnCamera.style.display = 'none'; btnLibrary.style.display = 'none'; };
-  if (isCreator !== true) { hideBoth(); return; }
+  // [第119回] is_creator 限定を撤回。表示可否は feature_flags のみで判定。
   try {
     const flags = await getFeatureFlags(false);
     if (!flags.image_upload) { hideBoth(); return; }
@@ -66,8 +65,8 @@ async function updateImageQuotaUI() {
   const btnLibrary = document.getElementById('compose-image-btn-library');
   const quotaEl = document.getElementById('compose-image-quota');
   if (!btnCamera || !btnLibrary || !quotaEl) return;
-  // 両ボタンとも非表示なら残量UIも空に(isCreator!==true / feature_flags OFF時)
-  if ((btnCamera.style.display === 'none' && btnLibrary.style.display === 'none') || isCreator !== true) {
+  // [第119回] isCreator 条件を除去。両ボタン非表示（feature_flags OFF）のときのみ空に。
+  if (btnCamera.style.display === 'none' && btnLibrary.style.display === 'none') {
     quotaEl.innerHTML = '';
     return;
   }
