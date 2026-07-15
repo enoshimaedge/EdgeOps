@@ -169,6 +169,11 @@ window.EdgeOpsI18n = {
     toast_gid_copied:           'グループIDをコピーしました',
     toast_copy_failed:          'コピーに失敗しました',
     toast_copy_unsupported:     'この環境ではコピーできません',
+    // ── 第2弾追補：カスタムLINK・テンプレ説明（2026/07/15） ──
+    heading_custom_link:        'カスタムLINK',
+    desc_custom_link:           'グループ専用の外部リンクを設定できます。設定すると、ホーム画面のヘッダーに「LINK」ボタンが表示され、メンバー全員がアクセスできます。',
+    label_link_url:             'URL(https://〜・最大2048文字)',
+    desc_templates:             'よく使う連絡文を最大6件まで登録できます。ここで登録した文は、メンバー全員がメッセージ作成時に呼び出せます。現場に合わせて自由に編集・削除してください。空欄にした枠は表示されません。',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -338,5 +343,10 @@ window.EdgeOpsI18n = {
     toast_gid_copied:           'Group ID copied',
     toast_copy_failed:          'Failed to copy',
     toast_copy_unsupported:     'Copy is not supported in this environment',
+    // ── 第2弾追補：カスタムLINK・テンプレ説明（2026/07/15） ──
+    heading_custom_link:        'Custom LINK',
+    desc_custom_link:           'Set an external link for this group. Once set, a "LINK" button appears in the home header and all members can access it.',
+    label_link_url:             'URL (https:// ... , max 2048 chars)',
+    desc_templates:             'Register up to 6 frequently used messages. Members can insert them when composing. Edit or delete freely to fit your site. Empty slots are hidden.',
   }
 };
