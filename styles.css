@@ -315,6 +315,25 @@ html {
   background: var(--eo-surface-sunken);
 }
 
+/* ── 引き継ぎノートの状況注記（Design System 統一：無彩色・色分けしない） ──
+   旧 .handover-confirm-names（緑）/.handover-unconfirmed（赤）を置換。
+   .eo-msg の3行目として、確認状況を落ち着いた無彩色で示す。 */
+.eo-hw-note {
+  font-size: 11px; line-height: 1.4;
+  color: var(--eo-text-muted);
+  margin-top: 6px;
+}
+.eo-hw-note--attn { color: var(--eo-priority-caution); font-weight: 600; }
+
+/* ── 引き継ぎ画面上部の注記バー（色付き背景を廃し、システム注記トーンへ） ── */
+.eo-handover-notice {
+  padding: 8px 16px;
+  background: var(--eo-system-bg);
+  border-bottom: 1px solid var(--eo-border);
+  font-size: 12px; font-weight: 500;
+  color: var(--eo-system-fg);
+}
+
 /* ── 月別ヘッダー・アコーディオン ── */
 .month-section { margin-bottom: 4px; }
 .month-header {
@@ -543,6 +562,10 @@ html {
   text-align: center;
 }
 
+/* 【旧デザイン・非使用（Design System統一で .eo-msg へ移行）】
+   引き継ぎノートの描画は renderHandoverCardHtml が .eo-msg 構造を出力するように
+   変更したため、以下 .handover-card / .handover-priority-badge / .hw-action等は
+   もう参照されない。累積温存原則により削除せず記録として残す。 */
 .handover-card {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
