@@ -205,11 +205,6 @@ function onComposeImageButtonClickLibrary() {
 async function onComposeImageFileSelected(ev) {
   const file = ev && ev.target && ev.target.files && ev.target.files[0];
   if (!file) return;
-  // [チャッピー第52回判定 修正2] isCreator !== true なら拒否(表示制御の二重防御)
-  if (isCreator !== true) {
-    showToast('画像投稿はグループ管理者のみ利用できます');
-    return;
-  }
   // [⑫クォータ表示UI・チャッピー第58回判定 条件7・iPhone Safari対策/2026-05-18]
   // ファイル選択直後に残量再確認(ボタン押下時にチェックすると iOS Safari でジェスチャー連鎖が切れるため)
   try {
@@ -299,12 +294,6 @@ async function sendImageMessage() {
   const u = await ensureCurrentUser();
   if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
   const body = document.getElementById('compose-body').value.trim();
-
-  // [チャッピー第52回判定 修正2] isCreator !== true なら送信拒否(送信入口の二重防御)
-  if (isCreator !== true) {
-    showToast('画像投稿はグループ管理者のみ利用できます');
-    return;
-  }
 
   // [チャッピー第54回判定 GO] ⑦アンケート画像ガード:アンケート選択時は画像送信不可
   // context = 'message'(連絡)時のみ survey-checkbox を確認
