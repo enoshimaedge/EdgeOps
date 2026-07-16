@@ -85,7 +85,6 @@ Deno.serve(async (req: Request) => {
   const groupSessionId: string = groupSession.id;
 
   // safeGroup: signage_token / signage_enabled を除外して返す
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { signage_token: _st, signage_enabled: _se, ...safeGroup } = groupSession;
 
   // ───── messages / handover_notes 取得 ─────
@@ -111,11 +110,11 @@ Deno.serve(async (req: Request) => {
       .order('created_at', { ascending: false }),
   ]);
 
-  const messages: Array<{ id: string }> = messagesRes.data || [];
-  const handoverNotes: Array<{ id: string }> = handoverRes.data || [];
+  const messages = messagesRes.data || [];
+  const handoverNotes = handoverRes.data || [];
 
-  const msgIds: string[] = messages.map((m) => m.id);
-  const handoverIds: string[] = handoverNotes.map((h) => h.id);
+  const msgIds: string[] = messages.map((m: { id: string }) => m.id);
+  const handoverIds: string[] = handoverNotes.map((h: { id: string }) => h.id);
 
   // ───── 関連データを並列取得 ─────
   // 変更①: item_receivers を追加（msgIds に限定・全件取得しない）
