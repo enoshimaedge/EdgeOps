@@ -2525,12 +2525,10 @@ async function sendMessage() {
     const __loading = startDelayedLoading('投稿中…', '通信状況により数秒かかる場合があります');
     try {
       showToast('投稿中...');
-      const { error } = await supabase.from('handover_notes').insert({
-        group_session_id: currentGroup.id,
-        sender_eo_uid: currentUser.eo_uid,
-        sender_name: currentUser.display_name,
-        content: body,
-        priority: selectedHandoverPriority
+      const { error } = await supabase.rpc('create_handover_with_receivers', {
+        p_group_session_id: currentGroup.id,
+        p_body: body,
+        p_priority: selectedHandoverPriority
       });
       if (error) throw error;
       document.getElementById('compose-body').value = '';
