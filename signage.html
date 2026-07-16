@@ -1608,6 +1608,23 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
       return true;
     });
 
+    // ════════════════════════════════════════════════════════════
+    // [受信者スナップショット優先 / EO-DEC-0125 / 2026-07-16]
+    // 連絡(message)で item_receivers があれば、それを未読名簿の正本にする。
+    // → スマホ詳細画面(第124回)と同じ顔ぶれになり、端末間の食い違いを解消。
+    // 無い過去分は従来の humanMembers（参考表示）のまま。
+    // 対象は未読/既読名簿の「顔ぶれ」のみ。既読数字・バッジには影響しない。
+    // ════════════════════════════════════════════════════════════
+    let rosterMembers = humanMembers;
+    if (itemType === 'message') {
+      const allItemReceivers = _globalSignageData ? (_globalSignageData.item_receivers || []) : [];
+      const snapshotRows = allItemReceivers.filter(ir => ir.item_id === itemId);
+      if (snapshotRows.length > 0) {
+        const snapshotUids = new Set(snapshotRows.map(ir => ir.receiver_eo_uid));
+        rosterMembers = (members || []).filter(m => snapshotUids.has(m.eo_uid));
+      }
+    }
+
     let readUids = [];
     if (itemType === 'message') {
       // ─── signage-fetch 経由化: read_receipts はキャッシュから単一メッセージ分を抽出 ───
@@ -1638,8 +1655,8 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
         .map(c => c.eo_uid);
     }
 
-    const readMembers = humanMembers.filter(m => readUids.includes(m.eo_uid));
-    const unreadMembers = humanMembers.filter(m => !readUids.includes(m.eo_uid));
+    const readMembers = rosterMembers.filter(m => readUids.includes(m.eo_uid));
+    const unreadMembers = rosterMembers.filter(m => !readUids.includes(m.eo_uid));
 
     let html = '';
     if (itemType === 'message') {
