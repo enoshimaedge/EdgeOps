@@ -2858,7 +2858,7 @@ async function showDetail(messageId) {
     .select('receiver_eo_uid')
     .eq('item_type', 'message')
     .eq('item_id', messageId);
-  if (snapshotError) console.warn('[showDetail] item_receivers fetch error:', snapshotError.message);
+  if (snapshotError) console.warn('[showDetail] item_receivers fetch error:', snapshotError.message, { messageId });
 
   if (Array.isArray(snapshotRows) && snapshotRows.length > 0) {
     // スナップショットあり：送信時の顔ぶれを正本にする
