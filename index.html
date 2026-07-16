@@ -1026,6 +1026,70 @@ const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
       document.body.style.overflow = 'hidden';
     }
 
+    // ═══════════════════════════════════════════
+    // [2026/7/17 第126回判定 EO-DEC-0126 案A-2] 認証失効時の再認証画面
+    // ═══════════════════════════════════════════
+    // 背景:放置後リロードで LINE id_token が失効した状態で resolveEoUid() を呼ぶと、
+    //       line-auth の LINE Verify API が 400(IdToken expired)で拒否し例外を投げる。
+    //       従来はその例外が init() 外側 catch に落ち、無条件で screen-start(初期グループ
+    //       作成画面)を表示していた。所属は無事なのに未参加画面を出す誤表示が本質。
+    // 対策(第126回 A-2):認証失効時は screen-start を出さず、専用の再認証画面へ出し分ける。
+    //   ・ボタンで liff.login({ redirectUri: location.href }) を実行(明示・自動login=A-1は不採用)。
+    //   ・無限ループ防止:再認証を1回試して戻ってきても失効なら、
+    //     「LINEを閉じてリッチメニューから起動し直す」案内に切り替える(sessionStorage フラグ)。
+    // 不可触:DB / RPC / L3 / line-auth EF / eo_uid 生成式 / signage には触れない。
+    const REAUTH_FLAG_KEY = 'sl_reauth_attempted';
+    function showReauthScreen() {
+      // 既に1回再認証を試みて戻ってきた場合は、ループさせず再起動案内に切り替える
+      let alreadyTried = false;
+      try { alreadyTried = sessionStorage.getItem(REAUTH_FLAG_KEY) === '1'; } catch (_) {}
+
+      const existing = document.getElementById('reauth-error');
+      if (existing) existing.remove();
+      const div = document.createElement('div');
+      div.id = 'reauth-error';
+      div.style.cssText = 'position:fixed; inset:0; z-index:99999; background:#0f2f3f; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; font-family:sans-serif;';
+
+      if (!alreadyTried) {
+        // 初回:再認証ボタンを提示
+        div.innerHTML =
+          '<div style="font-size:20px; font-weight:bold; margin-bottom:16px;">セッションが切れました</div>' +
+          '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#dbe7ec; margin-bottom:28px;">ログイン情報の有効期限が切れました。<br>下のボタンから再認証して続けてください。</div>' +
+          '<button id="reauth-btn" style="font-size:16px; font-weight:bold; color:#0f2f3f; background:#fff; border:none; border-radius:9px; padding:14px 32px; cursor:pointer;">再認証して続ける</button>';
+        document.body.appendChild(div);
+        document.body.style.overflow = 'hidden';
+        const btn = document.getElementById('reauth-btn');
+        if (btn) {
+          btn.addEventListener('click', function () {
+            try { sessionStorage.setItem(REAUTH_FLAG_KEY, '1'); } catch (_) {}
+            try {
+              liff.login({ redirectUri: location.href });
+            } catch (e) {
+              console.error('[showReauthScreen] liff.login failed:', e?.message);
+              // login 自体が走らない端末向けフォールバック:再起動案内へ
+              showReauthRestartGuide();
+            }
+          });
+        }
+      } else {
+        // 2回目(再認証を試したのにまた失効):ループ防止で再起動案内に切り替える
+        showReauthRestartGuide(div);
+      }
+    }
+
+    function showReauthRestartGuide(reuseDiv) {
+      const existing = document.getElementById('reauth-error');
+      if (existing && !reuseDiv) existing.remove();
+      const div = reuseDiv || document.createElement('div');
+      div.id = 'reauth-error';
+      div.style.cssText = 'position:fixed; inset:0; z-index:99999; background:#0f2f3f; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; font-family:sans-serif;';
+      div.innerHTML =
+        '<div style="font-size:20px; font-weight:bold; margin-bottom:16px;">お手数ですが再起動してください</div>' +
+        '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#dbe7ec;">LINEをいったん閉じて、リッチメニューから EdgeOps を起動し直してください。<br><br>再起動すると元の画面に戻ります。</div>';
+      if (!reuseDiv || !div.parentNode) document.body.appendChild(div);
+      document.body.style.overflow = 'hidden';
+    }
+
     // [2026/5/23 案D] LIFF SDK 初期化直後の誤判定対策で 500ms リトライ1回入れる(チャッピー第72回判定GO)
     //   背景:liff.isInClient() が SDK 初期化直後・状態遷移直後に false を返すことがあり、
     //         書き込み操作時に誤って遮断画面が出るバグ(超管理者ボタン誤遮断・5/22箱根新規グループ作成失敗の一要因)
@@ -1283,7 +1347,26 @@ async function init() {
     }
 
     // [Phase 0 5-3] auth.js の resolveEoUid を使用してeo_uidを解決
-    const _auth = await resolveEoUid(supabase);
+    // [2026/7/17 第126回判定 EO-DEC-0126 案A-2] 認証失効(id_token expired 等)を screen-start に
+    //   落とさず、再認証画面へ出し分ける。resolveEoUid が失敗する = 認証が確立できていない状態
+    //   (未参加ではなく失効)なので、ここで専用画面へ分岐して以降の初期化には進めない。
+    let _auth;
+    try {
+      _auth = await resolveEoUid(supabase);
+    } catch (authErr) {
+      console.error('[init] resolveEoUid failed (auth expired?). Show reauth screen:', authErr?.message);
+      hideLoading();
+      showReauthScreen();
+      return;
+    }
+    if (!_auth || !_auth.eoUid) {
+      console.error('[init] resolveEoUid returned no eoUid. Show reauth screen.');
+      hideLoading();
+      showReauthScreen();
+      return;
+    }
+    // 認証に成功したので、再認証ループ防止フラグはクリアしておく
+    try { sessionStorage.removeItem(REAUTH_FLAG_KEY); } catch (_) {}
     currentUser = { eo_uid: _auth.eoUid, provider: 'line', provider_uid: _auth.providerUid, line_name: _auth.displayName, picture_url: _auth.pictureUrl || '', display_name: _auth.displayName };
 
     // [2026/5/23 案B] リロード耐性のため localStorage に保存(チャッピー第72回判定GO)
@@ -1326,7 +1409,20 @@ async function init() {
       hideLoading(); showScreen('screen-start');
     }
   } catch (e) {
-    console.error(e); hideLoading(); showScreen('screen-start');
+    console.error(e);
+    // [2026/7/17 第126回判定 EO-DEC-0126 案B] screen-start を出す直前の最終ガード。
+    //   認証が復旧済み(currentUser.eo_uid あり)なら、既存 approved 所属を再確認し、
+    //   見つかれば screen-home に引き戻す。案A-2 で拾えなかった経路の保険として、
+    //   所属者を誤って初期画面へ落とさない。所属が無ければ従来どおり screen-start。
+    try {
+      if (currentUser?.eo_uid) {
+        const restoredOnError = await restoreExistingMembershipIfAny();
+        if (restoredOnError) { hideLoading(); return; }
+      }
+    } catch (guardErr) {
+      console.warn('[init] case-B guard failed (fallback to screen-start):', guardErr?.message);
+    }
+    hideLoading(); showScreen('screen-start');
   }
 }
 
