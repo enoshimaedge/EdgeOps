@@ -1242,7 +1242,7 @@ function buildItemHtml(item) {
   let readBadge = '';
   if (humanCount > 0) {
     if (item._type === 'message') {
-      const readCount = readCountMap[item.id] || 0;
+      const readCountRaw = readCountMap[item.id] || 0;
       // ════════════════════════════════════════════════════════════
       // [既読バッジ分母仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
       // 送信時点で確定した受信者数を分母とする(index.html L3153 と同一方式)
@@ -1269,10 +1269,15 @@ function buildItemHtml(item) {
         // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
         // 受信者0名(送信時点で送信者以外いない)→ 既読対象なし表示
         readBadge = `<span style="font-size:10px; color:#94a3b8; font-weight:700;">📋 対象者なし</span>`;
-      } else if (readCount >= receiverCount) {
-        readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
       } else {
-        readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
+        // [第123回] read_count が分母を超えないようクランプ（index.html 一覧 L2280 と同方式）。
+        // 退出→再入場者の既読が分子に混じっても、バッジ上は分母を超えて見えないようにする。
+        const readCount = Math.min(readCountRaw, receiverCount);
+        if (readCount >= receiverCount) {
+          readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
+        } else {
+          readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
+        }
       }
     } else {
       const confirmedCount = item._confirmed || 0;
@@ -1558,10 +1563,10 @@ function openModalByIndex(index) {
   const hh = String(createdAt.getHours()).padStart(2, '0');
   const mm = String(createdAt.getMinutes()).padStart(2, '0');
   const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null);
+  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null, item.receiver_count != null ? item.receiver_count : null);
 }
 
-async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt) {
+async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt, itemReceiverCount) {
   const modal = document.getElementById('modal-msg-detail');
   document.getElementById('modal-priority-badge').innerHTML =
     `<span class="message-priority ${priorityCls}">${priorityLabel}</span>`;
@@ -1641,8 +1646,27 @@ async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, item
     const readMembers = humanMembers.filter(m => readUids.includes(m.eo_uid));
     const unreadMembers = humanMembers.filter(m => !readUids.includes(m.eo_uid));
 
+    // ════════════════════════════════════════════════════════════
+    // [既読名簿の復元不能フォールバック / チャッピー第123回判定 EO-DEC-0123 / 2026-07-16]
+    //   index.html の詳細画面と同一仕様。退出→再入場者がいるグループでは、
+    //   created_at だけでは送信時点の母数を正確に復元できず、送信時固定の
+    //   receiver_count と名簿(humanMembers)の人数が食い違うことがある。
+    //   その異常ケースでは、誤った名前を出さず注記表示に切り替える（スマホと同じ挙動）。
+    //   receiver_count は送信時固定の正として維持（再計算しない）。
+    //   message のみ対象（receiver_count は連絡のみ保存）。
+    // ════════════════════════════════════════════════════════════
+    const rosterUnrecoverable = (itemType === 'message') && (itemReceiverCount != null) && (humanMembers.length !== itemReceiverCount);
+
     let html = '';
-    if (itemType === 'message') {
+    if (rosterUnrecoverable) {
+      html = `
+        <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:12px;">
+          <div style="font-size:13px; color:rgba(255,255,255,0.5); text-align:center; line-height:1.7;">
+            このメッセージは、メンバーの退出・再入場があったため、<br>既読者・未読者の名前を正確に表示できません。<br>合計人数のみ表示しています（受信対象 ${itemReceiverCount}名）。
+          </div>
+        </div>
+      `;
+    } else if (itemType === 'message') {
       html = `
         <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:12px;">
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
