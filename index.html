@@ -2848,19 +2848,33 @@ async function showDetail(messageId) {
   // 送信者・サイネージ端末・送信時点未参加メンバーを除いた受信者リスト
   // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
   // ════════════════════════════════════════════════════════════
-  // [未読リスト分母仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
-  // B: サイネージ除外 / C: 送信者除外 / D: 送信時点未参加除外
-  // ※ 数値(totalMembers)は msg.receiver_count を優先利用、
-  //    名前リスト(unreadMembers)は receivers から派生するため
-  //    receivers 自体に送信時点フィルタを適用する必要がある
+  // [受信者スナップショット優先 / EO-DEC-0124 / 2026-07-16]
+  // item_receivers があればそれを未読名簿の正本にする（送信時の顔ぶれで固定）。
+  // 無い過去分は従来どおり現在メンバーから逆算（参考表示）。
+  // 数字(totalMembers=receiver_count)・既読リストは変更しない。
   // ════════════════════════════════════════════════════════════
-  const receivers = members.filter(m => {
-    if (m.eo_uid === msg.sender_eo_uid) return false;                          // C
-    if (m.is_signage) return false;                                            // B
-    const joinedAt = detailMemberJoinedAt.get(m.eo_uid);
-    if (joinedAt !== undefined && joinedAt > msgCreatedAtMs) return false;     // D
-    return true;
-  });
+  let receivers;
+  // クエリ失敗時は snapshotRows が null になり Array.isArray チェックで false → 過去分フォールバック（意図どおり）
+  const { data: snapshotRows } = await supabase.from('item_receivers')
+    .select('receiver_eo_uid')
+    .eq('item_type', 'message')
+    .eq('item_id', messageId);
+
+  if (Array.isArray(snapshotRows) && snapshotRows.length > 0) {
+    // スナップショットあり：送信時の顔ぶれを正本にする
+    // ※ members に居ない受信者（退出済み）は自動的に除外される。意図どおり（退出者の名前を無理に出さない）。
+    const snapshotUids = new Set(snapshotRows.map(r => r.receiver_eo_uid));
+    receivers = members.filter(m => snapshotUids.has(m.eo_uid));
+  } else {
+    // スナップショットなし（過去分）：従来どおり現在メンバーから逆算（参考表示）
+    receivers = members.filter(m => {
+      if (m.eo_uid === msg.sender_eo_uid) return false;                        // C
+      if (m.is_signage) return false;                                          // B
+      const joinedAt = detailMemberJoinedAt.get(m.eo_uid);
+      if (joinedAt !== undefined && joinedAt > msgCreatedAtMs) return false;   // D
+      return true;
+    });
+  }
   const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
   const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
