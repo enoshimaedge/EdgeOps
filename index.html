@@ -2546,14 +2546,6 @@ async function sendMessage() {
   const __loading = startDelayedLoading('送信中…', '通信状況により数秒かかる場合があります');
   try {
     showToast('送信中...');
-    // 送信時点の受信者数を固定保存（後からメンバーが増えても分母が変わらないようにする）
-    // ★ status='approved' フィルタ追加：離脱予定や保留中のメンバーをカウントに含めない（v7.17 第18章準拠）
-    const receiverCountAtSend = members.filter(m =>
-      m.status === 'approved' &&
-      m.eo_uid !== currentUser.eo_uid &&
-      !m.is_signage
-    ).length;
-
     // ── アンケート対応(管理者かつチェック時のみ true) ──
     // グローバル変数 isCreator を使用（members 依存を排除しタイミング問題を回避）
     const surveyCb = document.getElementById('survey-checkbox');
@@ -2570,16 +2562,13 @@ async function sendMessage() {
       }
     }
 
-    const insertPayload = {
-      group_session_id: currentGroup.id, sender_eo_uid: currentUser.eo_uid,
-      body: body, read_count: 0, priority: selectedPriority,
-      receiver_count: receiverCountAtSend
-    };
-    if (isSurvey) {
-      insertPayload.is_survey = true;
-      insertPayload.survey_deadline = surveyDeadline;
-    }
-    const { error } = await supabase.from('messages').insert(insertPayload);
+    const { error } = await supabase.rpc('create_message_with_receivers', {
+      p_group_session_id: currentGroup.id,
+      p_body: body,
+      p_priority: selectedPriority,
+      p_is_survey: isSurvey,
+      p_survey_deadline: surveyDeadline
+    });
     if (error) throw error;
     document.getElementById('compose-body').value = '';
     selectedPriority = 'info';
