@@ -2562,7 +2562,7 @@ async function sendMessage() {
       }
     }
 
-    const { data: rpcResult, error } = await supabase.rpc('create_message_with_receivers', {
+    const { error } = await supabase.rpc('create_message_with_receivers', {
       p_group_session_id: currentGroup.id,
       p_body: body,
       p_priority: selectedPriority,
