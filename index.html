@@ -2877,20 +2877,6 @@ async function showDetail(messageId) {
   const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
   const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
   const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
-  // ════════════════════════════════════════════════════════════
-  // [既読名簿の復元不能フォールバック / チャッピー第123回判定 EO-DEC-0123 / 2026-07-16]
-  //   退出→再入場したメンバーがいるグループでは、group_members の
-  //   created_at / approved_at だけでは「送信時点で誰が母数だったか」を
-  //   正確に復元できない（過去の在籍期間が残っていないため）。
-  //   その結果、送信時固定の receiver_count（正しい分母）と、現在メンバーから
-  //   復元した名簿（receivers）の人数が食い違うことがある。
-  //   この異常ケースでは、誤った既読者・未読者名を出すより、名簿を出さず
-  //   合計人数のみ表示して注記に切り替える（現場の信頼を守る・第123回条件2）。
-  //   ※ receiver_count は送信時固定の正として維持。ここでは再計算しない（条件1）。
-  //   ※ receiver_count が NULL（過去の画像メッセージ等）は従来どおり扱う。
-  //   根本解決は第2段（送信時受信者スナップショット・item_receivers）で対応予定。
-  // ════════════════════════════════════════════════════════════
-  const rosterUnrecoverable = (msg.receiver_count != null) && (receivers.length !== msg.receiver_count);
   // [2026/6/20] 帯の表示を統一：色アイコン＋本文冒頭20文字。
   // 色は優先度（urgent=🔴 / normal=🟡 / その他=🟢）。一覧の pLabel と同じ対応。
   const msgIcon = (msg.priority === 'urgent') ? t('priority_urgent') : (msg.priority === 'normal') ? t('priority_caution') : t('priority_notice');
@@ -2911,30 +2897,15 @@ async function showDetail(messageId) {
     const enabled = await isImageDeleteEnabled();
     delBtn.style.display = enabled ? 'inline-block' : 'none';
   })();
-  if (rosterUnrecoverable) {
-    // 異常ケース：合計(receiver_count)のみ正として表示。既読/未読の断定はしない。
-    document.getElementById('detail-read-count').textContent = '—';
-    document.getElementById('detail-unread-count').textContent = '—';
-    document.getElementById('detail-total-count').textContent = totalMembers;
-  } else {
-    document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
-    document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
-    document.getElementById('detail-total-count').textContent = totalMembers;
-  }
+  document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
+  document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
+  document.getElementById('detail-total-count').textContent = totalMembers;
   document.getElementById('detail-read-label').textContent = t('stat_read');
   document.getElementById('detail-unread-label').textContent = t('stat_unread');
   document.getElementById('detail-total-label').textContent = t('stat_total');
   document.getElementById('detail-read-heading').textContent = t('heading_read_list');
   document.getElementById('detail-unread-heading').textContent = t('heading_unread_list');
   const readListEl = document.getElementById('detail-read-list');
-  const unreadListEl = document.getElementById('detail-unread-list');
-  if (rosterUnrecoverable) {
-    // 異常ケース：名簿を正確に復元できないため、誤った名前を出さず注記表示に切り替える。
-    // （既読リスト側に注記を表示し、未読リスト側は空にする）
-    // 注記は稀なフォールバックのため i18n 辞書を介さず直接記述（index.html 単独で完結）
-    readListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;line-height:1.7;">このメッセージは、メンバーの退出・再入場があったため、<br>既読者・未読者の名前を正確に表示できません。<br>合計人数のみ表示しています。</div>`;
-    unreadListEl.innerHTML = '';
-  } else {
   // 既読リストから送信者・サイネージ端末を除外
   const receiverReads = validReads.filter(r => {
     if (r.eo_uid === msg.sender_eo_uid) return false;
@@ -2950,6 +2921,7 @@ async function showDetail(messageId) {
   } else {
     readListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">${t('empty_no_read')}</div>`;
   }
+  const unreadListEl = document.getElementById('detail-unread-list');
   if (receivers.length === 0) {
     // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
     // 未読対象者がそもそもいない(1人グループ・投稿時点で他在籍者なし等)
@@ -2959,7 +2931,6 @@ async function showDetail(messageId) {
   } else {
     // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
     unreadListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">${t('empty_no_unread')}</div>`;
-  }
   }
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
