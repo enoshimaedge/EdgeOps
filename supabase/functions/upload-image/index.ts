@@ -315,6 +315,7 @@ Deno.serve(async (req: Request) => {
     //   messages: body・sender_eo_uid
     //   handover_notes: content(body相当)・sender_eo_uid・sender_name(NOT NULL・追加)
     let insertData;
+    let rcMembers: Array<{ eo_uid: string; is_signage: boolean | null }> | null = null;
     if (metadata.context === 'message') {
       // ════════════════════════════════════════════════════════════
       // [receiver_count 送信時固定 / 画像メッセージ対応 / 2026-06-29]
@@ -328,13 +329,14 @@ Deno.serve(async (req: Request) => {
       //       handover_notes は receiver_count を使用しないため対象外（無変更）。
       // ════════════════════════════════════════════════════════════
       let receiverCountAtSend: number | null = null;
-      const { data: rcMembers, error: rcError } = await supabase
+      const { data: rcMembersData, error: rcError } = await supabase
         .from('group_members')
         .select('eo_uid, is_signage')
         .eq('group_session_id', groupSessionId)
         .eq('status', 'approved');
-      if (!rcError && Array.isArray(rcMembers)) {
-        receiverCountAtSend = rcMembers.filter(
+      if (!rcError && Array.isArray(rcMembersData)) {
+        rcMembers = rcMembersData;
+        receiverCountAtSend = rcMembersData.filter(
           (m) => m.eo_uid !== eoUid && m.is_signage !== true,
         ).length;
       }
@@ -417,6 +419,32 @@ Deno.serve(async (req: Request) => {
         durationMs: Date.now() - startTime,
       });
       return errorResponse('DB_FAILED', requestId, 'DB書き込み失敗');
+    }
+
+    // ===== 受信者スナップショット（連絡のみ・EO-DEC-0124）=====
+    // context==='message' かつ rcMembers 取得成功時のみ保存する。
+    // handover は対象外。rcMembers の filter 条件は receiver_count 算出と同一。
+    if (metadata.context === 'message' && Array.isArray(rcMembers)) {
+      const receiverRows = rcMembers
+        .filter((m) => m.eo_uid !== eoUid && m.is_signage !== true)
+        .map((m) => ({
+          item_type: 'message',
+          item_id: insertedData.id,
+          group_session_id: groupSessionId,
+          receiver_eo_uid: m.eo_uid,
+        }));
+      if (receiverRows.length > 0) {
+        const { error: irError } = await supabase
+          .from('item_receivers')
+          .insert(receiverRows);
+        if (irError) {
+          // スナップショット保存失敗は投稿自体を失敗させない（本体は既に保存済み）。
+          // ログのみ残し、後追い調査対象とする。
+          console.error('item_receivers insert failed (image message):', {
+            eoUid, groupSessionId, messageId: insertedData.id, irError,
+          });
+        }
+      }
     }
 
     // ===== Step 9: 成功ログ =====
