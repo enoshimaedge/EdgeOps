@@ -1363,7 +1363,12 @@ async function init() {
       // 既存 restoreExistingMembershipIfAny()(第22回承認済み)を起動時にも呼ぶだけ。
       // 復帰できなければ従来どおり screen-start を表示。
       const restored = await restoreExistingMembershipIfAny();
-      if (restored) { hideLoading(); return; }
+      if (restored) {
+        hideLoading();
+        // [第127回 EO-DEC-0127] リロード時、直前の主要画面へ差し替え
+        restoreLastMajorScreen();
+        return;
+      }
       hideLoading(); showScreen('screen-start');
     }
   } catch (e) {
@@ -1375,7 +1380,12 @@ async function init() {
     try {
       if (currentUser?.eo_uid) {
         const restoredOnError = await restoreExistingMembershipIfAny();
-        if (restoredOnError) { hideLoading(); return; }
+        if (restoredOnError) {
+          hideLoading();
+          // [第127回 EO-DEC-0127] 最終ガード経路でも直前の主要画面へ差し替え
+          restoreLastMajorScreen();
+          return;
+        }
       }
     } catch (guardErr) {
       console.warn('[init] case-B guard failed (fallback to screen-start):', guardErr?.message);
@@ -1463,7 +1473,10 @@ async function restoreSession(memberId, groupId) {
       ]);
       isCreator = creatorResult;
       hideLoading();
-      showScreen('screen-home'); return;
+      showScreen('screen-home');
+      // [第127回 EO-DEC-0127] リロード時、直前の主要画面(引き継ぎ/プロフィール)へ差し替え
+      restoreLastMajorScreen();
+      return;
     }
   } catch (e) {
     // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
@@ -3613,6 +3626,26 @@ async function leaveGroup() {
 
 // URLかどうか判定してヘッダータイトルを返す
 function showScreen(id) {
+  // ═══════════════════════════════════════════
+  // [2026/7/17 第127回判定 EO-DEC-0127 案A・方式a] リロード時の主要画面復元
+  // ═══════════════════════════════════════════
+  // 直前に見ていた主要画面(連絡一覧/引き継ぎ/プロフィール)を sessionStorage に記録し、
+  // リロード後の起動シーケンス(home 着地後)で restoreLastMajorScreen() が差し替える。
+  //   ・記録対象:screen-home / screen-handover / screen-profile のみ。
+  //   ・詳細(screen-detail / screen-handover-detail)・承認・申請系・モーダルは記録しない
+  //     = 直近の主要画面IDが保持され、リロード後はその親(一覧等)に戻る。
+  //   ・screen-compose に入るときは lastMajorScreen を screen-home にリセットする
+  //     (第127回条件1:作成画面からのリロードは必ず連絡一覧に戻す)。
+  //     showScreen('screen-compose') は作成画面への唯一の入口なのでここで一括処理。
+  // 認証・DB・RPC・L3・signage には触れない純粋なUX処理。
+  try {
+    if (id === 'screen-home' || id === 'screen-handover' || id === 'screen-profile') {
+      sessionStorage.setItem('lastMajorScreen', id);
+    } else if (id === 'screen-compose') {
+      sessionStorage.setItem('lastMajorScreen', 'screen-home');
+    }
+  } catch (_) {}
+
   // ★ バグ② 修正: 現在の screen-home スクロール位置を保存（戻ったときに復元するため）
   const currentActive = document.querySelector('.screen.active');
   if (currentActive && currentActive.id === 'screen-home') {
@@ -3639,6 +3672,25 @@ function showScreen(id) {
   }
 }
 
+// ═══════════════════════════════════════════
+// [2026/7/17 第127回判定 EO-DEC-0127 案A・方式a] home 着地後の主要画面差し替え
+// ═══════════════════════════════════════════
+// 起動シーケンスが screen-home に着地した後に呼ぶ。sessionStorage の lastMajorScreen が
+// screen-handover / screen-profile なら、その画面へ差し替える(方式a:home着地→差し替え)。
+//   ・screen-profile は既存 showProfile() 経由(管理者表示・テンプレ編集等の制御のため・条件2)。
+//   ・screen-handover は showScreen() が loadHandoverNotes() を確実に呼ぶ(条件3)。
+//   ・記録なし / screen-home のときは何もしない(連絡一覧のまま)。
+function restoreLastMajorScreen() {
+  try {
+    const last = sessionStorage.getItem('lastMajorScreen');
+    if (last === 'screen-handover') {
+      showScreen('screen-handover');
+    } else if (last === 'screen-profile') {
+      showProfile();
+    }
+    // それ以外(screen-home / null)は home のまま
+  } catch (_) {}
+}
 let toastTimer = null;
 // ═══════════════════════════════════════════
 // グループまたぎ機能 (v1.3)
