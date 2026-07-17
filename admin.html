@@ -59,13 +59,26 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     --text-light: #9aa5b8;
   }
 
+  /* [2026/7/17] 下に引きずられる(iOS/Android ラバーバンド)対策:index.html/styles.css の実績
+     パターンに合わせる。body を position:fixed で固定し、スクロールは .content だけが担う。
+     admin.html 単体で完結・DB/認証には影響なし。 */
+  html {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior-y: contain;
+  }
   body {
     font-family: 'Yu Gothic', 'YuGothic', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
+    position: fixed;
+    top: 0; bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
     max-width: 430px;
-    margin: 0 auto;
+    overflow: hidden;
+    overscroll-behavior-y: contain;
   }
 
   /* ── ヘッダー ── */
@@ -92,7 +105,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   }
 
   /* ── 画面 ── */
-  .screen { display: none; flex-direction: column; min-height: 100vh; }
+  .screen { display: none; flex-direction: column; height: 100%; }
   .screen.active { display: flex; }
 
   /* ── ローディング ── */
@@ -155,7 +168,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   .tab-icon { font-size: 18px; display: block; margin-bottom: 2px; }
 
   /* ── コンテンツ ── */
-  .content { flex: 1; padding: 16px; overflow-y: auto; }
+  .content { flex: 1; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 
   /* ── タブパネル ── */
   .tab-panel { display: none; }
@@ -863,13 +876,14 @@ function renderMembers(members) {
   const activeMembers = members.filter(m => m.status === 'approved' || m.status === 'pending');
   const leftMembers = members.filter(m => m.status === 'left');
 
-  // 上段の並び順：is_creator が true → 最上部、それ以外は approved_at の古い順
+  // [2026/7/17 案2] 上段の並び順：is_creator が true → 最上部。
+  //   作成者グループ内・一般グループ内とも approved_at の新しい順（最新が上）。
   activeMembers.sort((a, b) => {
     if (a.is_creator && !b.is_creator) return -1;
     if (!a.is_creator && b.is_creator) return 1;
     const aTime = a.approved_at ? new Date(a.approved_at).getTime() : 0;
     const bTime = b.approved_at ? new Date(b.approved_at).getTime() : 0;
-    return aTime - bTime;
+    return bTime - aTime;   // 新しい順（降順）
   });
 
   // 下段の並び順：created_at の新しい順（最近退出した人が上）
