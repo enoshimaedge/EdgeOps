@@ -876,13 +876,15 @@ function renderMembers(members) {
   const activeMembers = members.filter(m => m.status === 'approved' || m.status === 'pending');
   const leftMembers = members.filter(m => m.status === 'left');
 
-  // [2026/7/17 案2] 上段の並び順：is_creator が true → 最上部。
-  //   作成者グループ内・一般グループ内とも approved_at の新しい順（最新が上）。
+  // [2026/7/17 案2・修正] 上段の並び順：is_creator が true → 最上部。
+  //   各グループ内は created_at の新しい順（最新が上）。
+  //   ※作成者は create_group_with_creator が approved_at をセットせず NULL のため、
+  //     approved_at 基準だと NULL が最古扱いになり並びが崩れる。全員に値がある created_at を使う。
   activeMembers.sort((a, b) => {
     if (a.is_creator && !b.is_creator) return -1;
     if (!a.is_creator && b.is_creator) return 1;
-    const aTime = a.approved_at ? new Date(a.approved_at).getTime() : 0;
-    const bTime = b.approved_at ? new Date(b.approved_at).getTime() : 0;
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
     return bTime - aTime;   // 新しい順（降順）
   });
 
