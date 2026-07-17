@@ -1266,6 +1266,12 @@ async function isImageUploadAllowedForContext(context) {
 // ═══════════════════════════════════════════
 async function init() {
   try {
+    // [第127回 EO-DEC-0127 修正] home 着地の showScreen('screen-home') が lastMajorScreen を
+    //   'screen-home' に上書きしてしまい、直後の restoreLastMajorScreen() が上書き後の値を読んで
+    //   復元できていなかった。起動の最初に「上書き前の値」を退避しておき、復元はこれを使う。
+    //   保持は localStorage(リロードをまたいで確実に残す)。
+    try { pendingRestoreScreen = localStorage.getItem('lastMajorScreen'); } catch (_) { pendingRestoreScreen = null; }
+
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // [Phase 4-2B] feature_flagsプリロード(fire-and-forget・起動阻害しない)
@@ -3629,7 +3635,7 @@ function showScreen(id) {
   // ═══════════════════════════════════════════
   // [2026/7/17 第127回判定 EO-DEC-0127 案A・方式a] リロード時の主要画面復元
   // ═══════════════════════════════════════════
-  // 直前に見ていた主要画面(連絡一覧/引き継ぎ/プロフィール)を sessionStorage に記録し、
+  // 直前に見ていた主要画面(連絡一覧/引き継ぎ/プロフィール)を localStorage に記録し、
   // リロード後の起動シーケンス(home 着地後)で restoreLastMajorScreen() が差し替える。
   //   ・記録対象:screen-home / screen-handover / screen-profile のみ。
   //   ・詳細(screen-detail / screen-handover-detail)・承認・申請系・モーダルは記録しない
@@ -3640,9 +3646,9 @@ function showScreen(id) {
   // 認証・DB・RPC・L3・signage には触れない純粋なUX処理。
   try {
     if (id === 'screen-home' || id === 'screen-handover' || id === 'screen-profile') {
-      sessionStorage.setItem('lastMajorScreen', id);
+      localStorage.setItem('lastMajorScreen', id);
     } else if (id === 'screen-compose') {
-      sessionStorage.setItem('lastMajorScreen', 'screen-home');
+      localStorage.setItem('lastMajorScreen', 'screen-home');
     }
   } catch (_) {}
 
@@ -3675,14 +3681,17 @@ function showScreen(id) {
 // ═══════════════════════════════════════════
 // [2026/7/17 第127回判定 EO-DEC-0127 案A・方式a] home 着地後の主要画面差し替え
 // ═══════════════════════════════════════════
-// 起動シーケンスが screen-home に着地した後に呼ぶ。sessionStorage の lastMajorScreen が
-// screen-handover / screen-profile なら、その画面へ差し替える(方式a:home着地→差し替え)。
+// 起動シーケンスが screen-home に着地した後に呼ぶ。init 開始時に退避した pendingRestoreScreen
+// (= home 着地の showScreen 上書き前の値)が screen-handover / screen-profile なら差し替える。
 //   ・screen-profile は既存 showProfile() 経由(管理者表示・テンプレ編集等の制御のため・条件2)。
 //   ・screen-handover は showScreen() が loadHandoverNotes() を確実に呼ぶ(条件3)。
 //   ・記録なし / screen-home のときは何もしない(連絡一覧のまま)。
+//   ・一度差し替えたら pendingRestoreScreen はクリア(復元は起動時の一回だけ)。
+let pendingRestoreScreen = null;
 function restoreLastMajorScreen() {
   try {
-    const last = sessionStorage.getItem('lastMajorScreen');
+    const last = pendingRestoreScreen;
+    pendingRestoreScreen = null; // 復元は起動時の一回のみ
     if (last === 'screen-handover') {
       showScreen('screen-handover');
     } else if (last === 'screen-profile') {
