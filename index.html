@@ -1199,6 +1199,7 @@ console.log('[EdgeOps] Environment:', CURRENT_ENV, '| hostname:', window.locatio
 // ═══════════════════════════════════════════
 let currentUser = null;
 let currentGroup = null;
+let profileFormGroupId = null; // プロフィール編集フォームが表示しているグループの id
 let currentMemberId = null;
 let isCreator = false;
 let messages = [];
@@ -1433,6 +1434,7 @@ async function restoreSession(memberId, groupId) {
           const next = remainingMemberships[0];
           currentMemberId = next.id;
           currentGroup = next.group_sessions;
+          syncProfileForm();
           localStorage.setItem('sl_member_id', next.id);
           localStorage.setItem('sl_group_id', next.group_sessions.group_id);
           const [creatorResult] = await Promise.all([
@@ -1462,6 +1464,7 @@ async function restoreSession(memberId, groupId) {
     if (member.status === 'approved') {
       currentMemberId = member.id; currentUser.display_name = member.display_name;
       currentGroup = member.group_sessions;
+      syncProfileForm();
       // ST版(SL-)の期限切れチェック
       if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
         if (new Date(currentGroup.expires_at) <= new Date()) {
@@ -1549,6 +1552,7 @@ async function restoreExistingMembershipIfAny() {
     localStorage.setItem('sl_group_id', m.group_sessions.group_id);
     currentMemberId = m.id;
     currentGroup = m.group_sessions;
+    syncProfileForm();
     currentUser.display_name = m.display_name;
     isCreator = await resolveIsCreator(m.group_session_id, m.id);
     await loadHome();
@@ -3219,6 +3223,11 @@ async function updateGroupName() {
   const newName = document.getElementById('profile-group-name').value.trim();
   if (!newName) { showToast('グループ名を入力してください'); return; }
   if (newName.length > 30) { showToast('グループ名は30文字以内にしてください'); return; }
+  if (profileFormGroupId && currentGroup?.id && profileFormGroupId !== currentGroup.id) {
+    showToast('グループ情報が切り替わりました。画面を更新してからもう一度お試しください。');
+    syncProfileForm(); // 現在グループの値へ再同期
+    return;
+  }
   try {
     const { error } = await supabase.from('group_sessions')
       .update({ group_name: newName }).eq('id', currentGroup.id);
@@ -3235,6 +3244,11 @@ async function updateIndustry() {
   if (!isCreator) { showToast('管理者のみ変更できます'); return; }
   const newIndustry = document.getElementById('profile-industry').value;
   if (!newIndustry) { showToast('業種を選択してください'); return; }
+  if (profileFormGroupId && currentGroup?.id && profileFormGroupId !== currentGroup.id) {
+    showToast('グループ情報が切り替わりました。画面を更新してからもう一度お試しください。');
+    syncProfileForm(); // 現在グループの値へ再同期
+    return;
+  }
   try {
     const { error } = await supabase.from('group_sessions')
       .update({ industry: newIndustry }).eq('id', currentGroup.id);
@@ -3281,6 +3295,11 @@ async function updateLinkUrl() {
     showToast('URLは2048文字以内にしてください');
     return;
   }
+  if (profileFormGroupId && currentGroup?.id && profileFormGroupId !== currentGroup.id) {
+    showToast('グループ情報が切り替わりました。画面を更新してからもう一度お試しください。');
+    syncProfileForm(); // 現在グループの値へ再同期
+    return;
+  }
   try {
     const { error } = await supabase.from('group_sessions')
       .update({ link_url: raw }).eq('id', currentGroup.id);
@@ -3311,6 +3330,11 @@ async function removeLinkUrl() {
     return;
   }
   if (!confirm('カスタムLINKを削除しますか?\n削除するとメンバー全員のLINKボタンが非表示になります。')) return;
+  if (profileFormGroupId && currentGroup?.id && profileFormGroupId !== currentGroup.id) {
+    showToast('グループ情報が切り替わりました。画面を更新してからもう一度お試しください。');
+    syncProfileForm(); // 現在グループの値へ再同期
+    return;
+  }
   try {
     const { error } = await supabase.from('group_sessions')
       .update({ link_url: null }).eq('id', currentGroup.id);
@@ -3378,6 +3402,19 @@ async function updateDisplayName() {
   } catch (e) { showToast('更新に失敗しました。'); }
 }
 
+// プロフィール編集フォーム(3項目)を currentGroup の値へ再同期する。
+// 対象: グループ名 / 業種 / LINK URL のみ。表示名は対象外(切替追従済みのため)。
+function syncProfileForm() {
+  const gnEl = document.getElementById('profile-group-name');
+  if (gnEl) gnEl.value = currentGroup?.group_name || '';
+  const indEl = document.getElementById('profile-industry');
+  if (indEl) indEl.value = currentGroup?.industry || '';
+  const linkEl = document.getElementById('profile-link-url');
+  if (linkEl) linkEl.value = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url : '';
+  // 案B用: このフォームがどのグループを表示しているかを記録
+  profileFormGroupId = currentGroup?.id || null;
+}
+
 function showProfile() {
   document.getElementById('profile-name').textContent = currentUser.display_name || '---';
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
@@ -3397,15 +3434,7 @@ function showProfile() {
   if (adminSection) {
     adminSection.style.display = isCreator ? 'block' : 'none';
   }
-  // グループ名を入力欄にセット（管理者のみ）
-  const gnEl = document.getElementById('profile-group-name');
-  if (gnEl) gnEl.value = currentGroup?.group_name || '';
-  // 業種をセレクトにセット（管理者のみ）
-  const indEl = document.getElementById('profile-industry');
-  if (indEl) indEl.value = currentGroup?.industry || '';
-  // [UI改善② LINKボタン] カスタムLINK URLを入力欄にセット(管理者のみ)
-  const linkEl = document.getElementById('profile-link-url');
-  if (linkEl) linkEl.value = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url : '';
+  syncProfileForm();
   // LINEプロフィール画像を表示
   const avatarEl = document.getElementById('profile-avatar');
   if (avatarEl) {
@@ -3800,6 +3829,8 @@ async function switchGroup(newGroupSessionId, newMemberId) {
     display_name: newMember.display_name
   };
   isCreator = newMember.is_creator || false;
+
+  syncProfileForm();
 
   closeBottomSheet();
 
