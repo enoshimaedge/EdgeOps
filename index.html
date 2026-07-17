@@ -1271,6 +1271,8 @@ async function init() {
     //   復元できていなかった。起動の最初に「上書き前の値」を退避しておき、復元はこれを使う。
     //   保持は localStorage(リロードをまたいで確実に残す)。
     try { pendingRestoreScreen = localStorage.getItem('lastMajorScreen'); } catch (_) { pendingRestoreScreen = null; }
+    // [第127回追加] home の連絡/引き継ぎ/すべてタブ(homeFilter)も復元する。上書き前に退避。
+    try { pendingRestoreFilter = localStorage.getItem('lastHomeFilter'); } catch (_) { pendingRestoreFilter = null; }
 
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -2200,6 +2202,8 @@ async function loadMoreMessages() {
 
 async function setHomeFilter(f) {
   homeFilter = f;
+  // [第127回追加] タブ状態(連絡/引き継ぎ/すべて)を記録し、リロード後に復元する。
+  try { localStorage.setItem('lastHomeFilter', f); } catch (_) {}
   ['msg','handover','all'].forEach(k => {
     const el = document.getElementById('filter-chip-' + k);
     if (el) el.classList.toggle('active', k === f);
@@ -3649,6 +3653,9 @@ function showScreen(id) {
       localStorage.setItem('lastMajorScreen', id);
     } else if (id === 'screen-compose') {
       localStorage.setItem('lastMajorScreen', 'screen-home');
+      // [第127回追加・要件②] 作成画面に入ったらタブは連絡(msg)にリセット。
+      //   リロードで作成画面には戻さず、連絡タブの一覧に戻す。
+      localStorage.setItem('lastHomeFilter', 'msg');
     }
   } catch (_) {}
 
@@ -3688,16 +3695,25 @@ function showScreen(id) {
 //   ・記録なし / screen-home のときは何もしない(連絡一覧のまま)。
 //   ・一度差し替えたら pendingRestoreScreen はクリア(復元は起動時の一回だけ)。
 let pendingRestoreScreen = null;
+let pendingRestoreFilter = null;
 function restoreLastMajorScreen() {
   try {
     const last = pendingRestoreScreen;
+    const lastFilter = pendingRestoreFilter;
     pendingRestoreScreen = null; // 復元は起動時の一回のみ
+    pendingRestoreFilter = null;
     if (last === 'screen-handover') {
       showScreen('screen-handover');
+      return;
     } else if (last === 'screen-profile') {
       showProfile();
+      return;
     }
-    // それ以外(screen-home / null)は home のまま
+    // home に留まる場合:タブ状態(連絡/引き継ぎ/すべて)を復元する。
+    //   'msg' は既定なので明示復元不要。'handover'/'all' のときだけ切り替える。
+    if (lastFilter === 'handover' || lastFilter === 'all') {
+      setHomeFilter(lastFilter);
+    }
   } catch (_) {}
 }
 let toastTimer = null;
