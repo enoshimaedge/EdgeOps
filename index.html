@@ -206,6 +206,7 @@
             <option value="attraction">集客施設</option>
             <option value="freelance">フリーランス集団</option>
             <option value="club">部活・クラブ</option>
+            <option value="event">イベント・催事</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
@@ -682,6 +683,9 @@
       <div class="group-id-label" data-i18n="label_your_group_id">あなたのグループID</div>
       <div class="group-id-value" id="profile-group-id">---</div>
       <button class="copy-btn" onclick="copyGroupId()" data-i18n="btn_copy">コピー</button>
+      <div style="margin-top:10px; font-size:12px; color:rgba(255,255,255,0.7);">
+        <span data-i18n="label_industry_prefix">業種：</span><span style="color:rgba(255,255,255,0.95); font-weight:600;" id="profile-industry">---</span>
+      </div>
       <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
         <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-expires">有効期限：取得中...</div>
         <div style="font-size:12px; color:rgba(255,255,255,0.7);" id="profile-members">参加中：取得中...</div>
@@ -697,19 +701,6 @@
           <input class="form-input" id="profile-group-name" type="text" placeholder="例：フロントスタッフ" maxlength="30">
         </div>
         <button class="btn btn-secondary" onclick="updateGroupName()" style="margin-bottom:12px;" data-i18n="btn_update_group_name">グループ名を更新</button>
-        <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label" data-i18n="form_change_industry">業種を変更</label>
-          <select class="form-input" id="profile-industry">
-            <option value="">-- 選択してください --</option>
-            <option value="hotel">ホテル・旅館</option>
-            <option value="clinic">病院・クリニック</option>
-            <option value="care">介護施設</option>
-            <option value="attraction">集客施設</option>
-            <option value="freelance">フリーランス集団</option>
-            <option value="club">部活・クラブ</option>
-          </select>
-        </div>
-        <button class="btn btn-secondary" onclick="updateIndustry()" style="margin-bottom:12px;" data-i18n="btn_update_industry">業種を更新</button>
         <!-- 月次レポートボタン -->
         <button class="btn btn-secondary" onclick="showMonthlyReport()" style="margin-top:4px; background:#f0f8ff; border-color:#4a90d9; color:#1a5fa8;">
            <span data-i18n="btn_monthly_report">月次レポートを見る</span>
@@ -2502,6 +2493,14 @@ const TEMPLATES = {
     '部費・遠征費のお知らせ。〇〇日までに〇〇円を集金します。期日までにご準備ください。',
     '持ち物・準備のお願い。〇〇日は〇〇が必要です。お子様の準備をご確認ください。',
   ],
+  event: [
+    '本日の開催時間をお知らせします。開場〇〇時、開演〇〇時、終了〇〇時です。担当者は配置時刻をご確認ください。',
+    '〇〇ブースの設営が完了しました。担当スタッフは最終確認をお願いします。',
+    '来場者数が〇〇名を超えました。〇〇エリアが混雑しています。誘導担当は対応をお願いします。',
+    '本日のタイムテーブルに変更があります。〇〇時からの〇〇は〇〇時へ変更となりました。関係者へ共有をお願いします。',
+    '落とし物・忘れ物の情報を共有します。〇〇エリアで〇〇が届いています。本部までご案内ください。',
+    '撤収作業を〇〇時より開始します。担当者は〇〇へお集まりください。',
+  ],
 };
 
 // ═══════════════════════════════════════════
@@ -3239,8 +3238,32 @@ async function updateGroupName() {
   } catch (e) { console.error(e); showToast('更新に失敗しました。'); }
 }
 
+// ── 業種の表示名を返す（value → 表示名） ──
+// [2026/7/21] プロフィール画面（GID枠）の業種表示用に新設
+//   第132回指摘「表示文言と内部値を混ぜず統一」に従い、対応をこの1箇所に集約する
+function getIndustryLabel(value) {
+  const labels = {
+    hotel: 'ホテル・旅館',
+    clinic: '病院・クリニック',
+    care: '介護施設',
+    attraction: '集客施設',
+    freelance: 'フリーランス集団',
+    club: '部活・クラブ',
+    event: 'イベント・催事'
+  };
+  return labels[value] || value || '';
+}
+
 // ── 業種変更（管理者のみ） ──
+// [2026/7/21] 業種はグループ作成時に確定し、後から変更不可とした（開発順序 第2項・第132回GO）
+//   UI側の変更導線も削除済み。本関数は呼び出し元が存在しないが、
+//   累積温存原則により関数本体は残置する。将来、施設管理者による変更を
+//   Plus版 manager.html で実装する場合はそちらで新規実装すること。
 async function updateIndustry() {
+  console.warn('updateIndustry(): disabled - 業種はグループ作成時に確定し変更不可（2026/7/21）');
+  showToast('業種はグループ作成時に決まり、後から変更できません');
+  return;
+  // ↓ 以下、旧処理（呼び出されない・変更禁止）
   if (!isCreator) { showToast('管理者のみ変更できます'); return; }
   const newIndustry = document.getElementById('profile-industry').value;
   if (!newIndustry) { showToast('業種を選択してください'); return; }
@@ -3408,7 +3431,7 @@ function syncProfileForm() {
   const gnEl = document.getElementById('profile-group-name');
   if (gnEl) gnEl.value = currentGroup?.group_name || '';
   const indEl = document.getElementById('profile-industry');
-  if (indEl) indEl.value = currentGroup?.industry || '';
+  if (indEl) indEl.textContent = getIndustryLabel(currentGroup?.industry);
   const linkEl = document.getElementById('profile-link-url');
   if (linkEl) linkEl.value = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url : '';
   // 案B用: このフォームがどのグループを表示しているかを記録
