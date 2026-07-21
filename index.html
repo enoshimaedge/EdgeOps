@@ -2616,7 +2616,18 @@ async function sendMessage() {
       await loadMessages();
       showScreen('screen-home');
       showToast('引き継ぎを投稿しました！');
-    } catch (e) { console.error(e); showToast('投稿に失敗: ' + (e.message || JSON.stringify(e))); }
+    } catch (e) {
+      console.error(e);
+      const __msg = (e.message || JSON.stringify(e) || '');
+      // [2026/7/21] NOT_AUTHORIZED は主にサイネージ端末からの引き継ぎ投稿で発生する（第136回・現状維持）
+      //   RPC create_handover_with_receivers が is_signage=true を拒否するため。
+      //   利用者に NOT_AUTHORIZED をそのまま見せず、原因が伝わる文言にする。
+      if (__msg.includes('NOT_AUTHORIZED')) {
+        showToast(t('toast_handover_not_authorized'));
+      } else {
+        showToast('投稿に失敗: ' + __msg);
+      }
+    }
     finally { __loading.stop(); }
     return;
   }
