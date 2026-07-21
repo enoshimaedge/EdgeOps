@@ -126,6 +126,7 @@ window.EdgeOpsI18n = {
     toast_cancelled:            'キャンセルしました',
     toast_delete_done:          '削除しました',
     toast_load_failed:          '読み込みに失敗しました',
+    toast_handover_not_authorized: 'サイネージ端末から引き継ぎノートは投稿できません',
     // ── 第2弾：主要5画面の残り文言（2026/07/15） ──
     month_card_label:           '{label}（{n}件）',
     stat_read:                  '既読',
@@ -304,6 +305,7 @@ window.EdgeOpsI18n = {
     toast_cancelled:            'Cancelled',
     toast_delete_done:          'Deleted',
     toast_load_failed:          'Failed to load',
+    toast_handover_not_authorized: 'Signage terminals cannot post handover notes',
     // ── 第2弾：主要5画面の残り文言（2026/07/15） ──
     month_card_label:           '{label} ({n})',
     stat_read:                  'Read',
