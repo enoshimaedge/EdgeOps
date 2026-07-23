@@ -59,6 +59,18 @@ window.EdgeOpsI18n = {
     // ── メッセージ詳細画面 ───────────────────────────────────────
     btn_delete_message:         'このメッセージを削除する',
 
+    // ── 引用して全員に返信（仕様書 v1.7 第29章 / 2026-07-23 Issue⑥）──
+    btn_reply_all:              '全員に返信',
+    label_reply_badge:          '返信',
+    label_reply_count:          '返信{n}件',
+    label_original_post:        '元の連絡',
+    label_unread_reply:         '未読返信あり',
+    label_deleted_post:         'この投稿は削除されました',
+    label_original_unavailable: '元の連絡を確認できません',
+    toast_reply_sent:           '返信しました',
+    heading_reply_compose:      '全員に返信',
+    btn_cancel:                 'キャンセル',
+
     // ── 引き継ぎノート画面 ───────────────────────────────────────
     header_sub_handover:        '引き継ぎノート',
     btn_handover_takeover:      '引き継ぎました',
@@ -237,6 +249,18 @@ window.EdgeOpsI18n = {
 
     // ── メッセージ詳細画面 ───────────────────────────────────────
     btn_delete_message:         'Delete',
+
+    // ── 引用して全員に返信（仕様書 v1.7 第29章 / 2026-07-23 Issue⑥）──
+    btn_reply_all:              'Reply to All',
+    label_reply_badge:          'Reply',
+    label_reply_count:          '{n} replies',
+    label_original_post:        'Original',
+    label_unread_reply:         'New replies',
+    label_deleted_post:         'This post was deleted',
+    label_original_unavailable: 'Original post unavailable',
+    toast_reply_sent:           'Reply posted',
+    heading_reply_compose:      'Reply to All',
+    btn_cancel:                 'Cancel',
 
     // ── 引き継ぎノート画面 ───────────────────────────────────────
     header_sub_handover:        'Handover Notes',
