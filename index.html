@@ -591,9 +591,46 @@
       <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);" id="detail-unread-heading">未読</div>
       <div id="detail-unread-list"></div>
     </div>
+    <!-- [2026/7/23 Issue③ 仕様書 第12章] 投稿グループの返信を古い順に表示 -->
+    <div id="detail-thread-wrap" style="display:none; margin-top:12px;">
+      <div class="card">
+        <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);" id="detail-thread-heading">返信</div>
+        <div id="detail-thread-list"></div>
+      </div>
+    </div>
+    <!-- [2026/7/23 Issue③ 仕様書 第12章] 全員に返信ボタン(条件を満たす場合のみ) -->
+    <div id="detail-reply-wrap" style="display:none; margin-top:12px;">
+      <button class="btn btn-primary" onclick="openReplyCompose()" data-i18n="btn_reply_all">全員に返信</button>
+    </div>
     <div id="detail-delete-wrap" style="display:none; margin-top:12px;">
       <button class="delete-msg-btn" onclick="deleteMessage()" data-i18n="btn_delete_message">このメッセージを削除する</button>
     </div>
+  </div>
+</div>
+
+<!-- ══ 画面⑤-2：返信作成（引用して全員に返信・仕様書 第13章） ══ -->
+<!-- [2026/7/23 Issue② EO-DEC-0141] 優先度・アンケート・引き継ぎ・画像添付のUIは設けない。 -->
+<div class="screen" id="screen-reply">
+  <div class="header">
+    <div class="back-btn" onclick="cancelReply()">‹</div>
+    <div><div class="header-title" data-i18n="heading_reply_compose">全員に返信</div></div>
+  </div>
+  <div class="content">
+    <!-- 引用表示部：元投稿者・元投稿日時・元投稿本文。画像は複製せず参照表示 -->
+    <div class="card" style="padding:14px 16px; margin-bottom:16px; background:#f8f9fb; border-left:3px solid var(--border);">
+      <div style="font-size:11px; font-weight:700; color:var(--text-light); letter-spacing:0.5px; margin-bottom:6px;" id="reply-quote-label">元の連絡</div>
+      <div style="font-size:12px; color:var(--text-light); margin-bottom:8px;" id="reply-quote-meta"></div>
+      <div style="font-size:14px; line-height:1.7; word-break:break-all; color:var(--text-mid);" id="reply-quote-body"></div>
+      <div id="reply-quote-image-wrap" style="display:none; margin-top:10px;">
+        <img id="reply-quote-image-thumb" alt="" style="max-width:100%; max-height:180px; border-radius:8px; background:#e4e8f0; object-fit:contain; display:block; image-orientation:from-image;">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="label_compose_body">メッセージ内容</label>
+      <textarea class="form-textarea" id="reply-body" style="font-size:16px;" placeholder="返信内容を入力してください..."></textarea>
+    </div>
+    <button class="btn btn-primary" id="reply-send-btn" onclick="sendReply()" data-i18n="btn_reply_all">全員に返信</button>
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="cancelReply()" data-i18n="btn_cancel">キャンセル</button>
   </div>
 </div>
 
@@ -861,7 +898,7 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=20260721-2"></script>   <!-- ← 追加。必ず最初 -->
+<script src="js/i18n.js?v=20260723-1"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260704-2"></script>
 <script src="js/image.js"></script>
 <script src="js/templates.js?v=20260704-3"></script>
@@ -3031,6 +3068,11 @@ async function showDetail(messageId) {
   }
   // ── アンケート回答UI制御 ──
   await applySurveyDetailUI(msg);
+  // ── [2026/7/23 Issue③] 投稿グループの返信表示と返信ボタン（仕様書 第12章） ──
+  // 既読集計・realReadMap・receiver_count には一切触れていない（第118回 条件12）。
+  window.__currentDetailMessageObj = msg;
+  applyReplyButtonVisibility(msg);
+  await renderDetailThread(msg);
   showScreen('screen-detail');
 }
 
@@ -3423,6 +3465,151 @@ async function deleteMessage() {
     showScreen('screen-home');
     showToast(t('toast_delete_done'));
   } catch (e) { console.error(e); showToast('削除に失敗しました。'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 引用して全員に返信（仕様書 v1.7 第12章・第13章 / Issue②③ 2026/7/23）
+// ─────────────────────────────────────────────────────────────
+// ・多段階の禁止：返信への返信も、最終rootは元投稿に集約される（第7章）。
+//   root の確定は RPC 側で行う。フロントは開いている投稿のIDを渡すだけ。
+// ・既読集計ロジック・realReadMap・read_receipts・receiver_count には触れない（第118回 条件12）。
+// ・DBアクセスは index.html メインscriptに集約する（分割定義仕様書 v1.1 第3章）。
+// ═══════════════════════════════════════════════════════════════
+
+// 現在詳細画面で開いている投稿グループの root ID（返信作成画面へ渡す）
+let currentThreadRootId = null;
+// 返信作成画面で引用している元投稿（キャンセル時の戻り先判定にも使う）
+let currentReplyTarget = null;
+
+// 指定投稿が属する投稿グループの返信を古い順に取得して描画する。
+// messages 配列には返信が含まれないため（一覧の集約は Issue④ で対応）、DBから直接取得する。
+async function renderDetailThread(msg) {
+  const wrap = document.getElementById('detail-thread-wrap');
+  const listEl = document.getElementById('detail-thread-list');
+  if (!wrap || !listEl) return;
+  // 開いた投稿が返信なら、その root が投稿グループの起点。元投稿なら自分自身が起点。
+  const rootId = msg.root_post_id || msg.id;
+  currentThreadRootId = rootId;
+  try {
+    const { data: replies, error } = await supabase.from('messages')
+      .select('*')
+      .eq('group_session_id', currentGroup.id)
+      .eq('root_post_id', rootId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    const list = replies || [];
+    if (list.length === 0) { wrap.style.display = 'none'; listEl.innerHTML = ''; return; }
+    document.getElementById('detail-thread-heading').textContent = t('label_reply_count', { n: list.length });
+    listEl.innerHTML = list.map(r => {
+      // 論理削除された返信は本文を出さずプレースホルダーを表示（第27-4章）
+      if (r.is_deleted) {
+        return `<div class="person-row" style="display:block; padding:12px 16px;">
+          <div style="font-size:13px; color:var(--text-light); font-style:italic;">${escHtml(t('label_deleted_post'))}</div>
+        </div>`;
+      }
+      return `<div class="person-row" style="display:block; padding:12px 16px;">
+        <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(getMemberName(r.sender_eo_uid))}　${escHtml(formatTime(r.created_at))}</div>
+        <div style="font-size:14px; line-height:1.7; word-break:break-all;">${linkify(r.body)}</div>
+      </div>`;
+    }).join('');
+    wrap.style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    wrap.style.display = 'none';
+    listEl.innerHTML = '';
+  }
+}
+
+// 返信ボタンの表示条件（第12章）
+// messages の投稿であり、is_survey でなく、is_deleted でなく、閲覧者が承認済みメンバーであること。
+// 共用操作端末（is_signage=true）にも表示する。引き継ぎ投稿は screen-detail を使わないため対象外。
+function applyReplyButtonVisibility(msg) {
+  const wrap = document.getElementById('detail-reply-wrap');
+  if (!wrap) return;
+  const isSurvey = !!msg.is_survey;
+  const isDeleted = !!msg.is_deleted;
+  const isApprovedMember = !!(currentUser && currentUser.eo_uid && members.some(m => m.eo_uid === currentUser.eo_uid));
+  wrap.style.display = (!isSurvey && !isDeleted && isApprovedMember) ? 'block' : 'none';
+}
+
+// 返信作成画面を開く（第13章）
+function openReplyCompose() {
+  const msg = messages.find(m => m.id === currentDetailMessageId)
+           || (window.__currentDetailMessageObj && window.__currentDetailMessageObj.id === currentDetailMessageId
+               ? window.__currentDetailMessageObj : null);
+  if (!msg) { showToast('元の連絡が見つかりません'); return; }
+  currentReplyTarget = msg;
+  // 引用表示部：元投稿者・元投稿日時・本文
+  document.getElementById('reply-quote-label').textContent = t('label_original_post');
+  document.getElementById('reply-quote-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
+  document.getElementById('reply-quote-body').innerHTML = linkify(msg.body);
+  // 画像は複製せず、元投稿の thumbnail_url / image_url を参照表示する
+  const imgWrap = document.getElementById('reply-quote-image-wrap');
+  const imgEl = document.getElementById('reply-quote-image-thumb');
+  const src = msg.thumbnail_url || msg.image_url;
+  if (src && imgWrap && imgEl) {
+    imgEl.src = src;
+    imgWrap.style.display = 'block';
+  } else if (imgWrap) {
+    imgWrap.style.display = 'none';
+    if (imgEl) imgEl.removeAttribute('src');
+  }
+  document.getElementById('reply-body').value = '';
+  showScreen('screen-reply');
+}
+
+// 入力を破棄して詳細画面へ戻る（第13章）
+function cancelReply() {
+  const body = document.getElementById('reply-body');
+  if (body && body.value.trim() && !confirm('入力内容を破棄しますか?')) return;
+  if (body) body.value = '';
+  currentReplyTarget = null;
+  showScreen('screen-detail');
+}
+
+// 返信を登録する（第24章・第30章）
+async function sendReply() {
+  await assertLiffEnvironment();
+  const u = await ensureCurrentUser();
+  if (!u) { showToast('認証エラーです。アプリを再起動してください。'); return; }
+  const target = currentReplyTarget;
+  if (!target) { showToast('元の連絡が見つかりません'); return; }
+  const bodyEl = document.getElementById('reply-body');
+  const body = bodyEl.value.trim();
+  if (!body) { showToast('内容を入力してください'); return; }
+  const btn = document.getElementById('reply-send-btn');
+  if (btn) btn.disabled = true;
+  const __loading = startDelayedLoading('送信中…', '通信状況により数秒かかる場合があります');
+  try {
+    showToast('送信中...');
+    // root の確定は RPC 内で行う（多段階の禁止・第7章）。ここでは開いている投稿のIDを渡す。
+    const { error } = await supabase.rpc('create_reply_with_receivers', {
+      p_group_session_id: currentGroup.id,
+      p_body: body,
+      p_root_post_id: target.id
+    });
+    if (error) throw error;
+    bodyEl.value = '';
+    currentReplyTarget = null;
+    await loadMessages();
+    showScreen('screen-home');
+    showToast(t('toast_reply_sent'));
+  } catch (e) {
+    console.error(e);
+    // 内部のエラーコードを利用者にそのまま見せない（第30章）。入力内容は保持する。
+    const raw = (e && (e.message || e.details)) ? `${e.message || ''} ${e.details || ''}` : JSON.stringify(e || {});
+    let msgText;
+    if (raw.includes('ROOT_NOT_FOUND')) msgText = '元の連絡が見つかりません';
+    else if (raw.includes('SURVEY_NOT_REPLIABLE')) msgText = 'アンケートには返信できません';
+    else if (raw.includes('DELETED_NOT_REPLIABLE')) msgText = '削除された投稿には返信できません';
+    else if (raw.includes('NOT_AUTHORIZED')) msgText = '返信の投稿権限がありません';
+    else if (raw.includes('GROUP_MISMATCH') || raw.includes('INVALID_ROOT')) msgText = 'この投稿には返信できません';
+    else msgText = '送信に失敗しました';
+    showToast(msgText);
+  } finally {
+    __loading.stop();
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function updateDisplayName() {
