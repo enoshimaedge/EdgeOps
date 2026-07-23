@@ -898,7 +898,7 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=20260723-1"></script>   <!-- ← 追加。必ず最初 -->
+<script src="js/i18n.js?v=20260723-3"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260704-2"></script>
 <script src="js/image.js"></script>
 <script src="js/templates.js?v=20260704-3"></script>
@@ -2356,7 +2356,9 @@ function eoReadHtmlOf(msg) {
     : `<span class="eo-msg__read">${t('read_count', { read: readCount, total: receiverCount })}</span>`;
 }
 
-// 投稿グループ1件分のHTML（EO-DEC-0148 規則2・3）
+// 投稿グループ1件分のHTML（EO-DEC-0148 規則2・3 / 2026-07-23 野口指示で並び順を新しい順へ変更）
+//   並び：最新返信（上） → 折りたたみ行 → 元投稿（折りたたみ・タップで開く）
+//   返信の行はタイトルだけで文脈が分かるよう「【引用返信】元投稿の冒頭」を表示する。
 function renderPostGroupHtml(group, KIND, CLS) {
   const root = group.root;
   const latest = group.latest;
@@ -2365,35 +2367,16 @@ function renderPostGroupHtml(group, KIND, CLS) {
   const rootKindCls = CLS[rp] || 'notice';
   const lp = latest.priority || 'info';
   const latestKindJa = KIND[lp] || t('priority_notice');
+  const rootTitle = getMessageTitle(root.body, 40);
 
-  // 元投稿の行（クリックで元投稿の詳細へ）
-  const rootImageLabel = (root.image_url || root.thumbnail_url)
-    ? `<span class="eo-msg__label">${t('label_image')}</span>` : '';
-  const rootRow = `
-    <div class="eo-msg eo-msg--${rootKindCls}" onclick="showDetail('${root.id}')" aria-label="重要度：${rootKindJa}">
-      <div class="eo-msg__text">${getMessageTitle(root.body, 40)}</div>
-      <div class="eo-msg__meta">
-        <span class="eo-msg__kind">${rootKindJa}</span>
-        <span class="eo-msg__sep">·</span>
-        <span class="eo-msg__who">${getMemberName(root.sender_eo_uid)}</span>
-        <span class="eo-msg__sep">·</span>
-        <span class="eo-msg__time">${formatTime(root.created_at)}</span>
-        ${rootImageLabel}
-        ${eoReadHtmlOf(root)}
-      </div>
-    </div>`;
-
-  // 折りたたみ行（規則3・4：返信が1件だけなら出さない）
-  const collapsedRow = group.hiddenCount > 0
-    ? `<div class="eo-msg__collapsed" style="padding:8px 16px 8px 32px; font-size:12px; color:var(--text-light); border-top:1px solid var(--border);">
-         ${t('label_reply_count', { n: group.hiddenCount })}
-       </div>`
-    : '';
-
-  // 最新返信の行（クリックで返信の詳細へ）。左に階層が分かるインデントを付ける。
+  // ① 最新返信（上）。タイトルに元投稿の冒頭を出して文脈を持たせる。
   const latestRow = `
-    <div class="eo-msg eo-msg--notice" onclick="showDetail('${latest.id}')" style="padding-left:32px;" aria-label="重要度：${latestKindJa}">
-      <div class="eo-msg__text">${getMessageTitle(latest.body, 40)}</div>
+    <div class="eo-msg eo-msg--notice" onclick="showDetail('${latest.id}')" aria-label="重要度：${latestKindJa}">
+      <div class="eo-msg__text">
+        <span style="color:var(--eo-accent); font-weight:700;">${t('label_reply_prefix')}</span>
+        <span style="color:var(--text-mid);">${rootTitle}</span>
+      </div>
+      <div class="eo-msg__text" style="margin-top:2px;">${getMessageTitle(latest.body, 40)}</div>
       <div class="eo-msg__meta">
         <span class="eo-msg__kind">${t('label_reply_badge')}</span>
         <span class="eo-msg__sep">·</span>
@@ -2404,7 +2387,57 @@ function renderPostGroupHtml(group, KIND, CLS) {
       </div>
     </div>`;
 
-  return rootRow + collapsedRow + latestRow;
+  // ② 折りたたみ行（返信が1件だけなら出さない）
+  const collapsedRow = group.hiddenCount > 0
+    ? `<div style="padding:8px 16px 8px 32px; font-size:12px; color:var(--text-light); border-top:1px solid var(--border);">
+         ${t('label_reply_count', { n: group.hiddenCount })}
+       </div>`
+    : '';
+
+  // ③ 元投稿（折りたたみ）。既定は閉じ、ヘッダのタップで開く。
+  const rootImageLabel = (root.image_url || root.thumbnail_url)
+    ? `<span class="eo-msg__label">${t('label_image')}</span>` : '';
+  const bodyId = `eo-root-${root.id}`;
+  const rootRow = `
+    <div style="border-top:1px solid var(--border);">
+      <div onclick="toggleRootPost('${bodyId}')"
+           style="display:flex; align-items:center; gap:6px; padding:8px 16px; cursor:pointer;">
+        <span id="${bodyId}-arrow" style="font-size:10px; color:var(--text-light);">▶</span>
+        <span style="font-size:12px; font-weight:700; color:var(--text-mid);">${t('label_original_post')}</span>
+        <span style="font-size:12px; color:var(--text-light); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${rootTitle}</span>
+      </div>
+      <div id="${bodyId}" style="display:none;">
+        <div class="eo-msg eo-msg--${rootKindCls}" onclick="showDetail('${root.id}')" aria-label="重要度：${rootKindJa}">
+          <div class="eo-msg__text">${rootTitle}</div>
+          <div class="eo-msg__meta">
+            <span class="eo-msg__kind">${rootKindJa}</span>
+            <span class="eo-msg__sep">·</span>
+            <span class="eo-msg__who">${getMemberName(root.sender_eo_uid)}</span>
+            <span class="eo-msg__sep">·</span>
+            <span class="eo-msg__time">${formatTime(root.created_at)}</span>
+            ${rootImageLabel}
+            ${eoReadHtmlOf(root)}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  return latestRow + collapsedRow + rootRow;
+}
+
+// 元投稿の折りたたみ開閉。月カードの高さも追随させる。
+function toggleRootPost(bodyId) {
+  const el = document.getElementById(bodyId);
+  const arrow = document.getElementById(bodyId + '-arrow');
+  if (!el) return;
+  const willOpen = (el.style.display === 'none');
+  el.style.display = willOpen ? 'block' : 'none';
+  if (arrow) arrow.textContent = willOpen ? '▼' : '▶';
+  // 親の月カードが max-height で閉じているため、開いた分だけ広げる
+  const monthBody = el.closest('.month-body');
+  if (monthBody && !monthBody.classList.contains('collapsed')) {
+    monthBody.style.maxHeight = (monthBody.scrollHeight + 400) + 'px';
+  }
 }
 
 function renderMessages() {
@@ -2428,11 +2461,7 @@ function renderMessages() {
   const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
 
   // 月別グループ化（EO-DEC-0148 規則5：投稿グループは最新活動日時の月に置く）
-  console.log('[EdgeOps] renderMessages build=20260723-2 messages=', messages.length,
-              'replies=', messages.filter(m => m.root_post_id).length);
   const displayItems = buildPostGroups(messages);
-  console.log('[EdgeOps] displayItems=', displayItems.length,
-              'groups=', displayItems.filter(m => m.__isGroup).length);
   const monthMap = {};
   displayItems.forEach(msg => {
     const d = new Date(msg.created_at);
@@ -3162,7 +3191,26 @@ async function showDetail(messageId) {
   // 色は優先度（urgent=🔴 / normal=🟡 / その他=🟢）。一覧の pLabel と同じ対応。
   const msgIcon = (msg.priority === 'urgent') ? t('priority_urgent') : (msg.priority === 'normal') ? t('priority_caution') : t('priority_notice');
   const msgTitleText = getMessageTitle(msg.body, 20);
-  document.getElementById('detail-title').textContent = msgTitleText ? `${msgIcon} ${msgTitleText}` : `${msgIcon} ${t('detail_title_default')}`;
+  // [2026/7/23 EO-DEC-0148] 返信を開いた場合、タイトルだけで何への返信か分かるようにする。
+  //   「連絡 返信1」では文脈が伝わらないため、元投稿の冒頭を見出しに使う。
+  //   元投稿は表示時に引くだけで、body には保存しない（C案）。
+  if (msg.root_post_id) {
+    let rootForTitle = messages.find(m => m.id === msg.root_post_id) || null;
+    if (!rootForTitle) {
+      const { data: rt } = await supabase.from('messages')
+        .select('id, body, is_deleted')
+        .eq('group_session_id', currentGroup.id)
+        .eq('id', msg.root_post_id)
+        .limit(1);
+      rootForTitle = (rt && rt[0]) || null;
+    }
+    const rootTitle = (rootForTitle && !rootForTitle.is_deleted)
+      ? getMessageTitle(rootForTitle.body, 20)
+      : t('label_original_unavailable');
+    document.getElementById('detail-title').textContent = `${t('label_reply_prefix')} ${rootTitle}`;
+  } else {
+    document.getElementById('detail-title').textContent = msgTitleText ? `${msgIcon} ${msgTitleText}` : `${msgIcon} ${t('detail_title_default')}`;
+  }
   document.getElementById('detail-meta').textContent = `${getMemberName(msg.sender_eo_uid)}　${formatTime(msg.created_at)}`;
   document.getElementById('detail-body').innerHTML = linkify(msg.body);
   // [Phase 4-2F] 画像表示(画像ありメッセージのみ・サムネを即時取得)
@@ -3665,8 +3713,7 @@ async function renderDetailThread(msg) {
         root = (rootRows && rootRows[0]) || null;
       }
       if (root && !root.is_deleted) {
-        originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border);">
-          <div style="font-size:11px; font-weight:700; color:var(--text-light); letter-spacing:0.5px; margin-bottom:4px;">${escHtml(t('label_original_post'))}</div>
+        originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border); cursor:pointer;" onclick="showDetail('${root.id}')">
           <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(getMemberName(root.sender_eo_uid))}　${escHtml(formatTime(root.created_at))}</div>
           <div style="font-size:14px; line-height:1.7; word-break:break-all; color:var(--text-mid);">${linkify(root.body)}</div>
         </div>`;
