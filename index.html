@@ -3412,10 +3412,11 @@ async function deleteMessage() {
     : 'このメッセージを削除しますか?\n既読データも削除されます。';
   if (!confirm(confirmMsg)) return;
   try {
-    // read_receiptsを先に削除
-    await supabase.from('read_receipts').delete().eq('message_id', currentDetailMessageId);
-    // メッセージを削除
-    const { error } = await supabase.from('messages').delete().eq('id', currentDetailMessageId);
+    // [2026/7/23 段階C・EO-DEC-0143] 直接DELETEを廃止し削除専用RPCへ置換。
+    // read_receipts の先行削除はRPC内部で行うため、フロントからは削除しない(仕様書 第27-3章)。
+    const { error } = await supabase.rpc('delete_message_safely', {
+      p_message_id: currentDetailMessageId
+    });
     if (error) throw error;
     currentDetailMessageId = null;
     await loadMessages();
