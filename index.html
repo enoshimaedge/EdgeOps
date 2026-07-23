@@ -3498,9 +3498,41 @@ async function renderDetailThread(msg) {
       .order('created_at', { ascending: true });
     if (error) throw error;
     const list = replies || [];
-    if (list.length === 0) { wrap.style.display = 'none'; listEl.innerHTML = ''; return; }
-    document.getElementById('detail-thread-heading').textContent = t('label_reply_count', { n: list.length });
-    listEl.innerHTML = list.map(r => {
+
+    // [2026/7/23 修正] 返信を開いている場合は元投稿を先頭に表示する（仕様書 第12章）。
+    // 返信単体では何への返信か判別できないため、元投稿の提示は必須である。
+    let originalHtml = '';
+    if (msg.root_post_id) {
+      let root = messages.find(m => m.id === rootId) || null;
+      if (!root) {
+        const { data: rootRows } = await supabase.from('messages')
+          .select('*')
+          .eq('group_session_id', currentGroup.id)
+          .eq('id', rootId)
+          .limit(1);
+        root = (rootRows && rootRows[0]) || null;
+      }
+      if (root && !root.is_deleted) {
+        originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border);">
+          <div style="font-size:11px; font-weight:700; color:var(--text-light); letter-spacing:0.5px; margin-bottom:4px;">${escHtml(t('label_original_post'))}</div>
+          <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(getMemberName(root.sender_eo_uid))}　${escHtml(formatTime(root.created_at))}</div>
+          <div style="font-size:14px; line-height:1.7; word-break:break-all; color:var(--text-mid);">${linkify(root.body)}</div>
+        </div>`;
+      } else {
+        // 元投稿が削除済み、または取得できなかった場合（第29章・第28-3章）
+        const label = (root && root.is_deleted) ? t('label_deleted_post') : t('label_original_unavailable');
+        originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border);">
+          <div style="font-size:13px; color:var(--text-light); font-style:italic;">${escHtml(label)}</div>
+        </div>`;
+      }
+    }
+
+    const shown = list.filter(r => r.id !== msg.id);
+    if (shown.length === 0 && !originalHtml) { wrap.style.display = 'none'; listEl.innerHTML = ''; return; }
+    document.getElementById('detail-thread-heading').textContent =
+      shown.length > 0 ? t('label_reply_count', { n: shown.length }) : t('label_original_post');
+    // いま開いている投稿自身は詳細画面の上部に既に表示されているため、この一覧からは除く（重複表示の防止）
+    listEl.innerHTML = originalHtml + list.filter(r => r.id !== msg.id).map(r => {
       // 論理削除された返信は本文を出さずプレースホルダーを表示（第27-4章）
       if (r.is_deleted) {
         return `<div class="person-row" style="display:block; padding:12px 16px;">
