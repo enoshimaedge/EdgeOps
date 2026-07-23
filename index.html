@@ -2267,6 +2267,146 @@ function getDayLabel(createdAt) {
   return t('date_md', { m: d.getMonth() + 1, d: d.getDate() });
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 投稿グループの組み立て（EO-DEC-0148・C案 / 仕様書 v1.8 第148回訂正章）
+// ─────────────────────────────────────────────────────────────
+// C案：body には返信本文だけを保存し、元投稿の文脈は「表示時に」組み立てる。
+//   ・getMessageTitle(body,40) が引用文を拾わないため、一覧の識別性が壊れない。
+//   ・RPC 2本を触らない。本文が肥大しない。元投稿の状態に表示が追随する。
+// 一覧規則（第3-2章・野口案でGO）：
+//   1. 投稿グループは「最新活動日時」の位置に置く
+//   2. 元投稿＋最新返信の2件を展開表示する
+//   3. それ以前の返信は折りたたむ（「返信n件」）
+//   4. 日付見出しは最新活動日時に従う
+//   5. 月別表示も最新活動日時の月に出す
+//   ・返信が無い通常投稿は従来どおり1件表示（グループ体裁にしない）
+//   ・返信が1件だけなら折りたたみ行を出さない
+// ═══════════════════════════════════════════════════════════════
+// 返信を持つ投稿を投稿グループへ畳み込み、表示用の配列を返す。
+// 返信の無い投稿は素の msg のまま返すため、既存の描画経路を変えない。
+function buildPostGroups(list) {
+  const byId = new Map(list.map(m => [m.id, m]));
+  const repliesByRoot = new Map();
+  const roots = [];
+
+  list.forEach(m => {
+    if (m.root_post_id) {
+      if (!repliesByRoot.has(m.root_post_id)) repliesByRoot.set(m.root_post_id, []);
+      repliesByRoot.get(m.root_post_id).push(m);
+    } else {
+      roots.push(m);
+    }
+  });
+
+  const out = [];
+  const consumed = new Set();
+
+  roots.forEach(root => {
+    const replies = (repliesByRoot.get(root.id) || [])
+      .slice()
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    replies.forEach(r => consumed.add(r.id));
+    if (replies.length === 0) {
+      out.push(root);                      // 返信なし：従来どおり1件表示
+      return;
+    }
+    const latest = replies[replies.length - 1];
+    out.push({
+      __isGroup: true,
+      id: root.id,
+      root,
+      latest,
+      replyCount: replies.length,
+      hiddenCount: replies.length - 1,     // 最新返信以外の件数
+      created_at: latest.created_at        // 並び順・日付見出し・月別は最新活動日時に従う
+    });
+  });
+
+  // root が今回の取得範囲に無い返信（60日境界をまたいだ場合など）は
+  // 単独表示にフォールバックする。第28-3章の趣旨。
+  list.forEach(m => {
+    if (m.root_post_id && !consumed.has(m.id) && !byId.has(m.root_post_id)) {
+      out.push(m);
+    }
+  });
+
+  return out;
+}
+
+// 既読の分母を求める。既存の一覧集計と同一のロジックをそのまま切り出したもの。
+// 既読集計仕様（第55-2回）・realReadMap・receiver_count の考え方は変更していない（第118回 条件12）。
+function eoReceiverCountOf(msg) {
+  if (msg.receiver_count != null) return msg.receiver_count;
+  const _joinedAtMap = window._memberJoinedAt || new Map();
+  const _msgCreatedAtMs = new Date(msg.created_at).getTime();
+  return members.filter(m => {
+    if (m.eo_uid === msg.sender_eo_uid) return false;
+    if (m.is_signage) return false;
+    const _joinedAt = _joinedAtMap.get(m.eo_uid);
+    if (_joinedAt !== undefined && _joinedAt > _msgCreatedAtMs) return false;
+    return true;
+  }).length;
+}
+
+function eoReadHtmlOf(msg) {
+  const receiverCount = eoReceiverCountOf(msg);
+  const readCount = Math.min(msg.read_count || 0, receiverCount);
+  return (readCount >= receiverCount)
+    ? `<span class="eo-msg__read eo-msg__read--done">${t('read_all')}</span>`
+    : `<span class="eo-msg__read">${t('read_count', { read: readCount, total: receiverCount })}</span>`;
+}
+
+// 投稿グループ1件分のHTML（EO-DEC-0148 規則2・3）
+function renderPostGroupHtml(group, KIND, CLS) {
+  const root = group.root;
+  const latest = group.latest;
+  const rp = root.priority || 'info';
+  const rootKindJa = KIND[rp] || t('priority_notice');
+  const rootKindCls = CLS[rp] || 'notice';
+  const lp = latest.priority || 'info';
+  const latestKindJa = KIND[lp] || t('priority_notice');
+
+  // 元投稿の行（クリックで元投稿の詳細へ）
+  const rootImageLabel = (root.image_url || root.thumbnail_url)
+    ? `<span class="eo-msg__label">${t('label_image')}</span>` : '';
+  const rootRow = `
+    <div class="eo-msg eo-msg--${rootKindCls}" onclick="showDetail('${root.id}')" aria-label="重要度：${rootKindJa}">
+      <div class="eo-msg__text">${getMessageTitle(root.body, 40)}</div>
+      <div class="eo-msg__meta">
+        <span class="eo-msg__kind">${rootKindJa}</span>
+        <span class="eo-msg__sep">·</span>
+        <span class="eo-msg__who">${getMemberName(root.sender_eo_uid)}</span>
+        <span class="eo-msg__sep">·</span>
+        <span class="eo-msg__time">${formatTime(root.created_at)}</span>
+        ${rootImageLabel}
+        ${eoReadHtmlOf(root)}
+      </div>
+    </div>`;
+
+  // 折りたたみ行（規則3・4：返信が1件だけなら出さない）
+  const collapsedRow = group.hiddenCount > 0
+    ? `<div class="eo-msg__collapsed" style="padding:8px 16px 8px 32px; font-size:12px; color:var(--text-light); border-top:1px solid var(--border);">
+         ${t('label_reply_count', { n: group.hiddenCount })}
+       </div>`
+    : '';
+
+  // 最新返信の行（クリックで返信の詳細へ）。左に階層が分かるインデントを付ける。
+  const latestRow = `
+    <div class="eo-msg eo-msg--notice" onclick="showDetail('${latest.id}')" style="padding-left:32px;" aria-label="重要度：${latestKindJa}">
+      <div class="eo-msg__text">${getMessageTitle(latest.body, 40)}</div>
+      <div class="eo-msg__meta">
+        <span class="eo-msg__kind">${t('label_reply_badge')}</span>
+        <span class="eo-msg__sep">·</span>
+        <span class="eo-msg__who">${getMemberName(latest.sender_eo_uid)}</span>
+        <span class="eo-msg__sep">·</span>
+        <span class="eo-msg__time">${formatTime(latest.created_at)}</span>
+        ${eoReadHtmlOf(latest)}
+      </div>
+    </div>`;
+
+  return rootRow + collapsedRow + latestRow;
+}
+
 function renderMessages() {
   const container = document.getElementById('home-messages');
 
@@ -2287,9 +2427,10 @@ function renderMessages() {
   const KIND = { urgent: t('priority_urgent'), normal: t('priority_caution'), info: t('priority_notice') };
   const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
 
-  // 月別グループ化
+  // 月別グループ化（EO-DEC-0148 規則5：投稿グループは最新活動日時の月に置く）
+  const displayItems = buildPostGroups(messages);
   const monthMap = {};
-  messages.forEach(msg => {
+  displayItems.forEach(msg => {
     const d = new Date(msg.created_at);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     if (!monthMap[key]) monthMap[key] = [];
@@ -2342,11 +2483,13 @@ function renderMessages() {
     const isOpen = (monthOpenState[monthKey] !== undefined)
       ? monthOpenState[monthKey]
       : (isLatest || !needAccordion);
-    const maxH = isOpen ? `${msgs.length * 200}px` : '0px';
+    // 投稿グループは最大3行（元投稿＋折りたたみ行＋最新返信）になるため高さを多めに見積もる
+    const rowUnits = msgs.reduce((n, m) => n + (m.__isGroup ? 3 : 1), 0);
+    const maxH = isOpen ? `${rowUnits * 200}px` : '0px';
 
     html += `<div class="month-section card">`;
     html += `<div class="month-header" onclick="toggleMonth('month-${monthKey}')">
-      <div class="month-label">${t('month_card_label', { label, n: msgs.length })}</div>
+      <div class="month-label">${t('month_card_label', { label, n: msgs.reduce((n, m) => n + (m.__isGroup ? 1 + m.replyCount : 1), 0) })}</div>
       ${needAccordion ? `<div class="month-toggle ${isOpen ? 'open' : 'closed'}" id="toggle-${monthKey}">▼</div>` : ''}
     </div>`;
     html += `<div class="month-body ${needAccordion && !isOpen ? 'collapsed' : ''}" id="month-${monthKey}" style="max-height:${maxH};">`;
@@ -2360,6 +2503,11 @@ function renderMessages() {
         html += `<div class="eo-msg-day">${dayLabel}</div><div class="eo-msg-list">`;
         currentDayLabel = dayLabel;
         isListOpen = true;
+      }
+      // ── EO-DEC-0148：投稿グループの描画（元投稿＋最新返信の2件を展開） ──
+      if (msg.__isGroup) {
+        html += renderPostGroupHtml(msg, KIND, CLS);
+        return;
       }
       // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
       // ════════════════════════════════════════════════════════════
