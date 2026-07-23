@@ -2428,7 +2428,11 @@ function renderMessages() {
   const CLS = { urgent: 'urgent', normal: 'caution', info: 'notice' };
 
   // 月別グループ化（EO-DEC-0148 規則5：投稿グループは最新活動日時の月に置く）
+  console.log('[EdgeOps] renderMessages build=20260723-2 messages=', messages.length,
+              'replies=', messages.filter(m => m.root_post_id).length);
   const displayItems = buildPostGroups(messages);
+  console.log('[EdgeOps] displayItems=', displayItems.length,
+              'groups=', displayItems.filter(m => m.__isGroup).length);
   const monthMap = {};
   displayItems.forEach(msg => {
     const d = new Date(msg.created_at);
