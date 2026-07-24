@@ -1224,6 +1224,35 @@ function linkifyBody(text) {
 let _buildItemContext = {}; // buildItemHtmlが参照するコンテキスト
 
 function buildItemHtml(item) {
+  // ── 投稿グループカードの描画（5-3）──
+  if (item._replies && item._replies.length > 0) {
+    const { msgPriorityMap } = _buildItemContext;
+    const p = msgPriorityMap[item.priority] || msgPriorityMap.normal;
+    const latestAt = new Date(item._latestAt);
+    const mo = latestAt.getMonth() + 1;
+    const dd = latestAt.getDate();
+    const hh = String(latestAt.getHours()).padStart(2, '0');
+    const mm = String(latestAt.getMinutes()).padStart(2, '0');
+    const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
+    const itemIndex = _buildItemContext.allItemsFlat.indexOf(item);
+    const rootSummaryHtml = item._rootSummary !== null
+      ? escHtmlSignage(item._rootSummary)
+      : '<span style="color:rgba(255,255,255,0.4);">元の連絡を確認できません</span>';
+    const replyBody = item._latestReply ? (item._latestReply.body || '') : '';
+    const isLong = replyBody.length > 60 || replyBody.split('\n').length > 2;
+    return `
+      <div class="message-item ${p.itemCls}" onclick="openModalByIndex(${itemIndex})" style="cursor:pointer;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <span class="message-priority ${p.cls}">${p.label}</span>
+          <span style="font-size:10px; color:rgba(255,255,255,0.5);">返信${item._replyCount}件</span>
+        </div>
+        <div style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:4px;">元の連絡：${rootSummaryHtml}</div>
+        <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(replyBody)}</div>
+        <div class="message-time">${timeStr} 最新活動${isLong ? '　<span style="font-size:10px; color:rgba(255,255,255,0.3);">タップで全文表示</span>' : ''}</div>
+      </div>
+    `;
+  }
+  // ── 既存の単独カード描画 ──
   const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt } = _buildItemContext;
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
@@ -1484,16 +1513,57 @@ async function loadMessage() {
       const isFullyConfirmed = eligibleCount > 0 && confirmed >= eligibleCount;
       return { ...h, body: h.content, _type: 'handover', _confirmed: confirmed, _fullyConfirmed: isFullyConfirmed };
     });
-    const messageItems = messages.map(m => ({ ...m, _type: 'message' }));
+    let messageItems = messages.map(m => ({ ...m, _type: 'message' }));
+
+    // ── 投稿グループの組み立て（5-1）──
+    {
+      const rootMap = new Map();
+      const orphanReplies = [];
+      messageItems.forEach(m => {
+        if (!m.root_post_id) rootMap.set(m.id, { item: m, replies: [] });
+      });
+      messageItems.forEach(m => {
+        if (m.root_post_id) {
+          if (rootMap.has(m.root_post_id)) rootMap.get(m.root_post_id).replies.push(m);
+          else orphanReplies.push(m);
+        }
+      });
+      const grouped = [];
+      rootMap.forEach(({ item, replies }) => {
+        if (replies.length === 0) {
+          item._latestAt = new Date(item.created_at).getTime();
+          grouped.push(item);
+        } else {
+          const allTimes = [item, ...replies].map(r => new Date(r.created_at).getTime());
+          const latestAt = Math.max(...allTimes);
+          const sortedReplies = replies.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          const rootBody = item.is_deleted ? '' : (item.body || '');
+          const rootSummary = item.is_deleted ? null : (rootBody.length > 20 ? rootBody.slice(0, 20) + '…' : rootBody);
+          grouped.push({
+            ...item,
+            _replies: sortedReplies,
+            _latestAt: latestAt,
+            _rootSummary: rootSummary,
+            _latestReply: sortedReplies[0],
+            _replyCount: replies.length,
+          });
+        }
+      });
+      orphanReplies.forEach(m => {
+        m._latestAt = new Date(m.created_at).getTime();
+        grouped.push(m);
+      });
+      messageItems = grouped;
+    }
 
     // 引き継ぎソート：新しい順のみ（重要度の色分けは表示側で維持）
     handoverItems.sort((a, b) => {
       return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    // 連絡ソート：新しい順のみ（重要度の色分けは表示側で維持）
+    // 連絡ソート（5-2）：最新活動日時の降順
     messageItems.sort((a, b) => {
-      return new Date(b.created_at) - new Date(a.created_at);
+      return b._latestAt - a._latestAt;
     });
 
     // buildItemHtmlが参照するコンテキストを設定
@@ -1552,21 +1622,40 @@ function openModalByIndex(index) {
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
     : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
-  const createdAt = new Date(item.created_at);
-  const mo = createdAt.getMonth() + 1;
-  const dd = createdAt.getDate();
-  const hh = String(createdAt.getHours()).padStart(2, '0');
-  const mm = String(createdAt.getMinutes()).padStart(2, '0');
+  // ── 投稿グループの時刻は最新活動日時を使用（5-4）──
+  const baseTime = item._replies ? new Date(item._latestAt) : new Date(item.created_at);
+  const mo = baseTime.getMonth() + 1;
+  const dd = baseTime.getDate();
+  const hh = String(baseTime.getHours()).padStart(2, '0');
+  const mm = String(baseTime.getMinutes()).padStart(2, '0');
   const timeStr = mo + '月' + dd + '日 ' + hh + ':' + mm;
-  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null);
+  // ── 投稿グループ情報を構築（5-4）──
+  const groupInfo = item._replies ? {
+    rootSummary: item._rootSummary,
+    latestReply: item._latestReply,
+    replyCount: item._replyCount,
+  } : null;
+  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null, groupInfo);
 }
 
-async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt) {
+async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt, groupInfo) {
   const modal = document.getElementById('modal-msg-detail');
   document.getElementById('modal-priority-badge').innerHTML =
     `<span class="message-priority ${priorityCls}">${priorityLabel}</span>`;
   // ⑦⑧ モーダル本文：メールアドレスはmailto、URLは外部ブラウザで開くリンクに変換
-  document.getElementById('modal-body').innerHTML = linkifyBody(body);
+  if (groupInfo) {
+    // ── 投稿グループ：3要素表示（5-4）──
+    const rootSummaryHtml = groupInfo.rootSummary !== null
+      ? escHtmlSignage(groupInfo.rootSummary)
+      : '<span style="color:rgba(255,255,255,0.4);">元の連絡を確認できません</span>';
+    const latestReplyHtml = groupInfo.latestReply ? linkifyBody(groupInfo.latestReply.body || '') : '';
+    document.getElementById('modal-body').innerHTML =
+      `<div style="font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:8px;">元の連絡：${rootSummaryHtml}</div>` +
+      `<div>${latestReplyHtml}</div>` +
+      `<div style="font-size:11px; color:rgba(255,255,255,0.4); margin-top:10px;">返信${groupInfo.replyCount}件</div>`;
+  } else {
+    document.getElementById('modal-body').innerHTML = linkifyBody(body);
+  }
   document.getElementById('modal-time').textContent = timeStr + ' 送信';
   document.getElementById('modal-members-info').innerHTML =
     '<div style="color:rgba(255,255,255,0.4); font-size:12px;">読み込み中...</div>';
