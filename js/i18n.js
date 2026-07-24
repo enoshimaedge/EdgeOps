@@ -192,6 +192,12 @@ window.EdgeOpsI18n = {
     label_template_n:           'テンプレ {n}',
     ph_template_empty:          '(空欄にすると表示されません)',
     toast_templates_saved:      'テンプレを保存しました',
+    // ── サイネージ管理・相対時刻（Issue⑦で追加）──────────────────
+    desc_signage_issued:        'サイネージURLが発行済みです',
+    desc_signage_disabled:      'サイネージは無効化されています',
+    desc_signage_not_issued:    'URLが未発行です。「URL発行・再生成」をタップしてください。',
+    time_just_now:              'たった今',
+    time_min_ago:               '{n}分前',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -384,5 +390,11 @@ window.EdgeOpsI18n = {
     label_template_n:           'Template {n}',
     ph_template_empty:          '(Leave blank to hide)',
     toast_templates_saved:      'Templates saved',
+    // ── サイネージ管理・相対時刻（Issue⑦で追加）──────────────────
+    desc_signage_issued:        'Signage URL has been issued',
+    desc_signage_disabled:      'Signage is disabled',
+    desc_signage_not_issued:    'No URL issued yet. Tap "Regenerate token".',
+    time_just_now:              'Just now',
+    time_min_ago:               '{n} min ago',
   }
 };

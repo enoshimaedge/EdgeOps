@@ -373,15 +373,15 @@ function updateSignageUrlDisplay() {
   const copyBtn = document.getElementById('copy-signage-btn');
   if (!el) return;
   if (currentGroup?.signage_token && currentGroup?.signage_enabled) {
-    el.textContent = 'サイネージURLが発行済みです';
+    el.textContent = t('desc_signage_issued');
     el.style.color = '#0F6B63';
     if (copyBtn) copyBtn.style.display = 'block';
   } else if (currentGroup?.signage_token && !currentGroup?.signage_enabled) {
-    el.textContent = 'サイネージは無効化されています';
+    el.textContent = t('desc_signage_disabled');
     el.style.color = '#e53935';
     if (copyBtn) copyBtn.style.display = 'none';
   } else {
-    el.textContent = 'URLが未発行です。「URL発行・再生成」をタップしてください。';
+    el.textContent = t('desc_signage_not_issued');
     el.style.color = 'var(--text-light)';
     if (copyBtn) copyBtn.style.display = 'none';
   }
@@ -426,8 +426,8 @@ function getMemberName(eoUid) {
 function formatTime(isoString) {
   if (!isoString) return '';
   const d = new Date(isoString); const now = new Date(); const diff = now - d;
-  if (diff < 60000) return 'たった今';
-  if (diff < 3600000) return `${Math.floor(diff/60000)}分前`;
+  if (diff < 60000) return t('time_just_now');
+  if (diff < 3600000) return t('time_min_ago', { n: Math.floor(diff/60000) });
   if (diff < 86400000) return `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
   return `${d.getMonth()+1}/${d.getDate()}`;
 }
