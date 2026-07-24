@@ -2365,22 +2365,20 @@ function renderPostGroupHtml(group, KIND, CLS) {
   const rp = root.priority || 'info';
   const rootKindJa = KIND[rp] || t('priority_notice');
   const rootKindCls = CLS[rp] || 'notice';
-  const lp = latest.priority || 'info';
-  const latestKindJa = KIND[lp] || t('priority_notice');
   const rootTitle = getMessageTitle(root.body, 40);
   // 引用の見出しは短くする（20文字）。長いと返信本文が埋もれるため。
   const rootTitleShort = getMessageTitle(root.body, 20);
 
   // ① 最新返信（上）。タイトルに元投稿の冒頭を出して文脈を持たせる。
   const latestRow = `
-    <div class="eo-msg eo-msg--notice" onclick="showDetail('${latest.id}')" aria-label="重要度：${latestKindJa}">
+    <div class="eo-msg eo-msg--${rootKindCls}" onclick="showDetail('${latest.id}')" aria-label="${rootKindJa}の引用返信">
       <div class="eo-msg__text">
         <span style="color:var(--eo-accent); font-weight:700;">${t('label_reply_prefix')}</span>
         <span style="color:var(--text-mid);">${rootTitleShort}</span>
       </div>
       <div class="eo-msg__text" style="margin-top:2px;">${getMessageTitle(latest.body, 40)}</div>
       <div class="eo-msg__meta">
-        <span class="eo-msg__kind">${t('label_reply_badge')}</span>
+        <span class="eo-msg__kind">${rootKindJa}</span>
         <span class="eo-msg__sep">·</span>
         <span class="eo-msg__who">${getMemberName(latest.sender_eo_uid)}</span>
         <span class="eo-msg__sep">·</span>
@@ -2398,9 +2396,9 @@ function renderPostGroupHtml(group, KIND, CLS) {
     ? `<span class="eo-msg__label">${t('label_image')}</span>` : '';
   const bodyId = `eo-root-${root.id}`;
   const rootRow = `
-    <div style="border-top:1px solid var(--border);">
+    <div style="border-top:1px solid var(--border); margin-bottom:10px;">
       <div onclick="toggleRootPost('${bodyId}')"
-           style="display:flex; align-items:center; gap:6px; padding:8px 16px; cursor:pointer;">
+           style="display:flex; align-items:center; gap:6px; padding:8px 16px; cursor:pointer; border-left:var(--eo-bar-width) solid var(--eo-priority-${rootKindCls});">
         <span id="${bodyId}-arrow" style="font-size:10px; color:var(--text-light);">▶</span>
         <span style="font-size:12px; font-weight:700; color:var(--text-mid);">${t('label_original_post')}</span>
         <span style="font-size:12px; color:var(--text-light); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${rootTitle}</span>
