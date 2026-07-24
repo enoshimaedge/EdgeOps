@@ -1073,9 +1073,26 @@ const SUPABASE_ANON_KEY = CFG.SUPABASE_ANON_KEY;
       div.style.cssText = 'position:fixed; inset:0; z-index:99999; background:#0f2f3f; color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px; text-align:center; font-family:sans-serif;';
       div.innerHTML =
         '<div style="font-size:20px; font-weight:bold; margin-bottom:16px;">セッションが切れました</div>' +
-        '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#dbe7ec;">お手数ですが、LINEをいったん閉じて、リッチメニューから EdgeOps を起動し直してください。<br><br>再起動すると元の画面に戻ります。</div>';
+        '<div style="font-size:14px; line-height:1.7; max-width:480px; color:#dbe7ec;">下の「もう一度試す」を押してください。<br>それでも直らない場合は、LINEをいったん閉じて、リッチメニューから EdgeOps を起動し直してください。</div>' +
+        // ═══════════════════════════════════════════
+        // [2026/7/25 第155回判定 EO-DEC-0155 案ウ-1] 「もう一度試す」ボタン
+        // ═══════════════════════════════════════════
+        // 第128回で廃止したのは liff.login() を呼ぶ「再認証して続ける」ボタン。
+        // これは location.reload() であり別物。第128回と矛盾しない。
+        // 現場端末（サイネージ／ドデカスマホ）では、文字だけの再起動案内は
+        // 運用負荷が高いため、その場で復帰できる導線を置く。
+        '<button id="reauth-retry-btn" style="margin-top:28px; padding:14px 32px; font-size:16px; font-weight:bold; color:#fff; background:#0F6B63; border:none; border-radius:9px; font-family:inherit; cursor:pointer;">もう一度試す</button>';
       document.body.appendChild(div);
       document.body.style.overflow = 'hidden';
+      const retryBtn = document.getElementById('reauth-retry-btn');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', function () {
+          retryBtn.disabled = true;
+          retryBtn.textContent = '読み込み中…';
+          retryBtn.style.opacity = '0.6';
+          location.reload();
+        });
+      }
     }
 
     // [2026/5/23 案D] LIFF SDK 初期化直後の誤判定対策で 500ms リトライ1回入れる(チャッピー第72回判定GO)
