@@ -1248,7 +1248,7 @@ function buildItemHtml(item) {
         </div>
         <div style="font-size:11px; color:rgba(255,255,255,0.45); margin-bottom:4px;">元の連絡：${rootSummaryHtml}</div>
         <div class="message-body${isLong ? ' collapsed' : ''}">${escHtmlSignage(replyBody)}</div>
-        <div class="message-time">${timeStr} 最新活動${isLong ? '　<span style="font-size:10px; color:rgba(255,255,255,0.3);">タップで全文表示</span>' : ''}</div>
+        <div class="message-time">${timeStr} 送信${isLong ? '　<span style="font-size:10px; color:rgba(255,255,255,0.3);">タップで全文表示</span>' : ''}</div>
       </div>
     `;
   }
@@ -1382,15 +1382,15 @@ function getHandoverLabel(item) {
   const isConfirmed = item._fullyConfirmed || item._confirmed > 0;
   if (item.priority === 'action') {
     return isConfirmed
-      ? { label: '🔴 重要・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
-      : { label: '🔴 重要・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
+      ? { label: '重要・対応済', cls: 'priority-urgent', itemCls: 'urgent' }
+      : { label: '重要・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
   }
   if (item.priority === 'done') {
-    return { label: '🟢 確認要・確認済', cls: 'priority-info', itemCls: 'info' };
+    return { label: '確認要・確認済', cls: 'priority-info', itemCls: 'info' };
   }
   return isConfirmed
-    ? { label: '🟡 通常・確認済', cls: 'priority-normal', itemCls: 'normal' }
-    : { label: '🟡 通常・未確認', cls: 'priority-normal', itemCls: 'normal' };
+    ? { label: '通常・確認済', cls: 'priority-normal', itemCls: 'normal' }
+    : { label: '通常・未確認', cls: 'priority-normal', itemCls: 'normal' };
 }
 
 // ═══════════════════════════════════════════
@@ -1414,9 +1414,9 @@ async function loadMessage() {
 
     // 連絡のpriorityMap
     const msgPriorityMap = {
-      urgent: { label: '🔴 緊急', cls: 'priority-urgent', itemCls: 'urgent', order: 0 },
-      normal: { label: '🟡 通常', cls: 'priority-normal', itemCls: 'normal', order: 1 },
-      info:   { label: '🟢 連絡', cls: 'priority-info',   itemCls: 'info',   order: 2 },
+      urgent: { label: '至急', cls: 'priority-urgent', itemCls: 'urgent', order: 0 },
+      normal: { label: '注意', cls: 'priority-normal', itemCls: 'normal', order: 1 },
+      info:   { label: '連絡', cls: 'priority-info',   itemCls: 'info',   order: 2 },
     };
 
     // 既読・確認情報・メンバー情報はすべて _globalSignageData から取得
@@ -1635,7 +1635,9 @@ function openModalByIndex(index) {
     latestReply: item._latestReply,
     replyCount: item._replyCount,
   } : null;
-  openModal(item.body || '', p.label, p.cls, timeStr, item.id, item._type, item.sender_eo_uid || '', item.created_at || null, groupInfo);
+  // 投稿グループの場合、既読・未読名簿は最新返信のものを表示する（EO-DEC-0151）
+  const modalTarget = item._latestReply || item;
+  openModal(item.body || '', p.label, p.cls, timeStr, modalTarget.id, item._type, modalTarget.sender_eo_uid || '', modalTarget.created_at || null, groupInfo);
 }
 
 async function openModal(body, priorityLabel, priorityCls, timeStr, itemId, itemType, senderUid, itemCreatedAt, groupInfo) {
