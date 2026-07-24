@@ -151,15 +151,33 @@ async function resolveEoUid(supabaseClient) {
 // ─────────────────────────────────────────────
 async function resolveEoUidViaLineAuth(supabaseClient) {
   // (a) LIFF id_token 取得
-  let id_token;
-  try {
-    id_token = liff.getIDToken();
-    if (!id_token) {
-      throw new Error('liff.getIDToken() returned empty');
+  // ═══════════════════════════════════════════
+  // [2026/7/25 第155回判定 EO-DEC-0155 案ア-1] getIDToken の500msリトライ
+  // ═══════════════════════════════════════════
+  // 背景:LINEを閉じて即座に開き直すと、SDK初期化直後に getIDToken() が
+  //   一瞬 空/null を返すことがあり、そのまま throw して
+  //   showReauthScreen()（セッション切れ画面）に落ちていた。
+  //   同種の問題は liff.isInClient() で2回発生しており（第72回・第76回）、
+  //   いずれも500msリトライで解決している。同じパターンを適用する。
+  // 設計:最大3回試行（初回 → 500ms後 → さらに500ms後）。
+  //   ★取得できた時点で即 break するため、正常時の待ち時間はゼロ。
+  let id_token = null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      id_token = liff.getIDToken();
+    } catch (e) {
+      console.warn('[auth.js] getIDToken attempt ' + (i + 1) + ' threw:', e?.message);
+      id_token = null;
     }
-  } catch (e) {
-    console.error('[auth.js] LIFF id_token 取得失敗:', e);
-    throw new Error('LIFF id_token unavailable: ' + (e?.message || e));
+    if (id_token) {
+      if (i > 0) console.log('[auth.js] getIDToken succeeded on attempt ' + (i + 1));
+      break;
+    }
+    if (i < 2) await new Promise(r => setTimeout(r, 500));
+  }
+  if (!id_token) {
+    console.error('[auth.js] LIFF id_token 取得失敗（3回試行）');
+    throw new Error('LIFF id_token unavailable after 3 attempts');
   }
 
   // (b) LINEAdapter から displayName / pictureUrl も取得(従来互換)
@@ -188,6 +206,43 @@ async function resolveEoUidViaLineAuth(supabaseClient) {
     if (!res.ok) {
       const errBody = await res.text();
       console.error('[auth.js] line-auth エラー:', res.status, errBody);
+
+      // ═══════════════════════════════════════════
+      // [2026/7/25 第155回判定 EO-DEC-0155 案イ-1] 400/401 時の再ログイン救済
+      // ═══════════════════════════════════════════
+      // 背景:閉じて即開いた際、失効した id_token が使い回されて line-auth が
+      //   400 を返すことがある。従来はそのまま throw → セッション切れ画面。
+      // 設計:400/401 のときだけ、5分クールダウン付きで liff.login() を1回試す。
+      //   ・liff.logout() は呼ばない（第63回条件）
+      //   ・クールダウンは refreshEdgeOpsAccessToken() の Phase 5 と同型
+      //   ・★第155回追加条件:login() が画面遷移しなかった場合に備え、
+      //     ここで return せず throw する。呼び出し側（index.html L1359）の
+      //     !_auth ガードに落ちる想定ではなく、確実に catch 側へ落とす。
+      if (res.status === 400 || res.status === 401) {
+        try {
+          const LAST_REAUTH_KEY = 'edgeops_last_reauth_login_ms';
+          const lastLogin = parseInt(localStorage.getItem(LAST_REAUTH_KEY) || '0', 10);
+          const elapsed = Date.now() - lastLogin;
+          const canLogin = typeof liff !== 'undefined'
+                        && liff.isInClient && liff.isInClient()
+                        && liff.login;
+          if (elapsed >= 5 * 60 * 1000 && canLogin) {
+            console.warn('[auth.js] 第155回:line-auth ' + res.status
+              + ' → liff.login() を1回試行');
+            localStorage.setItem(LAST_REAUTH_KEY, String(Date.now()));
+            liff.login();   // logout は呼ばない（第63回条件）
+            // liff.login() は通常ここでページ遷移する。
+            // 万一遷移しなかった場合は下の throw に進み、
+            // showReauthScreen() へ落ちる（undefined のまま後続へ進ませない）。
+          } else {
+            console.warn('[auth.js] 第155回:再ログイン見送り（cooldown '
+              + Math.floor(elapsed / 1000) + 's / canLogin=' + canLogin + '）');
+          }
+        } catch (e) {
+          console.warn('[auth.js] 第155回:再ログイン試行で例外（継続）:', e?.message);
+        }
+      }
+
       throw new Error('line-auth failed: HTTP ' + res.status + ' ' + errBody);
     }
 
