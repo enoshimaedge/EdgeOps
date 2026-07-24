@@ -1386,7 +1386,9 @@ function getHandoverLabel(item) {
       : { label: '重要・未確認', cls: 'priority-urgent', itemCls: 'urgent' };
   }
   if (item.priority === 'done') {
-    return { label: '確認要・確認済', cls: 'priority-info', itemCls: 'info' };
+    return isConfirmed
+      ? { label: '確認要・確認済', cls: 'priority-info', itemCls: 'info' }
+      : { label: '確認要・未確認', cls: 'priority-info', itemCls: 'info' };
   }
   return isConfirmed
     ? { label: '通常・確認済', cls: 'priority-normal', itemCls: 'normal' }
