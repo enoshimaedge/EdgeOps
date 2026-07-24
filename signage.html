@@ -12,6 +12,9 @@
   :root {
     --green: #06C755;
     --navy: #0f1e35;
+    /* [UI改善 2026/7/25] ヘッダー背景トークン。Fullyアクションバー #1B2A3A より
+       一段明るい紺にして、上(アクションバー)→中(ヘッダー)→下(本文 --navy)の階層を作る */
+    --header-bg: #26374B;
     --bg: #f2f3f7;
     --white: #ffffff;
     --text: #1a2f4a;
@@ -59,21 +62,16 @@
 
   /* ── ヘッダー ── */
   .signage-header {
-    background: var(--green);
+    /* [UI改善 2026/7/25] 緑帯を廃止し EdgeOps 紺に統一(index.html のヘッダーと同系) */
+    background: var(--header-bg);
     padding: 14px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
   }
-  .signage-logo {
-    /* [UI改善 2026/5/23] サイネージでもグループ名を主役に。EdgeOps を 24px→16px に縮小・font-weight 900→700 */
-    /* 理由:大画面サイネージ表示で「いまどのグループか」を一目で視認させる */
-    font-size: 16px;
-    font-weight: 700;
-    color: rgba(255,255,255,0.85);
-    letter-spacing: 1px;
-  }
+  /* [UI改善 2026/7/25] .signage-logo は削除。
+     Fullyアクションバーに EdgeOps と表示されるため、直下での重複表記をやめた */
   .signage-group-name {
     /* [UI改善 2026/5/23] グループ名を 16px→32px に拡大・font-weight 700 維持 */
     /* index.html の screen-home ヘッダー(EdgeOps小・グループ名大)と統一思想 */
@@ -81,7 +79,8 @@
     color: white;
     font-weight: 700;
     line-height: 1.2;
-    margin-top: 2px;
+    /* [UI改善 2026/7/25] 上の EdgeOps 表記を削除したため margin-top: 2px を 0 に */
+    margin-top: 0;
   }
   .last-updated {
     font-size: 14px;
@@ -117,8 +116,10 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    background: rgba(255,255,255,0.18);
-    border: 1.5px solid rgba(255,255,255,0.6);
+    /* [UI改善 2026/7/25] ヘッダーが紺になったため、白の半透明では沈む。
+       緑をアクセントとして残し、押せる場所を明示する */
+    background: rgba(6,199,85,0.16);
+    border: 1.5px solid var(--green);
     border-radius: 20px;
     padding: 6px 12px;
     color: white;
@@ -128,7 +129,9 @@
     font-family: inherit;
     white-space: nowrap;
     text-decoration: none;
-    margin-top: 4px;
+    /* [UI改善 2026/7/25] margin-top: 4px を削除。
+       LINKボタン側には無く、横並びで上下がズレる原因だった。
+       上の「最終更新」との間隔は親要素の gap: 4px が担う */
   }
 
   /* ── コンテンツエリア ── */
@@ -489,19 +492,22 @@
     display: none;
     align-items: center;
     gap: 4px;
-    background: rgba(255,255,255,0.18);
-    border: 1.5px solid rgba(255,255,255,0.6);
+    /* [UI改善 2026/7/25] 混雑度ボタンと同じく緑アクセントに統一 */
+    background: rgba(6,199,85,0.16);
+    border: 1.5px solid var(--green);
     border-radius: 20px;
-    padding: 5px 10px;
+    /* [UI改善 2026/7/25] 混雑度ボタンと寸法を完全一致させる
+       (旧: padding 5px 10px / font-size 11px → 縦幅と文字サイズがズレていた) */
+    padding: 6px 12px;
     color: white;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
     transition: background 0.15s;
   }
-  .link-header-btn:hover { background: rgba(255,255,255,0.3); }
+  .link-header-btn:hover { background: rgba(6,199,85,0.28); }
 
   /* ══════════════════════════════════════════════════════
    * [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
@@ -567,7 +573,6 @@
   <!-- ヘッダー -->
   <div class="signage-header">
     <div>
-      <div class="signage-logo">EdgeOps</div>
       <div class="signage-group-name" id="header-group-name">---</div>
     </div>
     <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
