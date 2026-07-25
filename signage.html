@@ -116,10 +116,11 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    /* [UI改善 2026/7/25] ヘッダーが紺になったため、白の半透明では沈む。
-       緑をアクセントとして残し、押せる場所を明示する */
-    background: rgba(6,199,85,0.16);
-    border: 1.5px solid var(--green);
+    /* [UI改善 2026/7/25] 枠は白線・塗りなし。
+       background: transparent によりヘッダー帯(--header-bg)がそのまま透けるため、
+       ヘッダー色を変更しても追従する */
+    background: transparent;
+    border: 1.5px solid rgba(255,255,255,0.75);
     border-radius: 20px;
     padding: 6px 12px;
     color: white;
@@ -492,9 +493,9 @@
     display: none;
     align-items: center;
     gap: 4px;
-    /* [UI改善 2026/7/25] 混雑度ボタンと同じく緑アクセントに統一 */
-    background: rgba(6,199,85,0.16);
-    border: 1.5px solid var(--green);
+    /* [UI改善 2026/7/25] 混雑度ボタンと同じく白枠・塗りなしに統一 */
+    background: transparent;
+    border: 1.5px solid rgba(255,255,255,0.75);
     border-radius: 20px;
     /* [UI改善 2026/7/25] 混雑度ボタンと寸法を完全一致させる
        (旧: padding 5px 10px / font-size 11px → 縦幅と文字サイズがズレていた) */
@@ -507,7 +508,7 @@
     white-space: nowrap;
     transition: background 0.15s;
   }
-  .link-header-btn:hover { background: rgba(6,199,85,0.28); }
+  .link-header-btn:hover { background: rgba(255,255,255,0.12); }
 
   /* ══════════════════════════════════════════════════════
    * [UI改善③ 天気QR折りたたみ] チャッピー第50回判定準拠
