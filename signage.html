@@ -230,8 +230,12 @@
     font-weight: 700;
     margin-bottom: 6px;
   }
-  .priority-urgent { background: #ffeaea; color: #c62828; border: 1px solid #e53935; }
-  .priority-normal { background: #fffde7; color: #f57f17; border: 1px solid #f9a825; }
+  /* [UI改善 2026/7/25] 赤・黄は塗りつぶし＋白文字に変更（緑 .priority-info は従来どおり）。
+     色はコントラスト比を優先して選定（対白文字）：
+       #C62828 = 5.62:1 ／ #A66A00 = 4.48:1
+     見た目に近い #F9A825 は 1.97:1 でサイネージの視距離では判読できないため不採用 */
+  .priority-urgent { background: #C62828; color: #ffffff; border: 1px solid #C62828; }
+  .priority-normal { background: #A66A00; color: #ffffff; border: 1px solid #A66A00; }
   .priority-info   { background: #f1f8f4; color: #2e7d32; border: 1px solid #66bb6a; }
   .message-body {
     font-size: 15px;
