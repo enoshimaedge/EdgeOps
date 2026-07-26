@@ -215,7 +215,8 @@
         <!-- ══ [Issue⑬ E1] イベント・催事の期限入力（event選択時のみ表示） ══ -->
         <div class="form-group" id="form-group-event-expiry" style="display:none; margin-bottom:12px;">
           <label class="form-label"><span data-i18n="form_event_last_day">利用できる最終日</span></label>
-          <input class="form-input" id="input-event-last-day" type="date">
+          <input class="form-input" id="input-event-last-day" type="date"
+                 style="min-width:0; max-width:100%;">
           <div style="font-size:11px; color:var(--text-light); margin-top:6px;"
                data-i18n="desc_event_last_day">選択した日の翌日から、このグループは利用できなくなります</div>
         </div>
@@ -290,7 +291,7 @@
           </select>
         </div>
         <button class="btn btn-primary" onclick="createGroup()">
-           新しいグループを作る
+          <span data-i18n="btn_create_group">新しいグループを作る</span>
         </button>
       </div>
       <div style="text-align:center; color:var(--text-light); font-size:13px; margin-bottom:10px;" data-i18n="label_or">または</div>
@@ -908,8 +909,8 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=20260726-1"></script>   <!-- ← 追加。必ず最初 -->
-<script src="js/ui-helpers.js?v=20260724-1"></script>
+<script src="js/i18n.js?v=20260727-1"></script>   <!-- ← 追加。必ず最初 -->
+<script src="js/ui-helpers.js?v=20260727-1"></script>
 <script src="js/image.js"></script>
 <script src="js/templates.js?v=20260704-3"></script>
 <script src="js/survey.js?v=20260704-4"></script>
@@ -994,6 +995,8 @@ const EVENT_I18N_PAIRS = [
   ['label_applied_group_id', 'label_applied_group_id_event'],
   ['label_your_group_id',    'label_your_group_id_event'],
   ['form_group_name',        'form_group_name_event'],
+  ['btn_create_group',       'btn_create_group_event'],
+  ['btn_join',               'btn_join_event'],
 ];
 
 function applyEventWording(isEvent) {
@@ -2196,8 +2199,12 @@ async function loadMessages() {
     renderMessages();
     preloadMessageImageUrls(messages); // 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
     const badge = document.getElementById('approval-badge');
+    const approvalBtn = document.getElementById('approval-btn');
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
     else { badge.style.display = 'none'; }
+    if (approvalBtn) {
+      approvalBtn.style.display = isEventGeneralMember() ? 'none' : '';
+    }
     // 引き継ぎ未確認バッジ更新
     await updateHandoverBadge();
   } catch (e) { console.error(e); }
@@ -2436,6 +2443,7 @@ function eoReceiverCountOf(msg) {
 }
 
 function eoReadHtmlOf(msg) {
+  if (isEventGeneralMember()) return '';
   const receiverCount = eoReceiverCountOf(msg);
   const readCount = Math.min(msg.read_count || 0, receiverCount);
   return (readCount >= receiverCount)
@@ -2653,9 +2661,10 @@ function renderMessages() {
       }
       const readCount = Math.min(msg.read_count || 0, receiverCount);
       const isDone = readCount >= receiverCount;
-      const readHtml = isDone
+      let readHtml = isDone
         ? `<span class="eo-msg__read eo-msg__read--done">${t('read_all')}</span>`
         : `<span class="eo-msg__read">${t('read_count', { read: readCount, total: receiverCount })}</span>`;
+      if (isEventGeneralMember()) readHtml = '';
       const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
@@ -3161,6 +3170,14 @@ async function showHandoverDetail(handoverId) {
       // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
       unconfirmedList.innerHTML = '<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">未確認メンバーはいません</div>';
     }
+    // [第157回 EO-DEC-0157・論点C] event の一般参加者には確認状況を表示しない
+    if (isEventGeneralMember()) {
+      document.getElementById('hw-confirmed-list')?.closest('.card')?.style.setProperty('display', 'none');
+      document.getElementById('hw-unconfirmed-list')?.closest('.card')?.style.setProperty('display', 'none');
+    } else {
+      document.getElementById('hw-confirmed-list')?.closest('.card')?.style.setProperty('display', '');
+      document.getElementById('hw-unconfirmed-list')?.closest('.card')?.style.setProperty('display', '');
+    }
 
     showScreen('screen-handover-detail');
   } catch(e) { console.error(e); showToast('取得に失敗しました'); }
@@ -3345,6 +3362,18 @@ async function showDetail(messageId) {
     // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
     unreadListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">${t('empty_no_unread')}</div>`;
   }
+  // [E7・案サ] event の一般参加者には既読・未読を一切表示しない
+  if (isEventGeneralMember()) {
+    const statRow = document.getElementById('detail-read-count')?.closest('div[style*="display:flex"]');
+    if (statRow) statRow.style.display = 'none';
+    document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', 'none');
+    document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', 'none');
+  } else {
+    const statRow = document.getElementById('detail-read-count')?.closest('div[style*="display:flex"]');
+    if (statRow) statRow.style.display = 'flex';
+    document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', '');
+    document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', '');
+  }
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
   if (deleteWrap) {
@@ -3424,6 +3453,11 @@ async function loadApprovals() {
     const { data: pending } = await supabase.from('group_members').select('*')
       .eq('group_session_id', currentGroup.id).eq('status', 'pending').order('created_at', { ascending: true });
     const container = document.getElementById('approval-list');
+    if (isEventGeneralMember()) {
+      container.innerHTML =
+        `<div class="empty" style="padding:40px;"><div class="empty-text">${t('empty_approval_organizer_only')}</div></div>`;
+      return;
+    }
     if (!pending || pending.length === 0) {
       container.innerHTML = `<div class="empty" style="padding:40px;"><div class="empty-text">${t('empty_no_pending_members')}</div></div>`;
       return;
@@ -3441,6 +3475,11 @@ async function loadApprovals() {
 }
 
 async function approveMember(memberId, displayName) {
+  // [第154回 EO-DEC-0154・案A] event では主催者以外の承認を受け付けない
+  if (isEventGeneralMember()) {
+    showToast(t('toast_approval_organizer_only'));
+    return;
+  }
   try {
     await supabase.from('group_members').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', memberId);
 
@@ -3503,6 +3542,11 @@ async function approveMember(memberId, displayName) {
 // - 却下された本人は次回 LIFF 起動時に restoreSession() で他グループ自動切替 or screen-start
 // ═══════════════════════════════════════════
 async function rejectMember(memberId, displayName) {
+  // [第157回 EO-DEC-0157・論点B] event では主催者以外の却下も受け付けない
+  if (isEventGeneralMember()) {
+    showToast(t('toast_approval_organizer_only'));
+    return;
+  }
   if (!confirm(`${displayName}さんの参加申請を却下しますか?\n本人には通知されません。`)) return;
   try {
     await supabase.from('group_members')
@@ -3955,6 +3999,16 @@ function syncProfileForm() {
   if (linkEl) linkEl.value = (currentGroup && typeof currentGroup.link_url === 'string') ? currentGroup.link_url : '';
   // 案B用: このフォームがどのグループを表示しているかを記録
   profileFormGroupId = currentGroup?.id || null;
+}
+
+// ── イベント催事モード判定（仕様書 第22章・第154回 EO-DEC-0154） ──
+function isEventGroup() {
+  return currentGroup?.industry === 'event';
+}
+// event グループの「一般参加者」（主催者＝作成者ではない人）かどうか
+// ※ST版は案A（フロント表示制御のみ）。サーバー側の権限制御は行わない。
+function isEventGeneralMember() {
+  return isEventGroup() && !isCreator;
 }
 
 function showProfile() {

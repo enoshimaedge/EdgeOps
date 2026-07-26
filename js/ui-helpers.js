@@ -359,6 +359,23 @@ function updateLinkButton() {
 async function updateMemberCount() {
   const membersEl = document.getElementById('profile-members');
   if (!membersEl || !currentGroup?.id) return;
+
+  // ── [第11-2章＋第158回 論点D] イベント催事モード ──
+  if (currentGroup.industry === 'event') {
+    const { data } = await supabase
+      .from('group_members')
+      .select('is_creator, is_signage')
+      .eq('group_session_id', currentGroup.id)
+      .eq('status', 'approved');
+    const rows = data || [];
+    const creators = rows.filter(m => m.is_creator).length;
+    const signages = rows.filter(m => !m.is_creator && m.is_signage).length;
+    const attendees = rows.filter(m => !m.is_creator && !m.is_signage).length;
+    const capacity  = Math.max(0, (currentGroup.max_members || 202) - creators - signages);
+    membersEl.textContent = `参加中：${attendees} / ${capacity}人`;
+    return;
+  }
+
   const maxMembers = currentGroup.max_members || 50;
   const { count } = await supabase
     .from('group_members')
