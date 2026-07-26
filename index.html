@@ -3364,12 +3364,12 @@ async function showDetail(messageId) {
   }
   // [E7・案サ] event の一般参加者には既読・未読を一切表示しない
   if (isEventGeneralMember()) {
-    const statRow = document.getElementById('detail-read-count')?.closest('div[style*="display:flex"]');
+    const statRow = document.getElementById('detail-read-count')?.parentElement?.parentElement;
     if (statRow) statRow.style.display = 'none';
     document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', 'none');
     document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', 'none');
   } else {
-    const statRow = document.getElementById('detail-read-count')?.closest('div[style*="display:flex"]');
+    const statRow = document.getElementById('detail-read-count')?.parentElement?.parentElement;
     if (statRow) statRow.style.display = 'flex';
     document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', '');
     document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', '');
