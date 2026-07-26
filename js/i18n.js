@@ -212,6 +212,7 @@ window.EdgeOpsI18n = {
     toast_group_full:            'このグループは満員です',
     notice_event_ended_title:    'このイベントは終了しました',
     notice_event_ended_body:     '新しいイベントに参加するか、新規作成してください。',
+    form_group_name_event:       'イベント名（任意）',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -424,5 +425,6 @@ window.EdgeOpsI18n = {
     toast_group_full:            'This group is full',
     notice_event_ended_title:    'This event has ended',
     notice_event_ended_body:     'Join a new event or create one.',
+    form_group_name_event:       'Event Name (optional)',
   }
 };
