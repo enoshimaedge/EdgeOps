@@ -198,6 +198,20 @@ window.EdgeOpsI18n = {
     desc_signage_not_issued:    'URLが未発行です。「URL発行・再生成」をタップしてください。',
     time_just_now:              'たった今',
     time_min_ago:               '{n}分前',
+    // ── イベント・催事モード（Issue⑬で追加）──────────────────────
+    heading_create_group_event:  '新しいイベントを作る',
+    form_group_id_join_event:    'イベントコードを入力して参加',
+    desc_group_id_join_event:    'イベントの主催者から共有されたコードを入力します',
+    form_group_id_event:         'イベントコード',
+    label_applied_group_id_event:'参加申請したイベントコード',
+    label_your_group_id_event:   'あなたのイベントコード',
+    form_event_last_day:         '利用できる最終日',
+    desc_event_last_day:         '選択した日の翌日から、このグループは利用できなくなります',
+    toast_event_last_day_required:'利用できる最終日を選択してください',
+    toast_event_last_day_past:   '本日以降の日付を選択してください',
+    toast_group_full:            'このグループは満員です',
+    notice_event_ended_title:    'このイベントは終了しました',
+    notice_event_ended_body:     '新しいイベントに参加するか、新規作成してください。',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -396,5 +410,19 @@ window.EdgeOpsI18n = {
     desc_signage_not_issued:    'No URL issued yet. Tap "Regenerate token".',
     time_just_now:              'Just now',
     time_min_ago:               '{n} min ago',
+    // ── イベント・催事モード（Issue⑬で追加）──────────────────────
+    heading_create_group_event:  'Create Event',
+    form_group_id_join_event:    'Join with Event Code',
+    desc_group_id_join_event:    'Enter the event code shared by the organizer',
+    form_group_id_event:         'Event Code',
+    label_applied_group_id_event:'Event Code',
+    label_your_group_id_event:   'Your Event Code',
+    form_event_last_day:         'Last day of use',
+    desc_event_last_day:         'This group becomes unavailable the day after the selected date.',
+    toast_event_last_day_required:'Please select the last day of use.',
+    toast_event_last_day_past:   'Please select today or a later date.',
+    toast_group_full:            'This group is full',
+    notice_event_ended_title:    'This event has ended',
+    notice_event_ended_body:     'Join a new event or create one.',
   }
 };

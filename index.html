@@ -180,6 +180,9 @@
     <div id="start-expiry-notice" style="display:none; background:#fff3e0; border-left:4px solid #f57c00; color:#7c4a00; padding:14px 16px; margin-bottom:16px; border-radius:6px; font-size:14px; line-height:1.6;">
        グループの有効期限が切れました。<br>新しいグループに参加するか、新規作成してください。
     </div>
+    <div id="start-expiry-notice-event" style="display:none; background:#fff3e0; border-left:4px solid #f57c00; color:#7c4a00; padding:14px 16px; margin-bottom:16px; border-radius:6px; font-size:14px; line-height:1.6;">
+      <span data-i18n="notice_event_ended_title">このイベントは終了しました</span><br><span data-i18n="notice_event_ended_body">新しいイベントに参加するか、新規作成してください。</span>
+    </div>
     <div style="text-align:center; padding: 32px 0 24px;">
       <div style="font-size:18px; font-weight:700; margin-bottom:8px;" data-i18n="heading_get_started">はじめましょう</div>
       <div style="font-size:14px; color:var(--text-light);" data-i18n="desc_get_started">グループを作成するか、既存のグループに参加してください
@@ -198,7 +201,7 @@
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label" data-i18n="form_industry">業種を選択</label>
-          <select class="form-input" id="input-industry">
+          <select class="form-input" id="input-industry" onchange="onIndustryChanged()">
             <option value="">-- 業種を選んでください --</option>
             <option value="hotel">ホテル・旅館</option>
             <option value="clinic">病院・クリニック</option>
@@ -208,6 +211,13 @@
             <option value="club">部活・クラブ</option>
             <option value="event">イベント・催事</option>
           </select>
+        </div>
+        <!-- ══ [Issue⑬ E1] イベント・催事の期限入力（event選択時のみ表示） ══ -->
+        <div class="form-group" id="form-group-event-expiry" style="display:none; margin-bottom:12px;">
+          <label class="form-label"><span data-i18n="form_event_last_day">利用できる最終日</span></label>
+          <input class="form-input" id="input-event-last-day" type="date">
+          <div style="font-size:11px; color:var(--text-light); margin-top:6px;"
+               data-i18n="desc_event_last_day">選択した日の翌日から、このグループは利用できなくなります</div>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label" data-i18n="form_region">地域を選択（任意）</label>
@@ -898,7 +908,7 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=20260724-1"></script>   <!-- ← 追加。必ず最初 -->
+<script src="js/i18n.js?v=20260725-1"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260724-1"></script>
 <script src="js/image.js"></script>
 <script src="js/templates.js?v=20260704-3"></script>
@@ -968,6 +978,41 @@ function updateLangButtons(lang) {
   document.querySelectorAll('[data-lang]').forEach(b => {
     b.classList.toggle('selected', b.dataset.lang === lang);
   });
+}
+
+// ════════════════════════════════════════════════════════════
+// [Issue⑬ E2] イベント・催事モードの文言差し替え（第154回判定）
+//   data-i18n 属性の値そのものを差し替える方式。
+//   これにより setLang() → applyLang() が再実行されても
+//   イベント表記が維持される（言語切替でJA/ENが戻らない）。
+// ════════════════════════════════════════════════════════════
+const EVENT_I18N_PAIRS = [
+  ['heading_create_group',   'heading_create_group_event'],
+  ['form_group_id_join',     'form_group_id_join_event'],
+  ['desc_group_id_join',     'desc_group_id_join_event'],
+  ['form_group_id',          'form_group_id_event'],
+  ['label_applied_group_id', 'label_applied_group_id_event'],
+  ['label_your_group_id',    'label_your_group_id_event'],
+];
+
+function applyEventWording(isEvent) {
+  EVENT_I18N_PAIRS.forEach(([base, ev]) => {
+    const from = isEvent ? base : ev;
+    const to   = isEvent ? ev   : base;
+    document.querySelectorAll(`[data-i18n="${from}"]`).forEach(el => {
+      el.dataset.i18n = to;
+    });
+  });
+  applyLang(getCurrentLang());
+}
+
+// 業種プルダウンの変更で、期限入力UIと文言を同時に切り替える（第3-1章・第5章）
+function onIndustryChanged() {
+  const v = document.getElementById('input-industry')?.value || '';
+  const isEvent = (v === 'event');
+  const box = document.getElementById('form-group-event-expiry');
+  if (box) box.style.display = isEvent ? 'block' : 'none';
+  applyEventWording(isEvent);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1509,6 +1554,7 @@ async function restoreSession(memberId, groupId) {
     if (member.status === 'approved') {
       currentMemberId = member.id; currentUser.display_name = member.display_name;
       currentGroup = member.group_sessions;
+      applyEventWording(currentGroup?.industry === 'event');
       syncProfileForm();
       // ST版(SL-)の期限切れチェック
       if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
@@ -1585,18 +1631,26 @@ async function restoreExistingMembershipIfAny() {
       .eq('eo_uid', currentUser.eo_uid)
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(20);                       // [Issue⑬ E10] 期限切れeventを飛ばすため全所属を取得
     if (error) {
       console.warn('restoreExistingMembershipIfAny query error:', error);
       return false;
     }
     if (!data || data.length === 0) return false;
-    const m = data[0];
+    // [Issue⑬ E10] 期限切れ event のみスキップ。通常グループは期限切れでも現行どおり復帰する
+    const m = data.find(r => {
+      const g = r.group_sessions;
+      if (!g) return false;
+      if (g.industry !== 'event') return true;
+      return !(g.expires_at && new Date(g.expires_at) <= new Date());
+    });
+    if (!m) return false;
     if (!m.group_sessions) return false;
     localStorage.setItem('sl_member_id', m.id);
     localStorage.setItem('sl_group_id', m.group_sessions.group_id);
     currentMemberId = m.id;
     currentGroup = m.group_sessions;
+    applyEventWording(currentGroup?.industry === 'event');
     syncProfileForm();
     currentUser.display_name = m.display_name;
     isCreator = await resolveIsCreator(m.group_session_id, m.id);
@@ -1675,7 +1729,19 @@ async function createGroup() {
   try {
     showToast('グループを作成中...');
     const groupId = generateGroupId();
-    const expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    // [Issue⑬ E1/E4] event のみ期限・上限を差し替える（第4章・第8章）
+    const isEventGroup = (industryVal === 'event');
+    let expiresAt;
+    if (isEventGroup) {
+      const lastDay = document.getElementById('input-event-last-day')?.value || '';
+      if (!lastDay) { showToast(t('toast_event_last_day_required')); return; }
+      const base = new Date(`${lastDay}T00:00:00`);          // ローカル時刻として解釈
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (base < today) { showToast(t('toast_event_last_day_past')); return; }
+      expiresAt = new Date(base); expiresAt.setDate(expiresAt.getDate() + 1);  // 翌日00:00
+    } else {
+      expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    }
     const regionVal = document.getElementById('input-region').value;
 
     const { data: result, error: rpcError } = await supabase.rpc(
@@ -1687,7 +1753,7 @@ async function createGroup() {
         p_group_name: groupNameVal || null,
         p_region: regionVal || null,
         p_expires_at: expiresAt.toISOString(),
-        p_max_members: 50
+        p_max_members: isEventGroup ? 202 : 50
       }
     );
     if (rpcError) {
@@ -1712,12 +1778,13 @@ async function createGroup() {
       industry: result.industry,
       region: result.region,
       expires_at: expiresAt.toISOString(),
-      max_members: 50
+      max_members: isEventGroup ? 202 : 50   // [Issue⑬ E4] 6章 p_max_members と必ず同じ値にする
     };
     currentMemberId = result.member_id;
     isCreator = true;
     // [2026/5/23 案B 追加] 作成成功時にも sl_display_name 更新(チャッピー第72回判定GO)
     try { localStorage.setItem('sl_display_name', displayName || ''); } catch (_) {}
+    applyEventWording(currentGroup?.industry === 'event');
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
   } catch (e) {
     console.error(e);
@@ -1810,6 +1877,7 @@ async function joinGroup() {
       localStorage.setItem('sl_group_id', result.group_id);
       currentUser.display_name = result.display_name;
       currentGroup = currentGroupObj;
+      applyEventWording(currentGroup?.industry === 'event');
       currentMemberId = result.member_id;
       isCreator = result.is_creator === true;
       await loadHome();
