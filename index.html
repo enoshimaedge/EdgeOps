@@ -2443,6 +2443,7 @@ function eoReceiverCountOf(msg) {
 }
 
 function eoReadHtmlOf(msg) {
+  // [E7・案サ / EO-DEC-0157] event の一般参加者には既読表示を出さない
   if (isEventGeneralMember()) return '';
   const receiverCount = eoReceiverCountOf(msg);
   const readCount = Math.min(msg.read_count || 0, receiverCount);
