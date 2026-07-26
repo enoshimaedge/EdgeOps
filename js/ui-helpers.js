@@ -362,6 +362,7 @@ async function updateMemberCount() {
 
   // ── [第11-2章＋第158回 論点D] イベント催事モード ──
   if (currentGroup.industry === 'event') {
+    // event は max_members=202 が既定。過去データで未設定の場合のみ既定値を使う。
     const defaultEventMaxMembers = 202;
     const { data } = await supabase
       .from('group_members')
