@@ -1562,7 +1562,8 @@ async function restoreSession(memberId, groupId) {
           // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
           clearEdgeOpsLocalStorage();
           hideLoading();
-          const notice = document.getElementById('start-expiry-notice');
+          const isEventExpired = (currentGroup?.industry === 'event');
+          const notice = document.getElementById(isEventExpired ? 'start-expiry-notice-event' : 'start-expiry-notice');
           if (notice) notice.style.display = 'block';
           showScreen('screen-start');
           return;
@@ -1842,7 +1843,7 @@ async function joinGroup() {
       } else if (msg.includes('TOO_MANY_GROUPS')) {
         alert('所属しすぎですね!\n参加できるグループは最大20までです。\n(申請中のグループも含む)\nプロフィール画面で不要なグループから退出してから再度お試しください。');
       } else if (msg.includes('GROUP_FULL')) {
-        showToast('このグループは満員です（最大50名）');
+        showToast(t('toast_group_full'));
       } else if (msg.includes('USER_NOT_FOUND')) {
         showToast('ユーザー情報が見つかりません。アプリを再起動してください。');
       } else if (msg.includes('AUTH_REQUIRED')) {
@@ -4303,7 +4304,7 @@ async function loadMyGroups() {
   const groupIds = memberships.map(m => m.group_session_id);
   const { data: groups } = await supabase
     .from('group_sessions')
-    .select('id, group_id, group_name')
+    .select('id, group_id, group_name, expires_at, industry')   // [Issue⑬ E10]
     .in('id', groupIds);
 
   const merged = memberships.map(m => {
@@ -4319,12 +4320,19 @@ async function loadMyGroups() {
     };
   });
 
-  merged.sort((a, b) => {
+  // [Issue⑬ E10] 期限切れ event のみ一覧から除外（第14章）。通常グループは現行どおり表示する
+  const visible = merged.filter(x => {
+    const g = (groups || []).find(y => y.id === x.group_session_id);
+    if (!g || g.industry !== 'event') return true;
+    return !(g.expires_at && new Date(g.expires_at) <= new Date());
+  });
+
+  visible.sort((a, b) => {
     if (a.is_creator !== b.is_creator) return a.is_creator ? -1 : 1;
     return (a.group_name || '').localeCompare(b.group_name || '');
   });
 
-  return merged;
+  return visible;
 }
 
 async function switchGroup(newGroupSessionId, newMemberId) {
@@ -4360,6 +4368,7 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   // 既存 restoreSession (L1217-1219) と同じ順で状態を更新
   currentMemberId = newMemberId;
   currentGroup = newGroup;
+  applyEventWording(currentGroup?.industry === 'event');
   // ★ チャッピー②指摘反映: currentUser を group_members の値で完全再生成
   //   eo_uid / line_name / picture_url は不変(同じ人なので保持)
   //   display_name のみグループごとに切替(現場で「前グループの名前で投稿」事故を防ぐ)
