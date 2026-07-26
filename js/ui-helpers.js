@@ -4,6 +4,8 @@
 // type="module" 不使用・import/export 不使用・トップレベル実行なし
 // ════════════════════════════════════════════════════════════════════
 
+const DEFAULT_EVENT_MAX_MEMBERS = 202;
+
 async function applyImageUploadButtonVisibility() {
   // compose画面の📷/🖼️ボタン表示制御。feature_flags の状態で出し分け。
   // [②Androidカメラ起動対策・チャッピー第59-2回判定 GO/2026-05-18] camera/library 2ボタン対応
@@ -362,8 +364,6 @@ async function updateMemberCount() {
 
   // ── [第11-2章＋第158回 論点D] イベント催事モード ──
   if (currentGroup.industry === 'event') {
-    // event は max_members=202 が既定。過去データで未設定の場合のみ既定値を使う。
-    const defaultEventMaxMembers = 202;
     const { data } = await supabase
       .from('group_members')
       .select('is_creator, is_signage')
@@ -373,7 +373,7 @@ async function updateMemberCount() {
     const creators = rows.filter(m => m.is_creator).length;
     const signages = rows.filter(m => !m.is_creator && m.is_signage).length;
     const attendees = rows.filter(m => !m.is_creator && !m.is_signage).length;
-    const capacity  = Math.max(0, (currentGroup.max_members || defaultEventMaxMembers) - creators - signages);
+    const capacity  = Math.max(0, (currentGroup.max_members || DEFAULT_EVENT_MAX_MEMBERS) - creators - signages);
     membersEl.textContent = `参加中：${attendees} / ${capacity}人`;
     return;
   }
