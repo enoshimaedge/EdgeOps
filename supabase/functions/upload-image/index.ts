@@ -190,7 +190,7 @@ Deno.serve(async (req: Request) => {
     //   is_creator は不参照（他機能では継続使用）。共通関数 isApprovedCreator は不変更。
     const { data: posterMember, error: posterError } = await supabase
       .from('group_members')
-      .select('is_signage, status')
+      .select('is_signage, status, is_creator')
       .eq('eo_uid', eoUid)
       .eq('group_session_id', groupSessionId)
       .eq('status', 'approved')
@@ -207,6 +207,42 @@ Deno.serve(async (req: Request) => {
         durationMs: Date.now() - startTime,
       });
       return errorResponse('PERMISSION_DENIED', requestId, '投稿権限がありません');
+    }
+
+    // ===== Step 4-2: [E6 案カ / EO-DEC-0154] event では管理者のみ投稿可 =====
+    // 第119回判定(approved・非サイネージなら投稿可)は通常グループの判定であり変更しない(仕様書22-5)。
+    // industry はフロントから受け取らず、サーバー側で取得する(案キ不採用)。
+    const { data: groupRow, error: groupRowError } = await supabase
+      .from('group_sessions')
+      .select('industry')
+      .eq('id', groupSessionId)
+      .maybeSingle();
+
+    if (groupRowError || !groupRow) {
+      // グループを特定できない場合は安全側で拒否(既存の posterError と同じ扱い)
+      await logFunction(supabase, {
+        requestId,
+        functionName: 'upload-image',
+        eoUid,
+        groupSessionId,
+        status: 'fail',
+        errorCode: 'PERMISSION_DENIED',
+        durationMs: Date.now() - startTime,
+      });
+      return errorResponse('PERMISSION_DENIED', requestId, '投稿権限がありません');
+    }
+
+    if (groupRow.industry === 'event' && posterMember.is_creator !== true) {
+      await logFunction(supabase, {
+        requestId,
+        functionName: 'upload-image',
+        eoUid,
+        groupSessionId,
+        status: 'fail',
+        errorCode: 'PERMISSION_DENIED',
+        durationMs: Date.now() - startTime,
+      });
+      return errorResponse('PERMISSION_DENIED', requestId, 'イベントでは写真の投稿は主催者のみ可能です');
     }
 
     // ===== Step 5: クォータ加算 =====
