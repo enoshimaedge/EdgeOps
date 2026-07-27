@@ -145,11 +145,14 @@ window.EdgeOpsI18n = {
     stat_read:                  '既読',
     stat_unread:                '未読',
     stat_total:                 '合計',
+    stat_left_unread:           '未読のまま退出', // [EO-DEC-0162]
     heading_read_list:          '既読（名前・時刻）',
     heading_unread_list:        '未読',
+    heading_left_unread_list:   '未読のまま退出', // [EO-DEC-0162]
     empty_no_unread:            '未読のメンバーはいません',
     empty_no_read:              'まだ誰も読んでいません',
     empty_no_unread_target:     '未読対象のメンバーがいません',
+    label_left_member:          '（退出済み）', // [EO-DEC-0162]
     detail_title_default:       'メッセージ詳細',
     heading_survey_answer:      'アンケートに回答',
     btn_survey_na:              '該当なし',
@@ -363,11 +366,14 @@ window.EdgeOpsI18n = {
     stat_read:                  'Read',
     stat_unread:                'Unread',
     stat_total:                 'Total',
+    stat_left_unread:           'Left unread', // [EO-DEC-0162]
     heading_read_list:          'Read by (name / time)',
     heading_unread_list:        'Unread',
+    heading_left_unread_list:   'Left without reading', // [EO-DEC-0162]
     empty_no_unread:            'No unread members',
     empty_no_read:              'No one has read yet',
     empty_no_unread_target:     'No members to mark as unread',
+    label_left_member:          '(Left)', // [EO-DEC-0162]
     detail_title_default:       'Message Details',
     heading_survey_answer:      'Answer Survey',
     btn_survey_na:              'Not applicable',

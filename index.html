@@ -590,6 +590,10 @@
         <div style="font-size:12px; color:var(--text-light);" id="detail-unread-label">未読</div>
       </div>
       <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
+        <div style="font-size:28px; font-weight:700; color:var(--text-mid);" id="detail-left-count">0</div>
+        <div style="font-size:12px; color:var(--text-light); line-height:1.3;" id="detail-left-label">未読のまま退出</div>
+      </div>
+      <div class="card" style="flex:1; padding:16px; text-align:center; margin-bottom:0;">
         <div style="font-size:28px; font-weight:700;" id="detail-total-count">0</div>
         <div style="font-size:12px; color:var(--text-light);" id="detail-total-label">合計</div>
       </div>
@@ -601,6 +605,11 @@
     <div class="card" style="margin-top:12px;">
       <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--red); border-bottom:1px solid var(--border);" id="detail-unread-heading">未読</div>
       <div id="detail-unread-list"></div>
+    </div>
+    <!-- [EO-DEC-0162] 未読のまま退出カード -->
+    <div class="card" style="margin-top:12px;">
+      <div style="padding:12px 16px; font-size:13px; font-weight:700; color:var(--text-mid); border-bottom:1px solid var(--border);" id="detail-left-heading">未読のまま退出</div>
+      <div id="detail-left-list"></div>
     </div>
     <!-- [2026/7/23 Issue③ 仕様書 第12章] 投稿グループの返信を古い順に表示 -->
     <div id="detail-thread-wrap" style="display:none; margin-top:12px;">
@@ -2292,6 +2301,36 @@ async function applyReadCorrection(targetMessages) {
   targetMessages.forEach(m => {
     if (realReadMap[m.id] !== undefined) m.read_count = realReadMap[m.id];
   });
+
+  // [EO-DEC-0162] item_receivers を一括取得して「未読のまま退出」数を算出
+  const { data: allItemReceivers } = await supabase.from('item_receivers')
+    .select('item_id, receiver_eo_uid')
+    .eq('item_type', 'message')
+    .in('item_id', msgIds);
+  const approvedUidSet = new Set(members.map(m => m.eo_uid));
+  window._leftUnreadMap = {};
+  (allItemReceivers || []).forEach(ir => {
+    if (!ir.receiver_eo_uid) return; // null/undefined receiver をスキップ
+    if (!window._leftUnreadMap[ir.item_id]) window._leftUnreadMap[ir.item_id] = new Set([ir.receiver_eo_uid]);
+    else window._leftUnreadMap[ir.item_id].add(ir.receiver_eo_uid);
+  });
+  // メッセージごとに「未読のまま退出数」= snapshotのuidのうちreceiptが無くかつapprovedに居ない人数
+  const receiptSet = {}; // message_id → Set<eo_uid>
+  (receipts || []).forEach(r => {
+    if (!receiptSet[r.message_id]) receiptSet[r.message_id] = new Set();
+    receiptSet[r.message_id].add(r.eo_uid);
+  });
+  const leftUnreadMapFinal = {};
+  Object.keys(window._leftUnreadMap).forEach(msgId => {
+    const snapshotSet = window._leftUnreadMap[msgId];
+    const msgReceiptSet = receiptSet[msgId] || new Set();
+    let count = 0;
+    snapshotSet.forEach(uid => {
+      if (!msgReceiptSet.has(uid) && !approvedUidSet.has(uid)) count++;
+    });
+    leftUnreadMapFinal[msgId] = count;
+  });
+  window._leftUnreadMap = leftUnreadMapFinal;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -2482,7 +2521,7 @@ function eoReadHtmlOf(msg) {
   if (isEventGeneralMember()) return '';
   const receiverCount = eoReceiverCountOf(msg);
   const readCount = Math.min(msg.read_count || 0, receiverCount);
-  return (readCount >= receiverCount)
+  return ((readCount + (window._leftUnreadMap?.[msg.id] || 0)) >= receiverCount) // [EO-DEC-0162]
     ? `<span class="eo-msg__read eo-msg__read--done">${t('read_all')}</span>`
     : `<span class="eo-msg__read">${t('read_count', { read: readCount, total: receiverCount })}</span>`;
 }
@@ -2696,7 +2735,7 @@ function renderMessages() {
         }).length;
       }
       const readCount = Math.min(msg.read_count || 0, receiverCount);
-      const isDone = readCount >= receiverCount;
+      const isDone = (readCount + (window._leftUnreadMap?.[msg.id] || 0)) >= receiverCount; // [EO-DEC-0162]
       let readHtml = isDone
         ? `<span class="eo-msg__read eo-msg__read--done">${t('read_all')}</span>`
         : `<span class="eo-msg__read">${t('read_count', { read: readCount, total: receiverCount })}</span>`;
@@ -3275,11 +3314,13 @@ async function showDetail(messageId) {
   // ★ 全メンバー（過去含む・status='left'等も含む）の参加時刻マップを作成（v7.17 第18章準拠）
   //    送信後に参加したメンバーの既読を read_count から除外するため
   const { data: allMembersForJoinedAtDetail } = await supabase.from('group_members')
-    .select('eo_uid, created_at')
+    .select('eo_uid, created_at, status, display_name, is_signage') // [EO-DEC-0162]
     .eq('group_session_id', currentGroup.id);
   const detailMemberJoinedAt = new Map();
+  const allMemberMap = new Map(); // [EO-DEC-0162] eo_uid → メンバー情報（退出済み含む）
   (allMembersForJoinedAtDetail || []).forEach(m => {
     detailMemberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+    allMemberMap.set(m.eo_uid, m); // [EO-DEC-0162]
   });
   const msgCreatedAtMs = new Date(msg.created_at).getTime();
 
@@ -3302,6 +3343,11 @@ async function showDetail(messageId) {
   // 数字(totalMembers=receiver_count)・既読リストは変更しない。
   // ════════════════════════════════════════════════════════════
   let receivers;
+  // [EO-DEC-0162] スナップショット経路での3分類用変数
+  let snapshotUids = null;
+  let snapshotReadSet = null; // null = 過去分経路
+  let leftUnreadMembersList = []; // 未読のまま退出したメンバーのeo_uid配列
+  const approvedUids = new Set(members.map(m => m.eo_uid)); // [EO-DEC-0162] 現在approved在籍メンバー
   // クエリ失敗時は snapshotRows が null になり Array.isArray チェックで false → 過去分フォールバック（意図どおり）
   const { data: snapshotRows } = await supabase.from('item_receivers')
     .select('receiver_eo_uid')
@@ -3309,9 +3355,13 @@ async function showDetail(messageId) {
     .eq('item_id', messageId);
 
   if (Array.isArray(snapshotRows) && snapshotRows.length > 0) {
-    // スナップショットあり：送信時の顔ぶれを正本にする
-    // ※ members に居ない受信者（退出済み）は自動的に除外される。意図どおり（退出者の名前を無理に出さない）。
-    const snapshotUids = new Set(snapshotRows.map(r => r.receiver_eo_uid));
+    // [EO-DEC-0162] スナップショットあり：3分類（既読・未読(在籍)・未読のまま退出）
+    snapshotUids = new Set(snapshotRows.map(r => r.receiver_eo_uid));
+    // readSet: snapshotUids の中で既読済み（在籍・退出を問わない）
+    snapshotReadSet = new Set((reads || []).filter(r => snapshotUids.has(r.eo_uid)).map(r => r.eo_uid));
+    // 未読のまま退出: snapshotUids にいて readSet になく approvedUids にいない人
+    leftUnreadMembersList = [...snapshotUids].filter(uid => !snapshotReadSet.has(uid) && !approvedUids.has(uid));
+    // receivers = スナップショット内の在籍メンバー（totalMembers フォールバック・unreadMembers 計算に使用）
     receivers = members.filter(m => snapshotUids.has(m.eo_uid));
   } else {
     // スナップショットなし（過去分）：従来どおり現在メンバーから逆算（参考表示）
@@ -3323,9 +3373,25 @@ async function showDetail(messageId) {
       return true;
     });
   }
-  const totalMembers = msg.receiver_count != null ? msg.receiver_count : receivers.length;
-  const readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
-  const unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
+  let totalMembers;
+  if (msg.receiver_count != null) {
+    totalMembers = msg.receiver_count;
+  } else if (snapshotUids) { // [EO-DEC-0162] スナップショット経路のフォールバック
+    totalMembers = snapshotUids.size;
+  } else {
+    totalMembers = receivers.length;
+  }
+  let readCount;
+  let unreadMembers;
+  if (snapshotReadSet !== null) {
+    // [EO-DEC-0162] スナップショット経路
+    readCount = snapshotReadSet.size;
+    unreadMembers = members.filter(m => snapshotUids.has(m.eo_uid) && !snapshotReadSet.has(m.eo_uid));
+  } else {
+    // 過去分経路（従来どおり）
+    readCount = [...readUids].filter(uid => uid !== msg.sender_eo_uid && !members.find(m => m.eo_uid === uid && m.is_signage)).length;
+    unreadMembers = receivers.filter(m => !readUids.has(m.eo_uid));
+  }
   // [2026/6/20] 帯の表示を統一：色アイコン＋本文冒頭20文字。
   // 色は優先度（urgent=🔴 / normal=🟡 / その他=🟢）。一覧の pLabel と同じ対応。
   const msgIcon = (msg.priority === 'urgent') ? t('priority_urgent') : (msg.priority === 'normal') ? t('priority_caution') : t('priority_notice');
@@ -3366,25 +3432,53 @@ async function showDetail(messageId) {
     delBtn.style.display = enabled ? 'inline-block' : 'none';
   })();
   document.getElementById('detail-read-count').textContent = Math.min(readCount, totalMembers);
-  document.getElementById('detail-unread-count').textContent = Math.max(0, totalMembers - readCount);
+  // [EO-DEC-0162] スナップショット経路では未読(在籍)人数、過去分は従来どおり
+  document.getElementById('detail-unread-count').textContent = snapshotReadSet !== null ? unreadMembers.length : Math.max(0, totalMembers - readCount);
+  document.getElementById('detail-left-count').textContent = leftUnreadMembersList.length; // [EO-DEC-0162]
   document.getElementById('detail-total-count').textContent = totalMembers;
   document.getElementById('detail-read-label').textContent = t('stat_read');
   document.getElementById('detail-unread-label').textContent = t('stat_unread');
+  document.getElementById('detail-left-label').textContent = t('stat_left_unread'); // [EO-DEC-0162]
   document.getElementById('detail-total-label').textContent = t('stat_total');
   document.getElementById('detail-read-heading').textContent = t('heading_read_list');
   document.getElementById('detail-unread-heading').textContent = t('heading_unread_list');
   const readListEl = document.getElementById('detail-read-list');
-  // 既読リストから送信者・サイネージ端末を除外
-  const receiverReads = validReads.filter(r => {
-    if (r.eo_uid === msg.sender_eo_uid) return false;
-    const member = members.find(m => m.eo_uid === r.eo_uid);
-    return member && !member.is_signage;
-  });
+  // [EO-DEC-0162] スナップショット経路：readSet 全員を表示（退出済みも含む）
+  let receiverReads;
+  if (snapshotReadSet !== null) {
+    receiverReads = (reads || []).filter(r => {
+      if (!snapshotReadSet.has(r.eo_uid)) return false;
+      if (r.eo_uid === msg.sender_eo_uid) return false;
+      const m = allMemberMap.get(r.eo_uid);
+      if (m && m.is_signage) return false;
+      return true;
+    });
+  } else {
+    // 過去分経路：従来どおり退出済みを除外
+    receiverReads = validReads.filter(r => {
+      if (r.eo_uid === msg.sender_eo_uid) return false;
+      const member = members.find(m => m.eo_uid === r.eo_uid);
+      return member && !member.is_signage;
+    });
+  }
   if (receiverReads.length > 0) {
     readListEl.innerHTML = receiverReads.map(r => {
-      const member = members.find(m => m.eo_uid === r.eo_uid);
-      if (!member) return ''; // 退出済みは表示しない
-      return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">${t('stat_read')}</div></div></div>`;
+      if (snapshotReadSet !== null) {
+        // [EO-DEC-0162] 退出済みメンバーも表示（グレー＋退出済みラベル）
+        const activeMember = members.find(m => m.eo_uid === r.eo_uid);
+        const memberData = activeMember || allMemberMap.get(r.eo_uid);
+        if (!memberData) return '';
+        const name = memberData.display_name || r.eo_uid;
+        const isLeft = !approvedUids.has(r.eo_uid);
+        const nameHtml = isLeft
+          ? `<span style="color:#8B959E">${escHtml(name)}${t('label_left_member')}</span>`
+          : escHtml(name);
+        return `<div class="person-row"><div><div class="person-name">${nameHtml}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">${t('stat_read')}</div></div></div>`;
+      } else {
+        const member = members.find(m => m.eo_uid === r.eo_uid);
+        if (!member) return ''; // 退出済みは表示しない
+        return `<div class="person-row"><div><div class="person-name">${escHtml(member.display_name)}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="person-time">${formatTime(r.read_at)}</div><div class="check-yes">${t('stat_read')}</div></div></div>`;
+      }
     }).join('');
   } else {
     readListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--text-light);font-size:13px;">${t('empty_no_read')}</div>`;
@@ -3400,16 +3494,36 @@ async function showDetail(messageId) {
     // [2026/5/25 日本語呼応修正 / チャッピー第87回判定GO]
     unreadListEl.innerHTML = `<div style="padding:16px;text-align:center;color:var(--green);font-size:13px;font-weight:600;">${t('empty_no_unread')}</div>`;
   }
+  // [EO-DEC-0162] 未読のまま退出カードの描画
+  const leftHeadingEl = document.getElementById('detail-left-heading');
+  if (leftHeadingEl) leftHeadingEl.textContent = t('heading_left_unread_list');
+  const leftListEl = document.getElementById('detail-left-list');
+  const leftCardEl = leftListEl ? leftListEl.closest('.card') : null;
+  if (leftUnreadMembersList.length > 0) {
+    if (leftListEl) {
+      leftListEl.innerHTML = leftUnreadMembersList.map(uid => {
+        const m = allMemberMap.get(uid) || {};
+        const name = m.display_name || uid;
+        return `<div class="person-row"><div class="person-name" style="color:#8B959E">${escHtml(name)}${t('label_left_member')}</div></div>`;
+      }).join('');
+    }
+    if (leftCardEl) leftCardEl.style.display = '';
+  } else {
+    if (leftCardEl) leftCardEl.style.display = 'none';
+  }
   // [E7・案サ] event の一般参加者には既読・未読を一切表示しない
   const detailStatsRow = document.getElementById('detail-stats-row');
   if (isEventGeneralMember()) {
     if (detailStatsRow) detailStatsRow.style.display = 'none';
     document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', 'none');
     document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', 'none');
+    if (leftCardEl) leftCardEl.style.display = 'none'; // [EO-DEC-0162]
   } else {
     if (detailStatsRow) detailStatsRow.style.display = 'flex';
     document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', '');
     document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', '');
+    // [EO-DEC-0162] 未読のまま退出カード：0人なら非表示、1人以上なら表示
+    if (leftCardEl) leftCardEl.style.display = leftUnreadMembersList.length > 0 ? '' : 'none';
   }
   // 自分が送信者なら削除ボタンを表示
   const deleteWrap = document.getElementById('detail-delete-wrap');
@@ -4195,46 +4309,7 @@ async function leaveGroup() {
   if (loadingEl) loadingEl.style.display = 'flex';
   try {
     stopPolling();
-    // 退出時：自分が未読のメッセージのread_countを+1して既読扱いにする
-    // （退出後に分母だけ残って既読率が永遠に100%にならない問題を防ぐ）
-    // 自分が送信者でないメッセージのIDを取得
-    const receivedMsgIds = messages
-      .filter(msg => msg.sender_eo_uid !== currentUser.eo_uid)
-      .map(msg => msg.id);
-
-    if (receivedMsgIds.length > 0) {
-      // 既読済みのメッセージIDを取得
-      const { data: myReceipts } = await supabase.from('read_receipts').select('message_id')
-        .in('message_id', receivedMsgIds).eq('eo_uid', currentUser.eo_uid);
-      const readMsgIds = new Set((myReceipts || []).map(r => r.message_id));
-
-      // 未読のメッセージだけ処理
-      const unreadMsgIds = receivedMsgIds.filter(id => !readMsgIds.has(id));
-      if (unreadMsgIds.length > 0) {
-        // [EO-DEC-0161 案ア] 直列2Nリクエスト→一括INSERT＋並列UPDATE。
-        //   失敗しても退出は完遂する(console.warnのみ)。既読集計ロジック自体は不変更。
-        const nowIso = new Date().toISOString();
-        const { error: bulkErr } = await supabase.from('read_receipts').insert(
-          unreadMsgIds.map(id => ({ message_id: id, eo_uid: currentUser.eo_uid, read_at: nowIso }))
-        );
-        if (bulkErr) console.warn('[leaveGroup] read_receipts 一括INSERT失敗(退出は継続):', bulkErr);
-
-        // [EO-DEC-0161 チャッピー条件] Promise.all ではなく Promise.allSettled を使う
-        const updateResults = await Promise.allSettled(
-          unreadMsgIds.map(id => {
-            const msg = messages.find(m => m.id === id);
-            if (!msg) return Promise.resolve();
-            return supabase.from('messages')
-              .update({ read_count: (msg.read_count || 0) + 1 })
-              .eq('id', id);
-          })
-        );
-        updateResults.forEach((r, i) => {
-          const err = r.status === 'rejected' ? r.reason : r.value?.error;
-          if (err) console.warn('[leaveGroup] read_count 更新失敗(退出は継続):', unreadMsgIds[i], err);
-        });
-      }
-    }
+    // [EO-DEC-0162] 退出時の機械既読は廃止。未読のまま退出した事実はそのまま表示する(第162回判定)。
     // 管理者が退出する場合、在籍中の最古参メンバーにis_creatorを引き継ぐ
     if (isCreator) {
       // [EO-DEC-0160 案イ] サイネージ端末は主催者昇格の対象外(NULL は人間扱い)
