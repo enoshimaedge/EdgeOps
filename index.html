@@ -1018,6 +1018,9 @@ function applyEventUiVisibility() {
   const chipAll      = document.getElementById('filter-chip-all');
   if (chipHandover) chipHandover.style.display = ev ? 'none' : '';
   if (chipAll)      chipAll.style.display      = ev ? 'none' : '';
+  // [第13章補完 / Issue㉒-B] 作成画面の「引き継ぎノート」種別トグルも event では出さない(全員)
+  const ctypeHandover = document.getElementById('ctype-handover');
+  if (ctypeHandover) ctypeHandover.style.display = ev ? 'none' : '';
   if (ev) {
     const bar = document.getElementById('handover-badge-bar');
     if (bar) bar.style.display = 'none';
@@ -1617,7 +1620,7 @@ async function resolveIsCreator(groupSessionId, myMemberId) {
   try {
     const { data: allMembers } = await supabase
       .from('group_members')
-      .select('id, is_creator, created_at')
+      .select('id, is_creator, created_at, is_signage')
       .eq('group_session_id', groupSessionId)
       .eq('status', 'approved')
       .order('created_at', { ascending: true });
@@ -1627,8 +1630,11 @@ async function resolveIsCreator(groupSessionId, myMemberId) {
     if (hasCreator) {
       return allMembers.find(m => m.id === myMemberId)?.is_creator || false;
     }
-    // 誰もTRUEでなければ最古メンバーを管理者とみなす（フォールバック）
-    return allMembers[0].id === myMemberId;
+    // 誰もTRUEでなければ最古の人間メンバーを管理者とみなす（フォールバック）
+    // [EO-DEC-0160 案イ] サイネージ端末は対象外(NULL は人間扱い)。人間がいなければ昇格させない
+    const humanMembers = allMembers.filter(m => m.is_signage !== true);
+    if (humanMembers.length === 0) return false;
+    return humanMembers[0].id === myMemberId;
   } catch (e) {
     return false;
   }
@@ -2874,6 +2880,8 @@ function showCompose() {
 }
 
 function selectComposeType(type) {
+  // [第13章補完 / Issue㉒-B] event では引き継ぎ種別を選択させない(直接呼び出しの保険)
+  if (type === 'handover' && currentGroup?.industry === 'event') type = 'msg';
   selectedComposeType = type;
   applyComposeType(type);
 }
@@ -4196,12 +4204,14 @@ async function leaveGroup() {
     }
     // 管理者が退出する場合、在籍中の最古参メンバーにis_creatorを引き継ぐ
     if (isCreator) {
+      // [EO-DEC-0160 案イ] サイネージ端末は主催者昇格の対象外(NULL は人間扱い)
       const { data: remainingMembers } = await supabase
         .from('group_members')
         .select('id, created_at')
         .eq('group_session_id', currentGroup.id)
         .eq('status', 'approved')
         .neq('id', currentMemberId)
+        .or('is_signage.eq.false,is_signage.is.null')
         .order('created_at', { ascending: true })
         .limit(1);
       if (remainingMembers && remainingMembers.length > 0) {
