@@ -2310,7 +2310,8 @@ async function applyReadCorrection(targetMessages) {
   const approvedUidSet = new Set(members.map(m => m.eo_uid));
   window._leftUnreadMap = {};
   (allItemReceivers || []).forEach(ir => {
-    if (!window._leftUnreadMap[ir.item_id]) window._leftUnreadMap[ir.item_id] = new Set(ir.receiver_eo_uid ? [ir.receiver_eo_uid] : []);
+    if (!ir.receiver_eo_uid) return; // null/undefined receiver をスキップ
+    if (!window._leftUnreadMap[ir.item_id]) window._leftUnreadMap[ir.item_id] = new Set([ir.receiver_eo_uid]);
     else window._leftUnreadMap[ir.item_id].add(ir.receiver_eo_uid);
   });
   // メッセージごとに「未読のまま退出数」= snapshotのuidのうちreceiptが無くかつapprovedに居ない人数
@@ -3372,7 +3373,14 @@ async function showDetail(messageId) {
       return true;
     });
   }
-  const totalMembers = msg.receiver_count != null ? msg.receiver_count : (snapshotUids ? snapshotUids.size : receivers.length);
+  let totalMembers;
+  if (msg.receiver_count != null) {
+    totalMembers = msg.receiver_count;
+  } else if (snapshotUids) { // [EO-DEC-0162] スナップショット経路のフォールバック
+    totalMembers = snapshotUids.size;
+  } else {
+    totalMembers = receivers.length;
+  }
   let readCount;
   let unreadMembers;
   if (snapshotReadSet !== null) {
