@@ -1994,9 +1994,15 @@ async function cancelRequest() {
       const { data: remainingMemberships } = await supabase
         .from('group_members').select('id, group_session_id, group_sessions(*)')
         .eq('eo_uid', currentUser.eo_uid).eq('status', 'approved')
-        .order('created_at', { ascending: false }).limit(1);
-      if (remainingMemberships && remainingMemberships.length > 0) {
-        const next = remainingMemberships[0];
+        .order('created_at', { ascending: false }).limit(20); // [EO-DEC-0163] 1人20グループ上限のため取得漏れなし
+      // [EO-DEC-0163] 期限切れeventのみ除外(E10と同一基準)。通常グループは期限切れでも残す
+      const validMemberships = (remainingMemberships || []).filter(mem => {
+        const g = mem.group_sessions;
+        if (!g || g.industry !== 'event') return true;
+        return !(g.expires_at && new Date(g.expires_at) <= new Date());
+      });
+      if (validMemberships.length > 0) {
+        const next = validMemberships[0];
         currentMemberId = next.id;
         currentGroup = next.group_sessions;
         localStorage.setItem('sl_member_id', next.id);
@@ -4360,19 +4366,25 @@ async function leaveGroup() {
     const leftGroupSessionId = currentGroup?.id;
 
     try {
-      // 残り所属グループを取得(自分の eo_uid で approved・退出したグループは除外・created_at DESC で最新1件)
+      // 残り所属グループを取得(自分の eo_uid で approved・退出したグループは除外・created_at DESC で最新20件→期限切れevent除外後の先頭1件)
       const { data: remainingMemberships } = await supabase
         .from('group_members')
-        .select('id, group_session_id')
+        .select('id, group_session_id, group_sessions(id, industry, expires_at)')
         .eq('eo_uid', currentUser.eo_uid)
         .eq('status', 'approved')
         .neq('group_session_id', leftGroupSessionId)
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(20); // [EO-DEC-0163] 1人20グループ上限のため取得漏れなし
 
-      if (remainingMemberships && remainingMemberships.length > 0) {
+      // [EO-DEC-0163] 期限切れeventのみ除外(E10と同一基準)。通常グループは期限切れでも残す
+      const validMemberships = (remainingMemberships || []).filter(mem => {
+        const g = mem.group_sessions;
+        if (!g || g.industry !== 'event') return true;
+        return !(g.expires_at && new Date(g.expires_at) <= new Date());
+      });
+      if (validMemberships.length > 0) {
         // ★ 残りグループあり → switchGroup() で自動切替(localStorage は switchGroup 内で更新)
-        const next = remainingMemberships[0];
+        const next = validMemberships[0];
         showToast('グループを退出しました');
         await switchGroup(next.group_session_id, next.id);
         return;
