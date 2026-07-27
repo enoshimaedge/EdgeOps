@@ -4172,7 +4172,7 @@ async function generateSignageToken() {
     if (error) throw error;
     // [Phase 0 後 追加] セキュリティ目的: 全サイネージ端末を強制退出(チャッピー承認済み)
     const { error: leaveError } = await supabase.from('group_members')
-      .update({ status: 'left' })
+      .update({ status: 'left', is_signage: false })
       .eq('group_session_id', currentGroup.id)
       .eq('is_signage', true)
       .neq('status', 'left');
