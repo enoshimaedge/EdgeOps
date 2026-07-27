@@ -181,6 +181,8 @@ async function submitSurveyNotApplicable() {
   }
 }
 async function showSurveyList() {
+  // [第12章 E8 / EO-DEC-0160] event の一般参加者には集計内訳を見せない(保険ガード)
+  if (typeof isEventGeneralMember === 'function' && isEventGeneralMember()) return;
   const modal = document.getElementById('modal-survey-list');
   const content = document.getElementById('survey-list-content');
   modal.style.display = 'block';
@@ -250,6 +252,8 @@ async function showSurveyList() {
   }
 }
 async function showSurveyDetail(messageId) {
+  // [第12章 E8 / EO-DEC-0160] event の一般参加者には集計内訳を見せない(保険ガード)
+  if (typeof isEventGeneralMember === 'function' && isEventGeneralMember()) return;
   const modal = document.getElementById('modal-survey-detail');
   const content = document.getElementById('survey-detail-content');
   const titleEl = document.getElementById('survey-detail-title');

@@ -910,10 +910,10 @@
 </div>
 
 <script src="js/i18n.js?v=20260727-1"></script>   <!-- ← 追加。必ず最初 -->
-<script src="js/ui-helpers.js?v=20260728-1"></script>
-<script src="js/image.js"></script>
+<script src="js/ui-helpers.js?v=20260728-2"></script>
+<script src="js/image.js?v=20260728-1"></script>
 <script src="js/templates.js?v=20260704-3"></script>
-<script src="js/survey.js?v=20260704-4"></script>
+<script src="js/survey.js?v=20260728-1"></script>
 <script src="js/report.js?v=20260705-1"></script>
 <script>
 // ═══════════════════════════════════════════
@@ -2884,7 +2884,7 @@ function applyComposeType(type) {
   document.getElementById('ctype-handover').classList.toggle('active', !isMsgActive);
   document.getElementById('section-msg-priority').style.display = isMsgActive ? '' : 'none';
   document.getElementById('section-handover-priority').style.display = isMsgActive ? 'none' : '';
-  document.getElementById('template-section').style.display = (!isMsgActive || !_groupTemplatesCache || _groupTemplatesCache.length === 0) ? 'none' : '';
+  document.getElementById('template-section').style.display = (!isMsgActive || !_groupTemplatesCache || _groupTemplatesCache.length === 0 || (typeof isEventGeneralMember === 'function' && isEventGeneralMember())) ? 'none' : '';
   const label = document.getElementById('compose-body-label');
   if (label) label.textContent = isMsgActive ? t('label_compose_body') : t('form_handover_body');
   const placeholder = document.getElementById('compose-body');

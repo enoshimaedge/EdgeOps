@@ -394,12 +394,14 @@ async function sendImageMessage() {
     if (!res || !res.ok) {
       // エラーコード抽出(Edge Function 応答仕様 v2.4)
       let errorCode = 'SERVER_ERROR';
+      let serverMessage = null;
       try {
         const errBody = await res.text();
         if (errBody) {
           try {
             const errJson = JSON.parse(errBody);
-            errorCode = errJson.error || errJson.code || `HTTP_${res.status}`;
+            errorCode = errJson.error_code || errJson.error || errJson.code || `HTTP_${res.status}`;
+            serverMessage = errJson.message || null;
           } catch (_) {
             errorCode = `HTTP_${res.status}`;
           }
@@ -407,7 +409,9 @@ async function sendImageMessage() {
           errorCode = `HTTP_${res.status}`;
         }
       } catch (_) { errorCode = `HTTP_${(res && res.status) || 'UNKNOWN'}`; }
-      throw new Error(errorCode);
+      const err = new Error(errorCode);
+      err.serverMessage = serverMessage;
+      throw err;
     }
 
     // ───── 成功時: 既存sendMessageと同じ後処理 ─────
@@ -454,6 +458,9 @@ async function sendImageMessage() {
       msg = '本日の画像投稿上限に達しました。明日までお待ちください';
     } else if (code === 'AUTH_TOKEN_INVALID' || code === 'AUTH_TOKEN_EXPIRED' || code === 'AUTH_TOKEN_MISSING') {
       msg = '認証エラー。LINEを開き直してください';
+    } else if (code === 'PERMISSION_DENIED') {
+      // [EO-DEC-0160] サーバーの文言をそのまま表示(例:「イベントでは写真の投稿は主催者のみ可能です」)
+      msg = (e && e.serverMessage) || '投稿権限がありません';
     } else if (code === 'FEATURE_DISABLED' || code === 'IMAGE_UPLOAD_DISABLED') {
       msg = '画像投稿は現在利用できません';
       resetImage = true;
