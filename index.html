@@ -1541,9 +1541,17 @@ async function restoreSession(memberId, groupId) {
         const { data: remainingMemberships } = await supabase
           .from('group_members').select('id, group_session_id, group_sessions(*)')
           .eq('eo_uid', currentUser.eo_uid).eq('status', 'approved')
-          .order('created_at', { ascending: false }).limit(1);
-        if (remainingMemberships && remainingMemberships.length > 0) {
-          const next = remainingMemberships[0];
+          .order('created_at', { ascending: false }).limit(20); // [EO-DEC-0161] 期限切れevent除外のため複数取得
+        // [EO-DEC-0161 / Issue⑬ E10 と同一基準] 期限切れ event のみスキップ。
+        // 通常グループは期限切れでも現行どおり復帰する
+        const validMemberships = (remainingMemberships || []).filter(m => {
+          const g = m.group_sessions;
+          if (!g) return false;
+          if (g.industry !== 'event') return true;
+          return !(g.expires_at && new Date(g.expires_at) <= new Date());
+        });
+        if (validMemberships.length > 0) {
+          const next = validMemberships[0];
           currentMemberId = next.id;
           currentGroup = next.group_sessions;
           syncProfileForm();
@@ -4176,8 +4184,15 @@ async function generateSignageToken() {
   } catch (e) { console.error(e); showToast('発行に失敗しました'); }
 }
 
+let isLeaving = false; // [EO-DEC-0161] leaveGroup 二重実行防止
+
 async function leaveGroup() {
+  if (isLeaving) return;
   if (!confirm('グループを退出しますか？')) return;
+  isLeaving = true;
+  // [EO-DEC-0161] 処理中表示(起動時と同じ #loading を再利用)
+  const loadingEl = document.getElementById('loading');
+  if (loadingEl) loadingEl.style.display = 'flex';
   try {
     stopPolling();
     // 退出時：自分が未読のメッセージのread_countを+1して既読扱いにする
@@ -4195,11 +4210,29 @@ async function leaveGroup() {
 
       // 未読のメッセージだけ処理
       const unreadMsgIds = receivedMsgIds.filter(id => !readMsgIds.has(id));
-      for (const msgId of unreadMsgIds) {
-        const msg = messages.find(m => m.id === msgId);
-        if (!msg) continue;
-        await supabase.from('read_receipts').insert({ message_id: msgId, eo_uid: currentUser.eo_uid, read_at: new Date().toISOString() });
-        await supabase.from('messages').update({ read_count: (msg.read_count || 0) + 1 }).eq('id', msgId);
+      if (unreadMsgIds.length > 0) {
+        // [EO-DEC-0161 案ア] 直列2Nリクエスト→一括INSERT＋並列UPDATE。
+        //   失敗しても退出は完遂する(console.warnのみ)。既読集計ロジック自体は不変更。
+        const nowIso = new Date().toISOString();
+        const { error: bulkErr } = await supabase.from('read_receipts').insert(
+          unreadMsgIds.map(id => ({ message_id: id, eo_uid: currentUser.eo_uid, read_at: nowIso }))
+        );
+        if (bulkErr) console.warn('[leaveGroup] read_receipts 一括INSERT失敗(退出は継続):', bulkErr);
+
+        // [EO-DEC-0161 チャッピー条件] Promise.all ではなく Promise.allSettled を使う
+        const updateResults = await Promise.allSettled(
+          unreadMsgIds.map(id => {
+            const msg = messages.find(m => m.id === id);
+            if (!msg) return Promise.resolve({ error: null });
+            return supabase.from('messages')
+              .update({ read_count: (msg.read_count || 0) + 1 })
+              .eq('id', id);
+          })
+        );
+        updateResults.forEach((r, i) => {
+          const err = r.status === 'rejected' ? r.reason : r.value?.error;
+          if (err) console.warn('[leaveGroup] read_count 更新失敗(退出は継続):', unreadMsgIds[i], err);
+        });
       }
     }
     // 管理者が退出する場合、在籍中の最古参メンバーにis_creatorを引き継ぐ
@@ -4280,7 +4313,10 @@ async function leaveGroup() {
     // 退出後の RPC が anonロールで実行され 42501 エラーになる致命的バグがあった
     clearEdgeOpsLocalStorage(); currentGroup = null; currentMemberId = null;
     showScreen('screen-start'); showToast('グループを退出しました');
-  } catch (e) { showToast('エラーが発生しました。'); }
+  } catch (e) { showToast('エラーが発生しました。'); } finally {
+    isLeaving = false;
+    hideLoading();
+  }
 }
 
 
