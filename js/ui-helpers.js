@@ -13,6 +13,8 @@ async function applyImageUploadButtonVisibility() {
   const btnLibrary = document.getElementById('compose-image-btn-library');
   if (!btnCamera || !btnLibrary) return;
   const hideBoth = () => { btnCamera.style.display = 'none'; btnLibrary.style.display = 'none'; };
+  // [第10章 E6 表示側 / EO-DEC-0160] event の一般参加者には写真ボタンを出さない(サーバー側拒否は実装済み)
+  if (typeof isEventGeneralMember === 'function' && isEventGeneralMember()) { hideBoth(); return; }
   // [第119回] is_creator 限定を撤回。表示可否は feature_flags のみで判定。
   try {
     const flags = await getFeatureFlags(false);
@@ -132,7 +134,10 @@ function updateExpiryWarningBar() {
   if (daysLeft <= 0) {
     bar.textContent = 'このグループは有効期限を過ぎています';
   } else {
-    bar.textContent = `あと${daysLeft}日でこのグループは使用できなくなります`;
+    // [EO-DEC-0160] event は威圧的でない文言にする(通常グループとサイネージは現行のまま)
+    bar.textContent = (currentGroup?.industry === 'event')
+      ? `あと${daysLeft}日でこのグループは終了します`
+      : `あと${daysLeft}日でこのグループは使用できなくなります`;
   }
   bar.style.display = 'block';
 }
