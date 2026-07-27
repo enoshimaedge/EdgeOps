@@ -168,6 +168,12 @@ function applyHandoverPriorityUI(p) {
 
 async function updateHandoverBadge() {
   try {
+    // [第13章] event では引き継ぎ未確認バッジを表示しない
+    if (currentGroup?.industry === 'event') {
+      const bar = document.getElementById('handover-badge-bar');
+      if (bar) bar.style.display = 'none';
+      return;
+    }
     // 72時間以内の引き継ぎを取得（sender_eo_uidも含めて取得）
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     const { data: notes } = await supabase.from('handover_notes').select('id, sender_eo_uid')
