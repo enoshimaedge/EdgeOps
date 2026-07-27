@@ -802,6 +802,9 @@
         <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
           <div style="font-size:12px; font-weight:700; color:var(--text-mid); margin-bottom:8px; letter-spacing:0.5px;" data-i18n="heading_signage">サイネージ管理</div>
           <div id="signage-url-display" style="font-size:12px; margin-bottom:8px; min-height:16px;"></div>
+          <button id="copy-signage-btn" class="btn btn-secondary" onclick="copySignageUrl()"
+            style="font-size:13px; padding:10px 8px; width:100%; margin-bottom:8px; display:none;"
+            data-i18n="btn_copy_signage_url">サイネージURLをコピー</button>
           <button class="btn btn-secondary" onclick="generateSignageToken()" style="font-size:13px; padding:10px 8px;" data-i18n="btn_regen_token">
              トークンを再生成する
           </button>
@@ -4172,7 +4175,7 @@ async function generateSignageToken() {
     if (error) throw error;
     // [Phase 0 後 追加] セキュリティ目的: 全サイネージ端末を強制退出(チャッピー承認済み)
     const { error: leaveError } = await supabase.from('group_members')
-      .update({ status: 'left' })
+      .update({ status: 'left', is_signage: false })
       .eq('group_session_id', currentGroup.id)
       .eq('is_signage', true)
       .neq('status', 'left');
