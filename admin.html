@@ -222,6 +222,9 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   .bar-attraction { background: #9C27B0; }
   .bar-freelance { background: #00BCD4; }
   .bar-club { background: #E91E63; }
+  .bar-event { background: #F4A261; }
+  .bar-cat-normal { background: #4A6080; }
+  .bar-cat-event { background: #F4A261; }
   .industry-count { font-size: 12px; font-weight: 700; color: var(--text); width: 24px; text-align: right; }
 
   /* ── カード ── */
@@ -267,6 +270,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   .industry-tag.clinic { background: #e3f2fd; color: #1565c0; }
   .industry-tag.care { background: #fff3e0; color: #e65100; }
   .industry-tag.attraction { background: #f3e5f5; color: #6a1b9a; }
+  .industry-tag.event { background: #fdf1e3; color: #a05a1c; }
   .group-item-info {
     display: flex;
     gap: 16px;
@@ -510,7 +514,8 @@ const INDUSTRY_LABELS = {
   care: '🏠 介護施設',
   attraction: '🎡 集客施設',
   freelance: '👥 フリーランス集団',
-  club: '🏆 部活・クラブ'
+  club: '🏆 部活・クラブ',
+  event: '🎪 イベント・催事'
 };
 
 // ── 初期化 ──
@@ -584,7 +589,7 @@ async function loadStats() {
     sb.from('group_members').select('eo_uid, status, group_session_id'),
     sb.from('group_members').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     sb.from('messages').select('*', { count: 'exact', head: true }),
-    sb.from('group_sessions').select('id, industry')
+    sb.from('group_sessions').select('id, industry, expires_at')
   ]);
 
   // アクティブグループ（承認済みメンバーが1人以上）
@@ -620,19 +625,42 @@ async function loadStats() {
     `${messageCount || 0}<span class="stat-unit">件</span>` +
     note(`全グループの送信メッセージ合計`);
 
-  // 業種内訳（6業種対応・アクティブグループのみ集計）
-  const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0, freelance: 0, club: 0 };
+  // 業種内訳（7業種対応・アクティブグループのみ集計）
+  // [第19章 19-2] 期限切れの event はアクティブ扱いにしない(通常グループは従来どおり期限を見ない)
+  const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0, freelance: 0, club: 0, event: 0 };
+  const nowTs = Date.now();
+  const isExpiredEvent = (g) =>
+    g.industry === 'event' && g.expires_at && new Date(g.expires_at).getTime() <= nowTs;
   (industryData || []).forEach(g => {
-    // アクティブグループ（承認済みメンバーが1人以上）のみカウント
-    if (activeGroupIds.has(g.id) && counts[g.industry] !== undefined) counts[g.industry]++;
+    if (!activeGroupIds.has(g.id)) return;
+    if (isExpiredEvent(g)) return;
+    if (counts[g.industry] !== undefined) counts[g.industry]++;
   });
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
 
   // 業種ラベル（絵文字とテキストを分離して取得）
   const INDUSTRY_SHORT = {
     hotel: 'ホテル', clinic: '病院', care: '介護',
-    attraction: '集客', freelance: 'フリーランス', club: '部活'
+    attraction: '集客', freelance: 'フリーランス', club: '部活', event: 'イベント'
   };
+
+  // [第19章 19-1] 大分類:通常グループ／イベントグループ
+  const eventCount  = counts.event;
+  const normalCount = Object.entries(counts)
+    .filter(([k]) => k !== 'event')
+    .reduce((a, [, v]) => a + v, 0);
+  const catTotal = (normalCount + eventCount) || 1;
+  const catHtml = `
+    <div class="industry-row">
+      <div class="industry-label">■ 通常グループ</div>
+      <div class="bar-wrap"><div class="bar-fill bar-cat-normal" style="width:${Math.round(normalCount/catTotal*100)}%"></div></div>
+      <div class="industry-count">${normalCount}</div>
+    </div>
+    <div class="industry-row" style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border, #e0e0e0);">
+      <div class="industry-label">■ イベントグループ</div>
+      <div class="bar-wrap"><div class="bar-fill bar-cat-event" style="width:${Math.round(eventCount/catTotal*100)}%"></div></div>
+      <div class="industry-count">${eventCount}</div>
+    </div>`;
 
   const html = Object.entries(counts).map(([id, count]) => `
     <div class="industry-row">
@@ -641,7 +669,7 @@ async function loadStats() {
       <div class="industry-count">${count}</div>
     </div>
   `).join('');
-  document.getElementById('industry-breakdown').innerHTML = html;
+  document.getElementById('industry-breakdown').innerHTML = catHtml + html;
 }
 
 // ═══════════════════════════════════════════
