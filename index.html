@@ -910,7 +910,7 @@
 </div>
 
 <script src="js/i18n.js?v=20260727-1"></script>   <!-- ← 追加。必ず最初 -->
-<script src="js/ui-helpers.js?v=20260727-1"></script>
+<script src="js/ui-helpers.js?v=20260728-1"></script>
 <script src="js/image.js"></script>
 <script src="js/templates.js?v=20260704-3"></script>
 <script src="js/survey.js?v=20260704-4"></script>
@@ -940,6 +940,7 @@ function setLang(lang) {
   applyLang(v);
   updateLangButtons(v);
   renderMessages();          // 動的文言を即時反映
+  updateGroupSwitcherBtn();  // [不具合修正] data-i18n 非対象のため言語切替時に再描画する
 }
 
 // 翻訳関数。{read} {total} 等の差し込みに対応（判定10）
@@ -1008,6 +1009,20 @@ function applyEventWording(isEvent) {
     });
   });
   applyLang(getCurrentLang());
+}
+
+// ── [第13章] event では引き継ぎ機能を表示しない（主催者を含む全員） ──
+function applyEventUiVisibility() {
+  const ev = currentGroup?.industry === 'event';
+  const chipHandover = document.getElementById('filter-chip-handover');
+  const chipAll      = document.getElementById('filter-chip-all');
+  if (chipHandover) chipHandover.style.display = ev ? 'none' : '';
+  if (chipAll)      chipAll.style.display      = ev ? 'none' : '';
+  if (ev) {
+    const bar = document.getElementById('handover-badge-bar');
+    if (bar) bar.style.display = 'none';
+    if (homeFilter !== 'msg') setHomeFilter('msg');
+  }
 }
 
 // 業種プルダウンの変更で、期限入力UIと文言を同時に切り替える（第3-1章・第5章）
@@ -1559,6 +1574,7 @@ async function restoreSession(memberId, groupId) {
       currentMemberId = member.id; currentUser.display_name = member.display_name;
       currentGroup = member.group_sessions;
       applyEventWording(currentGroup?.industry === 'event');
+      applyEventUiVisibility();
       syncProfileForm();
       // ST版(SL-)の期限切れチェック
       if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
@@ -1656,6 +1672,7 @@ async function restoreExistingMembershipIfAny() {
     currentMemberId = m.id;
     currentGroup = m.group_sessions;
     applyEventWording(currentGroup?.industry === 'event');
+    applyEventUiVisibility();
     syncProfileForm();
     currentUser.display_name = m.display_name;
     isCreator = await resolveIsCreator(m.group_session_id, m.id);
@@ -1790,6 +1807,7 @@ async function createGroup() {
     // [2026/5/23 案B 追加] 作成成功時にも sl_display_name 更新(チャッピー第72回判定GO)
     try { localStorage.setItem('sl_display_name', displayName || ''); } catch (_) {}
     applyEventWording(currentGroup?.industry === 'event');
+    applyEventUiVisibility();
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
   } catch (e) {
     console.error(e);
@@ -1883,6 +1901,7 @@ async function joinGroup() {
       currentUser.display_name = result.display_name;
       currentGroup = currentGroupObj;
       applyEventWording(currentGroup?.industry === 'event');
+      applyEventUiVisibility();
       currentMemberId = result.member_id;
       isCreator = result.is_creator === true;
       await loadHome();
@@ -2327,6 +2346,8 @@ async function loadMoreMessages() {
 }
 
 async function setHomeFilter(f) {
+  // [第13章] event では引き継ぎ・すべてタブを使用しない
+  if ((f === 'handover' || f === 'all') && currentGroup?.industry === 'event') f = 'msg';
   homeFilter = f;
   // [第127回追加] タブ状態(連絡/引き継ぎ/すべて)を記録し、リロード後に復元する。
   try { localStorage.setItem('lastHomeFilter', f); } catch (_) {}
@@ -4328,8 +4349,12 @@ function restoreLastMajorScreen() {
     pendingRestoreScreen = null; // 復元は起動時の一回のみ
     pendingRestoreFilter = null;
     if (last === 'screen-handover') {
-      showScreen('screen-handover');
-      return;
+      if (currentGroup?.industry === 'event') {
+        // [第13章] event は screen-handover を復元せず home に留まる
+      } else {
+        showScreen('screen-handover');
+        return;
+      }
     } else if (last === 'screen-profile') {
       showProfile();
       return;
@@ -4424,6 +4449,7 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   currentMemberId = newMemberId;
   currentGroup = newGroup;
   applyEventWording(currentGroup?.industry === 'event');
+  applyEventUiVisibility();
   // ★ チャッピー②指摘反映: currentUser を group_members の値で完全再生成
   //   eo_uid / line_name / picture_url は不変(同じ人なので保持)
   //   display_name のみグループごとに切替(現場で「前グループの名前で投稿」事故を防ぐ)
