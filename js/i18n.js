@@ -179,8 +179,10 @@ window.EdgeOpsI18n = {
     btn_regen_token:            'トークンを再生成する',
     note_regen_token:           '再生成すると旧URLは即無効化されます',
     empty_no_pending_members:   '承認待ちのメンバーはいません',
+    empty_approval_organizer_only:'参加申請の承認は主催者が行います',
     btn_approve_member:         '承認',
     btn_reject_member:          '却下',
+    toast_approval_organizer_only:'承認できるのは主催者だけです',
     toast_gid_copied:           'グループIDをコピーしました',
     toast_copy_failed:          'コピーに失敗しました',
     toast_copy_unsupported:     'この環境ではコピーできません',
@@ -213,6 +215,9 @@ window.EdgeOpsI18n = {
     notice_event_ended_title:    'このイベントは終了しました',
     notice_event_ended_body:     '新しいイベントに参加するか、新規作成してください。',
     form_group_name_event:       'イベント名（任意）',
+    btn_create_group:            '新しいグループを作る',
+    btn_create_group_event:      '新しいイベントを作る',
+    btn_join_event:              'イベントに参加する',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -392,8 +397,10 @@ window.EdgeOpsI18n = {
     btn_regen_token:            'Regenerate token',
     note_regen_token:           'Regenerating disables the old URL immediately',
     empty_no_pending_members:   'No members awaiting approval',
+    empty_approval_organizer_only:'Only the organizer can approve join requests',
     btn_approve_member:         'Approve',
     btn_reject_member:          'Reject',
+    toast_approval_organizer_only:'Only the organizer can approve members',
     toast_gid_copied:           'Group ID copied',
     toast_copy_failed:          'Failed to copy',
     toast_copy_unsupported:     'Copy is not supported in this environment',
@@ -426,5 +433,8 @@ window.EdgeOpsI18n = {
     notice_event_ended_title:    'This event has ended',
     notice_event_ended_body:     'Join a new event or create one.',
     form_group_name_event:       'Event Name (optional)',
+    btn_create_group:            'Create Group',
+    btn_create_group_event:      'Create Event',
+    btn_join_event:              'Join Event',
   }
 };
