@@ -204,6 +204,7 @@
           <select class="form-input" id="input-industry" onchange="onIndustryChanged()">
             <option value="">-- 業種を選んでください --</option>
             <option value="hotel">ホテル・旅館</option>
+            <option value="commercial">商業施設</option>
             <option value="clinic">病院・クリニック</option>
             <option value="care">介護施設</option>
             <option value="attraction">集客施設</option>
@@ -2845,6 +2846,14 @@ const TEMPLATES = {
     '本日のシフト変更をお知らせします。〇〇の担当が〇〇さんに変わりました。',
     'フロントミーティングを行います。〇〇時にフロントへお集まりください。',
   ],
+  commercial: [
+    '本日の開店前巡回を〇〇時より開始します。警備担当は〇〇入口の開錠・立ち会いをお願いします。',
+    '〇〇フロアの清掃を〇〇時までにお願いします。完了しましたらこのグループへ報告をお願いします。',
+    '〇〇（催事場）の設営は本日〇〇時搬入開始です。搬入口は〇〇をご利用ください。設営完了後に報告をお願いします。',
+    '〇〇入口・駐車場が混雑しています。警備担当は誘導の強化をお願いします。',
+    '〇〇フロアで〇〇（汚損・破損等）が発生しています。清掃・保守担当は至急対応をお願いします。',
+    '本日の閉店作業は〇〇時開始です。各協力会社の皆様は退館時に防災センターへお声がけをお願いします。',
+  ],
   clinic: [
     '本日の外来予約は午前〇〇件・午後〇〇件です。スタッフは時間通りに配置ください。',
     '〇〇先生の外来は本日〇〇時より開始予定です。受付準備をお願いします。',
@@ -3782,6 +3791,7 @@ async function updateGroupName() {
 function getIndustryLabel(value) {
   const labels = {
     hotel: 'ホテル・旅館',
+    commercial: '商業施設',
     clinic: '病院・クリニック',
     care: '介護施設',
     attraction: '集客施設',
