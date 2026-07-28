@@ -217,6 +217,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   .bar-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 8px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
   .bar-hotel { background: #06C755; }
+  .bar-commercial { background: #607D8B; }
   .bar-clinic { background: #2196F3; }
   .bar-care { background: #FF9800; }
   .bar-attraction { background: #9C27B0; }
@@ -267,6 +268,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     background: var(--green-light);
     color: var(--green-dark);
   }
+  .industry-tag.commercial { background: #eceff1; color: #455a64; }
   .industry-tag.clinic { background: #e3f2fd; color: #1565c0; }
   .industry-tag.care { background: #fff3e0; color: #e65100; }
   .industry-tag.attraction { background: #f3e5f5; color: #6a1b9a; }
@@ -510,6 +512,7 @@ let allGroups = [], allMembers = [];
 
 const INDUSTRY_LABELS = {
   hotel: '🏨 ホテル・旅館',
+  commercial: '🏬 商業施設',
   clinic: '🏥 病院・クリニック',
   care: '🏠 介護施設',
   attraction: '🎡 集客施設',
@@ -627,7 +630,7 @@ async function loadStats() {
 
   // 業種内訳（7業種対応・アクティブグループのみ集計）
   // [第19章 19-2] 期限切れの event はアクティブ扱いにしない(通常グループは従来どおり期限を見ない)
-  const counts = { hotel: 0, clinic: 0, care: 0, attraction: 0, freelance: 0, club: 0, event: 0 };
+  const counts = { hotel: 0, commercial: 0, clinic: 0, care: 0, attraction: 0, freelance: 0, club: 0, event: 0 };
   const nowTs = Date.now();
   const isExpiredEvent = (g) =>
     g.industry === 'event' && g.expires_at && new Date(g.expires_at).getTime() <= nowTs;
@@ -640,7 +643,7 @@ async function loadStats() {
 
   // 業種ラベル（絵文字とテキストを分離して取得）
   const INDUSTRY_SHORT = {
-    hotel: 'ホテル', clinic: '病院', care: '介護',
+    hotel: 'ホテル', commercial: '商業', clinic: '病院', care: '介護',
     attraction: '集客', freelance: 'フリーランス', club: '部活', event: 'イベント'
   };
 
