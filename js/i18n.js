@@ -24,9 +24,9 @@ window.EdgeOpsI18n = {
 
     // ── 他グループ追加参加画面 ────────────────────────────────────
     header_sub_add_group:       '既存グループはそのまま保持されます',
-    desc_group_id_join:         'グループの管理者から共有されたIDを入力します',
+    desc_group_id_join:         'グループ管理者またはイベント主催者から共有されたID・コードを入力します',
     form_display_name_group:    '表示名(このグループでの名前)',
-    form_group_id:              'グループID',
+    form_group_id:              'グループID／イベントコード',
 
     // ── 承認待ち画面 ─────────────────────────────────────────────
     heading_pending:            '参加申請中',
@@ -245,9 +245,9 @@ window.EdgeOpsI18n = {
 
     // ── 他グループ追加参加画面 ────────────────────────────────────
     header_sub_add_group:       'Join another group',
-    desc_group_id_join:         'Enter the group ID shared by the admin',
+    desc_group_id_join:         'Enter the ID or code shared by the group admin or event organizer.',
     form_display_name_group:    'Display Name in this Group',
-    form_group_id:              'Group ID',
+    form_group_id:              'Group ID / Event Code',
 
     // ── 承認待ち画面 ─────────────────────────────────────────────
     heading_pending:            'Pending Approval',
