@@ -18,7 +18,7 @@
         ▼screen-start           起動・グループ選択
         ▼screen-join-only       他グループ参加申請（既存ユーザー専用）
         ▼screen-pending         承認待ち
-        ▼screen-withdrawn       出店取りやめ（本人終了画面）[Issue㉓]
+        ▼screen-withdrawn       参加取りやめ（本人終了画面）[Issue㉓]
         ▼screen-home            ホーム（メッセージ一覧・サイネージ/混雑度ボタン）
         ▼screen-compose         メッセージ作成（＋画像投稿UI・アンケート）
         ▼screen-detail          メッセージ詳細（＋画像表示・アンケート回答）
@@ -385,7 +385,7 @@
   </div>
 </div>
 
-<!-- ══ 画面③'：出店取りやめ（本人終了画面）[Issue㉓ EO-DEC-0169] ══ -->
+<!-- ══ 画面③'：参加取りやめ（本人終了画面）[Issue㉓ EO-DEC-0169] ══ -->
 <div class="screen" id="screen-withdrawn">
   <div class="header">
     <div style="flex:1;">
@@ -400,7 +400,7 @@
   </div>
   <div class="content">
     <div style="text-align:center; padding: 64px 24px 32px;">
-      <div style="font-size:17px; font-weight:700; margin-bottom:16px; color:var(--text);" data-i18n="heading_withdrawn">このイベントへの参加は終了しました</div>
+      <div style="font-size:17px; font-weight:700; margin-bottom:16px; color:var(--text);" data-i18n="heading_withdrawn">参加は終了しました</div>
       <div style="font-size:14px; color:var(--text-light); line-height:1.8;" data-i18n="desc_withdrawn">詳細は主催者へお問い合わせください。</div>
     </div>
   </div>
@@ -1348,7 +1348,7 @@ let messages = [];
 let members = [];
 let pollTimer = null;
 
-// [Issue㉓ EO-DEC-0169] 出店取りやめ状態
+// [Issue㉓ EO-DEC-0169] 参加取りやめ状態
 window.activeWithdrawnUids = []; // 取りやめ中の eo_uid 配列
 window.myWithdrawn = false;      // 自分が取りやめ状態か
 
@@ -3896,7 +3896,7 @@ async function showMemberList() {
           + '<input type="checkbox" data-member-id="' + m.id + '" '
           + (m.is_signage ? 'checked ' : '')
           + 'style="accent-color:#0F6B63;width:16px;height:16px;border-radius:9px;cursor:pointer;" '
-          + 'onchange="setMemberSignage(this)"> サイネージ端末</label>'
+          + 'onchange="setMemberSignage(this)"> ' + escHtml(t('label_signage_checkbox')) + '</label>'
         : '';
       // [Issue㉓ EO-DEC-0169] 取りやめチェックは event主催者・非主催者・非サイネージのみ表示
       const withdrawalCheckbox = (canManageWithdrawal && m.is_creator !== true && m.is_signage !== true)
@@ -3904,10 +3904,10 @@ async function showMemberList() {
           + '<input type="checkbox" data-member-id="' + m.id + '" '
           + ((window.activeWithdrawnUids || []).includes(m.eo_uid) ? 'checked ' : '')
           + 'style="accent-color:#0F6B63;width:16px;height:16px;border-radius:9px;cursor:pointer;" '
-          + 'onchange="window.setMemberWithdrawal(this)"> 出店取りやめ</label>'
+          + 'onchange="window.setMemberWithdrawal(this)"> ' + escHtml(t('label_withdrawal_checkbox')) + '</label>'
         : '';
       const checkboxWrap = (signageCheckbox || withdrawalCheckbox)
-        ? '<div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">'
+        ? '<div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-start;gap:6px;flex-shrink:0;">'
           + signageCheckbox + withdrawalCheckbox + '</div>'
         : '';
       return `<div style="display:flex;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">`
@@ -3957,7 +3957,7 @@ window.setMemberSignage = async function(cb) {
   }
 };
 
-// [Issue㉓ EO-DEC-0169] 出店取りやめチェックボックス用グローバル関数
+// [Issue㉓ EO-DEC-0169] 参加取りやめチェックボックス用グローバル関数
 window.setMemberWithdrawal = async function(cb) {
   const mid = cb.dataset.memberId;
   const v = cb.checked;
@@ -3980,7 +3980,7 @@ window.setMemberWithdrawal = async function(cb) {
       cb.disabled = false;
       return;
     }
-    showToast(v ? '出店取りやめにしました' : '出店取りやめを解除しました');
+    showToast(v ? t('toast_withdrawal_on') : t('toast_withdrawal_off'));
     await refreshWithdrawalState();
     renderMessages();
     await showMemberList();
