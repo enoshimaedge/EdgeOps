@@ -250,7 +250,7 @@ Deno.serve(async (req: Request) => {
       ...m,
       body: placeholderBody,
       sender_eo_uid: null,
-      priority: 'withdrawn',
+      priority: 'info',
       image_url: null,
       thumbnail_url: null,
       image_mode: null,
