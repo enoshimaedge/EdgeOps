@@ -450,7 +450,11 @@ function generateGroupId() {
 
 function getMemberName(eoUid) {
   const member = members.find(m => m.eo_uid === eoUid);
-  return member?.display_name || '不明';
+  if (member?.display_name) return member.display_name;
+  // [Issue⑨ EO-DEC-0152] approved に居ない＝退出者。名前マップで解決する
+  const fromMap = (window._memberNameMap || {})[eoUid];
+  if (fromMap) return fromMap;
+  return '不明';
 }
 
 function formatTime(isoString) {
