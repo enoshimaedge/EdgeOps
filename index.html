@@ -402,6 +402,10 @@
     <div style="text-align:center; padding: 64px 24px 32px;">
       <div style="font-size:17px; font-weight:700; margin-bottom:16px; color:var(--text);" data-i18n="heading_withdrawn">参加は終了しました</div>
       <div style="font-size:14px; color:var(--text-light); line-height:1.8;" data-i18n="desc_withdrawn">詳細は主催者へお問い合わせください。</div>
+      <div style="margin-top:20px; display:flex; flex-direction:column; gap:10px;">
+        <button class="btn" onclick="goToJoinNewGroup()"><span data-i18n="btn_withdrawn_join_other">他のグループに参加する</span></button>
+        <button class="btn btn-danger" onclick="leaveGroup()"><span data-i18n="btn_withdrawn_leave">このグループを退出する</span></button>
+      </div>
     </div>
   </div>
 </div>
@@ -4655,7 +4659,7 @@ async function leaveGroup() {
     // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
     // 旧 localStorage.clear() は Supabase JS SDK の sb-*-auth-token も消し、
     // 退出後の RPC が anonロールで実行され 42501 エラーになる致命的バグがあった
-    clearEdgeOpsLocalStorage(); currentGroup = null; currentMemberId = null;
+    clearEdgeOpsLocalStorage(); currentGroup = null; currentMemberId = null; window.myWithdrawn = false; // [EO-DEC-0173] 取りやめ状態の残留を防ぐ
     showScreen('screen-start'); showToast('グループを退出しました');
   } catch (e) { showToast('エラーが発生しました。'); } finally {
     isLeaving = false;
@@ -4923,8 +4927,13 @@ function goToJoinNewGroup() {
   showScreen('screen-join-only');
 }
 
-// ★ 案C-改:キャンセル → プロフィール画面に戻る(現在のグループ状態は維持)
+// ★ 案C-改:キャンセル → 通常はプロフィールへ戻る(取りやめ中は終了画面へ戻す)
 function cancelJoinNewGroup() {
+  // [EO-DEC-0173] 取りやめ中の本人をプロフィール画面へ戻さない
+  if (window.myWithdrawn === true) {
+    showScreen('screen-withdrawn');
+    return;
+  }
   showScreen('screen-profile');
 }
 
