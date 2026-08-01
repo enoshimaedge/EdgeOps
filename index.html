@@ -3747,27 +3747,6 @@ async function showMemberList() {
     // [2026/5/27 課題③修正] is_signage=true メンバーに📺バッジ表示
     // [Issue⑲ EO-DEC-0168] event主催者向けサイネージ指定チェックボックス
     const canManageSignage = currentGroup.industry === 'event' && isCreator === true;
-    const onchangeHandler = '(async function(cb){'
-      + 'const mid=cb.dataset.memberId; const v=cb.checked; cb.disabled=true;'
-      + "const {data,error}=await supabase.rpc('event_set_member_signage',{p_member_id:mid,p_is_signage:v});"
-      + 'if(error){'
-      + 'cb.checked=!v;'
-      + "const msg=error.message||'';"
-      + "if(msg.includes('AUTH_REQUIRED'))showToast('認証エラーです。アプリを再起動してください。');"
-      + "else if(msg.includes('MEMBER_NOT_FOUND'))showToast('対象のメンバーが見つかりません。');"
-      + "else if(msg.includes('NOT_EVENT_GROUP'))showToast('このグループでは指定できません。');"
-      + "else if(msg.includes('NOT_ORGANIZER'))showToast('主催者のみが指定できます。');"
-      + "else if(msg.includes('CANNOT_TARGET_ORGANIZER'))showToast('主催者をサイネージ端末に指定することはできません。');"
-      + "else if(msg.includes('TARGET_NOT_APPROVED'))showToast('参加が承認されたメンバーのみ指定できます。');"
-      + "else showToast('変更に失敗しました。');"
-      + '}else{'
-      + "if(data&&data.token_created)showToast('サイネージ端末に指定し、サイネージURLを発行しました');"
-      + "else if(v)showToast('サイネージ端末に指定しました');"
-      + "else showToast('サイネージ指定を解除しました');"
-      + 'showMemberList();'
-      + '}'
-      + 'cb.disabled=false;'
-      + '})(this)';
     const html = memberList.map((m, i) => {
       const adminBadge = m.is_creator ? ' <span style="font-size:11px;background:var(--green);color:white;border-radius:4px;padding:1px 6px;">管理者</span>' : '';
       const signageBadge = m.is_signage ? ' <span style="font-size:11px;background:#5c6bc0;color:white;border-radius:4px;padding:1px 6px;">サイネージ</span>' : '';
@@ -3776,7 +3755,7 @@ async function showMemberList() {
           + '<input type="checkbox" data-member-id="' + m.id + '" '
           + (m.is_signage ? 'checked ' : '')
           + 'style="accent-color:#0F6B63;width:16px;height:16px;border-radius:9px;cursor:pointer;" '
-          + 'onchange="' + onchangeHandler + '"> サイネージ端末</label>'
+          + 'onchange="setMemberSignage(this)"> サイネージ端末</label>'
         : '';
       return `<div style="display:flex;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">`
            + `<div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-right:10px;flex-shrink:0;">${i+1}</div>`
@@ -3789,6 +3768,41 @@ async function showMemberList() {
     content.innerHTML = '<div style="text-align:center;color:var(--red);padding:24px;">取得に失敗しました</div>';
   }
 }
+
+// [Issue⑳ EO-DEC-0168] サイネージ指定チェックボックス用グローバル関数
+window.setMemberSignage = async function(cb) {
+  const mid = cb.dataset.memberId;
+  const v = cb.checked;
+  cb.disabled = true;
+  try {
+    const { data, error } = await supabase.rpc('event_set_member_signage', {
+      p_member_id: mid,
+      p_is_signage: v
+    });
+    if (error) {
+      cb.checked = !v;
+      const msg = error.message || '';
+      if (msg.includes('AUTH_REQUIRED')) showToast('認証エラーです。アプリを再起動してください。');
+      else if (msg.includes('MEMBER_NOT_FOUND')) showToast('対象のメンバーが見つかりません。');
+      else if (msg.includes('NOT_EVENT_GROUP')) showToast('このグループでは指定できません。');
+      else if (msg.includes('NOT_ORGANIZER')) showToast('主催者のみが指定できます。');
+      else if (msg.includes('CANNOT_TARGET_ORGANIZER')) showToast('主催者をサイネージ端末に指定することはできません。');
+      else if (msg.includes('TARGET_NOT_APPROVED')) showToast('参加が承認されたメンバーのみ指定できます。');
+      else showToast('変更に失敗しました。');
+      cb.disabled = false;
+      return;
+    }
+    if (data && data.token_created) showToast('サイネージ端末に指定し、サイネージURLを発行しました');
+    else if (v) showToast('サイネージ端末に指定しました');
+    else showToast('サイネージ指定を解除しました');
+    await showMemberList();
+  } catch (e) {
+    console.error('[setMemberSignage]', e);
+    cb.checked = !v;
+    showToast('変更に失敗しました。');
+    cb.disabled = false;
+  }
+};
 
 // ═══════════════════════════════════════════
 // プロフィール
