@@ -223,6 +223,46 @@ Deno.serve(async (req: Request) => {
     }));
   }
 
+  // ─── 5-3. event の参加取りやめ投稿をプレースホルダー化 ─────────────
+  const [withdrawalsResult] = await Promise.allSettled([
+    group.industry === 'event'
+      ? supabase.from('event_withdrawals').select('eo_uid')
+          .eq('group_session_id', group.id)
+          .is('released_at', null)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  logPartialFailure(rid, 'event_withdrawals_fetch', withdrawalsResult);
+
+  const withdrawnEoUids = (withdrawalsResult.status === 'fulfilled' && !withdrawalsResult.value.error)
+    ? (withdrawalsResult.value.data || [])
+        .map((row: { eo_uid?: string | null }) => row.eo_uid)
+        .filter((eo_uid): eo_uid is string => typeof eo_uid === 'string' && eo_uid.length > 0)
+    : [];
+  const withdrawnEoUidSet = new Set(withdrawnEoUids);
+
+  const placeholderBody = 'この投稿は表示されません。詳細は主催者へお問い合わせください。';
+  mergedMessages = mergedMessages.map((m: Record<string, unknown>) => {
+    const senderEoUid = typeof m.sender_eo_uid === 'string' ? m.sender_eo_uid : null;
+    if (!senderEoUid || !withdrawnEoUidSet.has(senderEoUid)) {
+      return m;
+    }
+    return {
+      ...m,
+      body: placeholderBody,
+      sender_eo_uid: null,
+      priority: 'withdrawn',
+      image_url: null,
+      thumbnail_url: null,
+      image_mode: null,
+      image_size: null,
+      thumbnail_size: null,
+      image_uploaded_at: null,
+      image_deleted_at: null,
+      is_survey: false,
+      survey_deadline: null,
+    };
+  });
+
   // ─── 6. 既読・確認・メンバー情報・アンケート回答を並列取得 ───────────
   const msgIds = mergedMessages.map((m: { id: string }) => m.id);
   const handoverIds = handoverNotes.map((h: { id: string }) => h.id);
@@ -301,6 +341,7 @@ Deno.serve(async (req: Request) => {
     confirmations_count: confirmations.length,
     members_count: members.length,
     survey_responses_count: surveyResponses.length,
+    withdrawn_count: withdrawnEoUidSet.size,
   }));
 
   return jsonResponse({
