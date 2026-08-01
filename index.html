@@ -18,6 +18,7 @@
         ▼screen-start           起動・グループ選択
         ▼screen-join-only       他グループ参加申請（既存ユーザー専用）
         ▼screen-pending         承認待ち
+        ▼screen-withdrawn       出店取りやめ（本人終了画面）[Issue㉓]
         ▼screen-home            ホーム（メッセージ一覧・サイネージ/混雑度ボタン）
         ▼screen-compose         メッセージ作成（＋画像投稿UI・アンケート）
         ▼screen-detail          メッセージ詳細（＋画像表示・アンケート回答）
@@ -381,6 +382,27 @@
     <button class="btn" onclick="cancelRequest()" style="margin-top:12px; background:#fff; color:#e53935; border:1.5px solid #e53935;">
        <span data-i18n="btn_cancel_request">申請を取り消す</span>
     </button>
+  </div>
+</div>
+
+<!-- ══ 画面③'：出店取りやめ（本人終了画面）[Issue㉓ EO-DEC-0169] ══ -->
+<div class="screen" id="screen-withdrawn">
+  <div class="header">
+    <div style="flex:1;">
+      <div style="color:rgba(255,255,255,0.75); font-size:11px; line-height:1.2;">EdgeOps</div>
+      <div id="withdrawn-group-name" style="color:white; font-size:18px; font-weight:700; line-height:1.3; margin-top:2px;"></div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="header-icon-btn" onclick="showGroupSwitcher()" role="button" tabindex="0" aria-label="グループを切り替える" title="グループを切り替える">
+        <svg viewBox="0 0 24 24"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h14"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H3"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="content">
+    <div style="text-align:center; padding: 64px 24px 32px;">
+      <div style="font-size:17px; font-weight:700; margin-bottom:16px; color:var(--text);" data-i18n="heading_withdrawn">このイベントへの参加は終了しました</div>
+      <div style="font-size:14px; color:var(--text-light); line-height:1.8;" data-i18n="desc_withdrawn">詳細は主催者へお問い合わせください。</div>
+    </div>
   </div>
 </div>
 
@@ -1326,6 +1348,10 @@ let messages = [];
 let members = [];
 let pollTimer = null;
 
+// [Issue㉓ EO-DEC-0169] 出店取りやめ状態
+window.activeWithdrawnUids = []; // 取りやめ中の eo_uid 配列
+window.myWithdrawn = false;      // 自分が取りやめ状態か
+
 // ── Step 5：カーソル方式（第119回・EO-DEC-0119） ──
 const PAGE_SIZE = 100;          // 初回100件・追加100件（第115回）
 let oldestLoadedAt = null;      // 読み込み済みの最古 created_at（ISO文字列）
@@ -1340,6 +1366,26 @@ let homeFilter = 'msg'; // 'msg' | 'handover' | 'all'
 // ═══════════════════════════════════════════
 // [Phase 4-2B] 画像投稿機能 - feature_flags 状態管理
 // ═══════════════════════════════════════════
+// [Issue㉓ EO-DEC-0169] 取りやめ状態の取得関数
+// ═══════════════════════════════════════════
+// 通常グループ(industry !== 'event')では即 return してRPCを一切呼ばない。
+// ═══════════════════════════════════════════
+window.refreshWithdrawalState = async function() {
+  window.activeWithdrawnUids = [];
+  window.myWithdrawn = false;
+  if (!currentGroup || currentGroup.industry !== 'event') return;
+  try {
+    const [listRes, mineRes] = await Promise.all([
+      supabase.rpc('event_list_active_withdrawals', { p_group_session_id: currentGroup.id }),
+      supabase.rpc('event_get_my_withdrawal_state', { p_group_session_id: currentGroup.id })
+    ]);
+    if (!listRes.error && listRes.data) window.activeWithdrawnUids = listRes.data.eo_uids || [];
+    if (!mineRes.error && mineRes.data) window.myWithdrawn = mineRes.data.withdrawn === true;
+  } catch (e) {
+    console.error('[refreshWithdrawalState]', e);
+  }
+};
+
 // チャッピー第49回判定(II): 起動時+5分キャッシュ・送信直前は再確認
 // マスタースイッチ image_upload=FALSE で完全無効化(緊急OFF最大5分以内)
 // ═══════════════════════════════════════════
@@ -1571,7 +1617,14 @@ async function restoreSession(memberId, groupId) {
           ]);
           isCreator = creatorResult;
           hideLoading();
-          showScreen('screen-home');
+          // [Issue㉓ EO-DEC-0169] 取りやめ中の本人は終了画面のみ表示
+          if (window.myWithdrawn) {
+            const wnEl = document.getElementById('withdrawn-group-name');
+            if (wnEl) wnEl.textContent = (next.group_sessions.group_name || next.group_sessions.group_id || '');
+            showScreen('screen-withdrawn');
+          } else {
+            showScreen('screen-home');
+          }
           showToast(`参加中のグループに切り替えました`);
           return;
         }
@@ -1615,6 +1668,13 @@ async function restoreSession(memberId, groupId) {
       ]);
       isCreator = creatorResult;
       hideLoading();
+      // [Issue㉓ EO-DEC-0169] 取りやめ中の本人は終了画面のみ表示
+      if (window.myWithdrawn) {
+        const wnEl = document.getElementById('withdrawn-group-name');
+        if (wnEl) wnEl.textContent = currentGroup.group_name || currentGroup.group_id || '';
+        showScreen('screen-withdrawn');
+        return;
+      }
       showScreen('screen-home');
       // [第127回 EO-DEC-0127] リロード時、直前の主要画面(引き継ぎ/プロフィール)へ差し替え
       restoreLastMajorScreen();
@@ -2243,6 +2303,19 @@ async function loadMessages() {
       window._surveyResponseCountMap = {};
     }
 
+    // [Issue㉓ EO-DEC-0169] 取りやめ状態を取得してから描画（ポーリングで最新化）
+    await refreshWithdrawalState();
+    if (window.myWithdrawn) {
+      // 自分が取りやめ状態：screen-home がアクティブなら終了画面へ切替
+      const homeEl = document.getElementById('screen-home');
+      if (homeEl && homeEl.classList.contains('active')) {
+        const wnEl = document.getElementById('withdrawn-group-name');
+        if (wnEl) wnEl.textContent = currentGroup.group_name || currentGroup.group_id || '';
+        showScreen('screen-withdrawn');
+      }
+      return;
+    }
+
     renderMessages();
     preloadMessageImageUrls(messages); // 第79回判定 案(a) 画像署名URLプリロード(2026-05-24)
     const badge = document.getElementById('approval-badge');
@@ -2540,12 +2613,36 @@ function renderPostGroupHtml(group, KIND, CLS) {
   const rp = root.priority || 'info';
   const rootKindJa = KIND[rp] || t('priority_notice');
   const rootKindCls = CLS[rp] || 'notice';
+
+  // [Issue㉓ EO-DEC-0169] 元投稿者が取りやめ中の場合、グループ全体をプレースホルダーに差し替え
+  const withdrawnUids = window.activeWithdrawnUids || [];
+  if (withdrawnUids.includes(root.sender_eo_uid)) {
+    const timeStr = formatTime(root.created_at);
+    return `
+      <div class="eo-msg" onclick="showDetail('${root.id}')" aria-label="取りやめ">
+        <div class="eo-msg__text" style="color:var(--text-light);font-style:italic;">${escHtml(t('label_withdrawn_post'))}</div>
+        <div class="eo-msg__meta">
+          <span class="eo-msg__time">${timeStr}</span>
+        </div>
+      </div>`;
+  }
+
   const rootTitle = getMessageTitle(root.body, 40);
   // 引用の見出しは短くする（20文字）。長いと返信本文が埋もれるため。
   const rootTitleShort = getMessageTitle(root.body, 20);
 
   // ① 最新返信（上）。タイトルに元投稿の冒頭を出して文脈を持たせる。
-  const latestRow = `
+  // [Issue㉓ EO-DEC-0169] 返信投稿者が取りやめ中の場合はプレースホルダー
+  const isLatestWithdrawn = withdrawnUids.includes(latest.sender_eo_uid);
+  const latestRow = isLatestWithdrawn
+    ? `
+    <div class="eo-msg" onclick="showDetail('${latest.id}')" aria-label="取りやめ">
+      <div class="eo-msg__text" style="color:var(--text-light);font-style:italic;">${escHtml(t('label_withdrawn_post'))}</div>
+      <div class="eo-msg__meta">
+        <span class="eo-msg__time">${formatTime(latest.created_at)}</span>
+      </div>
+    </div>`
+    : `
     <div class="eo-msg eo-msg--${rootKindCls}" onclick="showDetail('${latest.id}')" aria-label="${rootKindJa}の引用返信">
       <div class="eo-msg__text">
         <span style="color:var(--eo-accent); font-weight:700;">${t('label_reply_prefix')}</span>
@@ -2712,6 +2809,19 @@ function renderMessages() {
       // ── EO-DEC-0148：投稿グループの描画（元投稿＋最新返信の2件を展開） ──
       if (msg.__isGroup) {
         html += renderPostGroupHtml(msg, KIND, CLS);
+        return;
+      }
+      // [Issue㉓ EO-DEC-0169] 取りやめ中メンバーの投稿はプレースホルダーに差し替え
+      const isWithdrawnSender = (window.activeWithdrawnUids || []).includes(msg.sender_eo_uid);
+      if (isWithdrawnSender) {
+        const timeStr = formatTime(msg.created_at);
+        html += `
+          <div class="eo-msg" onclick="showDetail('${msg.id}')" aria-label="取りやめ">
+            <div class="eo-msg__text" style="color:var(--text-light);font-style:italic;">${escHtml(t('label_withdrawn_post'))}</div>
+            <div class="eo-msg__meta">
+              <span class="eo-msg__time">${timeStr}</span>
+            </div>
+          </div>`;
         return;
       }
       // receiver_countが保存済みならそれを使う（送信時点の受信者数で固定）
@@ -3318,6 +3428,35 @@ async function showDetail(messageId) {
   const msg = messages.find(m => m.id === messageId);
   if (!msg) return;
   currentDetailMessageId = messageId; // 削除用に保持
+
+  // [Issue㉓ EO-DEC-0169] 取りやめ中メンバーの投稿はプレースホルダーで表示
+  const isWithdrawnDetailSender = (window.activeWithdrawnUids || []).includes(msg.sender_eo_uid);
+  if (isWithdrawnDetailSender) {
+    document.getElementById('detail-title').textContent = t('detail_title_default');
+    document.getElementById('detail-meta').textContent = formatTime(msg.created_at);
+    document.getElementById('detail-body').innerHTML = escHtml(t('label_withdrawn_post'));
+    const imageWrap = document.getElementById('detail-image-wrap');
+    if (imageWrap) imageWrap.style.display = 'none';
+    const detailStatsRow = document.getElementById('detail-stats-row');
+    if (detailStatsRow) detailStatsRow.style.display = 'none';
+    document.getElementById('detail-read-list')?.closest('.card')?.style.setProperty('display', 'none');
+    document.getElementById('detail-unread-list')?.closest('.card')?.style.setProperty('display', 'none');
+    const leftListElW = document.getElementById('detail-left-list');
+    const leftCardElW = leftListElW ? leftListElW.closest('.card') : null;
+    if (leftCardElW) leftCardElW.style.display = 'none';
+    const deleteWrap = document.getElementById('detail-delete-wrap');
+    if (deleteWrap) deleteWrap.style.display = 'none';
+    const delBtn = document.getElementById('detail-image-delete-btn');
+    if (delBtn) delBtn.style.display = 'none';
+    try { await applySurveyDetailUI({ ...msg, is_survey: false }); } catch(_) {}
+    window.__currentDetailMessageObj = msg;
+    const replyWrap = document.getElementById('detail-reply-wrap');
+    if (replyWrap) replyWrap.style.display = 'none';
+    await renderDetailThread(msg);
+    showScreen('screen-detail');
+    return;
+  }
+
   await recordRead(messageId);
   const { data: reads } = await supabase.from('read_receipts').select('*')
     .eq('message_id', messageId).order('read_at', { ascending: true });
@@ -3736,7 +3875,7 @@ async function showMemberList() {
   try {
     const { data: memberList } = await supabase
       .from('group_members')
-      .select('id, display_name, is_creator, is_signage, created_at')
+      .select('id, display_name, is_creator, is_signage, created_at, eo_uid')
       .eq('group_session_id', currentGroup.id)
       .eq('status', 'approved')
       .order('created_at', { ascending: true });
@@ -3747,20 +3886,34 @@ async function showMemberList() {
     // [2026/5/27 課題③修正] is_signage=true メンバーに📺バッジ表示
     // [Issue⑲ EO-DEC-0168] event主催者向けサイネージ指定チェックボックス
     const canManageSignage = currentGroup.industry === 'event' && isCreator === true;
+    // [Issue㉓ EO-DEC-0169] 取りやめチェックボックス表示条件
+    const canManageWithdrawal = currentGroup.industry === 'event' && isCreator === true;
     const html = memberList.map((m, i) => {
       const adminBadge = m.is_creator ? ' <span style="font-size:11px;background:var(--green);color:white;border-radius:4px;padding:1px 6px;">管理者</span>' : '';
       const signageBadge = m.is_signage ? ' <span style="font-size:11px;background:#5c6bc0;color:white;border-radius:4px;padding:1px 6px;">サイネージ</span>' : '';
       const signageCheckbox = (canManageSignage && m.is_creator !== true)
-        ? '<label style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-light);flex-shrink:0;">'
+        ? '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-light);flex-shrink:0;">'
           + '<input type="checkbox" data-member-id="' + m.id + '" '
           + (m.is_signage ? 'checked ' : '')
           + 'style="accent-color:#0F6B63;width:16px;height:16px;border-radius:9px;cursor:pointer;" '
           + 'onchange="setMemberSignage(this)"> サイネージ端末</label>'
         : '';
+      // [Issue㉓ EO-DEC-0169] 取りやめチェックは event主催者・非主催者・非サイネージのみ表示
+      const withdrawalCheckbox = (canManageWithdrawal && m.is_creator !== true && m.is_signage !== true)
+        ? '<label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-light);flex-shrink:0;">'
+          + '<input type="checkbox" data-member-id="' + m.id + '" '
+          + ((window.activeWithdrawnUids || []).includes(m.eo_uid) ? 'checked ' : '')
+          + 'style="accent-color:#0F6B63;width:16px;height:16px;border-radius:9px;cursor:pointer;" '
+          + 'onchange="window.setMemberWithdrawal(this)"> 出店取りやめ</label>'
+        : '';
+      const checkboxWrap = (signageCheckbox || withdrawalCheckbox)
+        ? '<div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">'
+          + signageCheckbox + withdrawalCheckbox + '</div>'
+        : '';
       return `<div style="display:flex;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border);">`
            + `<div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-right:10px;flex-shrink:0;">${i+1}</div>`
-           + `<div style="font-size:14px;font-weight:500;">${escHtml(m.display_name)}${adminBadge}${signageBadge}</div>`
-           + signageCheckbox
+           + `<div style="font-size:14px;font-weight:500;flex:1;min-width:0;">${escHtml(m.display_name)}${adminBadge}${signageBadge}</div>`
+           + checkboxWrap
            + `</div>`;
     }).join('');
     content.innerHTML = `<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;">${memberList.length}人が参加中</div>` + html;
@@ -3798,6 +3951,41 @@ window.setMemberSignage = async function(cb) {
     await showMemberList();
   } catch (e) {
     console.error('[setMemberSignage]', e);
+    cb.checked = !v;
+    showToast('変更に失敗しました。');
+    cb.disabled = false;
+  }
+};
+
+// [Issue㉓ EO-DEC-0169] 出店取りやめチェックボックス用グローバル関数
+window.setMemberWithdrawal = async function(cb) {
+  const mid = cb.dataset.memberId;
+  const v = cb.checked;
+  cb.disabled = true;
+  try {
+    const { data, error } = await supabase.rpc('event_set_member_withdrawal', {
+      p_member_id: mid, p_withdrawn: v
+    });
+    if (error) {
+      cb.checked = !v;
+      const msg = error.message || '';
+      if (msg.includes('AUTH_REQUIRED')) showToast('認証エラーです。アプリを再起動してください。');
+      else if (msg.includes('MEMBER_NOT_FOUND')) showToast('対象のメンバーが見つかりません。');
+      else if (msg.includes('NOT_EVENT_GROUP')) showToast('このグループでは指定できません。');
+      else if (msg.includes('NOT_ORGANIZER')) showToast('主催者のみが指定できます。');
+      else if (msg.includes('CANNOT_TARGET_ORGANIZER')) showToast('主催者を取りやめにすることはできません。');
+      else if (msg.includes('CANNOT_TARGET_SIGNAGE')) showToast('サイネージ端末を取りやめにすることはできません。');
+      else if (msg.includes('TARGET_NOT_APPROVED')) showToast('参加が承認されたメンバーのみ指定できます。');
+      else { console.error('[setMemberWithdrawal] rpc error', error); showToast('変更に失敗しました。'); }
+      cb.disabled = false;
+      return;
+    }
+    showToast(v ? '出店取りやめにしました' : '出店取りやめを解除しました');
+    await refreshWithdrawalState();
+    renderMessages();
+    await showMemberList();
+  } catch (e) {
+    console.error('[setMemberWithdrawal]', e);
     cb.checked = !v;
     showToast('変更に失敗しました。');
     cb.disabled = false;
@@ -4051,10 +4239,19 @@ async function renderDetailThread(msg) {
         root = (rootRows && rootRows[0]) || null;
       }
       if (root && !root.is_deleted) {
-        originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border); cursor:pointer;" onclick="showDetail('${root.id}')">
-          <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(getMemberName(root.sender_eo_uid))}　${escHtml(formatTime(root.created_at))}</div>
-          <div style="font-size:14px; line-height:1.7; word-break:break-all; color:var(--text-mid);">${linkify(root.body)}</div>
-        </div>`;
+        // [Issue㉓ EO-DEC-0169] 元投稿者が取りやめ中の場合はプレースホルダー
+        const isRootWithdrawn = (window.activeWithdrawnUids || []).includes(root.sender_eo_uid);
+        if (isRootWithdrawn) {
+          originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border);">
+            <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(formatTime(root.created_at))}</div>
+            <div style="font-size:13px; color:var(--text-light); font-style:italic;">${escHtml(t('label_withdrawn_post'))}</div>
+          </div>`;
+        } else {
+          originalHtml = `<div class="person-row" style="display:block; padding:12px 16px; background:#f8f9fb; border-left:3px solid var(--border); cursor:pointer;" onclick="showDetail('${root.id}')">
+            <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(getMemberName(root.sender_eo_uid))}　${escHtml(formatTime(root.created_at))}</div>
+            <div style="font-size:14px; line-height:1.7; word-break:break-all; color:var(--text-mid);">${linkify(root.body)}</div>
+          </div>`;
+        }
       } else {
         // 元投稿が削除済み、または取得できなかった場合（第29章・第28-3章）
         const label = (root && root.is_deleted) ? t('label_deleted_post') : t('label_original_unavailable');
@@ -4079,6 +4276,13 @@ async function renderDetailThread(msg) {
       if (r.is_deleted) {
         return `<div class="person-row" style="display:block; padding:12px 16px;">
           <div style="font-size:13px; color:var(--text-light); font-style:italic;">${escHtml(t('label_deleted_post'))}</div>
+        </div>`;
+      }
+      // [Issue㉓ EO-DEC-0169] 取りやめ中メンバーの返信はプレースホルダーに差し替え
+      if ((window.activeWithdrawnUids || []).includes(r.sender_eo_uid)) {
+        return `<div class="person-row" style="display:block; padding:12px 16px;">
+          <div style="font-size:12px; color:var(--text-light); margin-bottom:4px;">${escHtml(formatTime(r.created_at))}</div>
+          <div style="font-size:13px; color:var(--text-light); font-style:italic;">${escHtml(t('label_withdrawn_post'))}</div>
         </div>`;
       }
       return `<div class="person-row" style="display:block; padding:12px 16px;">
@@ -4658,9 +4862,19 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   isLoadingMore = false;
   monthOpenState = {};
   window._memberJoinedAt = new Map();
+  // [Issue㉓ EO-DEC-0169] 取りやめ状態をリセット（グループ切替時）
+  window.activeWithdrawnUids = [];
+  window.myWithdrawn = false;
 
   await loadHome();
-  showScreen('screen-home');
+  // [Issue㉓ EO-DEC-0169] 取りやめ中の本人は終了画面のみ表示
+  if (window.myWithdrawn) {
+    const wnEl = document.getElementById('withdrawn-group-name');
+    if (wnEl) wnEl.textContent = newGroup.group_name || newGroup.group_id || '';
+    showScreen('screen-withdrawn');
+  } else {
+    showScreen('screen-home');
+  }
 
   showToast(`「${newGroup.group_name || newGroup.group_id}」に切り替えました`);
 }

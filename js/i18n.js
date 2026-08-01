@@ -221,6 +221,11 @@ window.EdgeOpsI18n = {
     btn_create_group:            '新しいグループを作る',
     btn_create_group_event:      '新しいイベントを作る',
     btn_join_event:              'イベントに参加する',
+    // ── 出店取りやめ（Issue㉓ EO-DEC-0169）──────────────────────────
+    heading_withdrawn:           'このイベントへの参加は終了しました',
+    desc_withdrawn:              '詳細は主催者へお問い合わせください。',
+    label_withdrawn_post:        'この投稿は表示されません。詳細は主催者へお問い合わせください。',
+    label_withdrawal_checkbox:   '出店取りやめ',
   },
   en: {
     // ── 友だち未登録画面 ─────────────────────────────────────────
@@ -442,5 +447,10 @@ window.EdgeOpsI18n = {
     btn_create_group:            'Create Group',
     btn_create_group_event:      'Create Event',
     btn_join_event:              'Join Event',
+    // ── 出店取りやめ（Issue㉓ EO-DEC-0169）──────────────────────────
+    heading_withdrawn:           'Your participation in this event has ended',
+    desc_withdrawn:              'Please contact the organizer for details.',
+    label_withdrawn_post:        'This post is not displayed. Please contact the organizer for details.',
+    label_withdrawal_checkbox:   'Withdrawn',
   }
 };
