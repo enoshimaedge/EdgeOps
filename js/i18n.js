@@ -224,6 +224,8 @@ window.EdgeOpsI18n = {
     // ── 参加取りやめ（Issue㉓ EO-DEC-0169）──────────────────────────
     heading_withdrawn:           '参加は終了しました',
     desc_withdrawn:              '詳細は主催者へお問い合わせください。',
+    btn_withdrawn_join_other:    '他のグループに参加する',
+    btn_withdrawn_leave:         'このグループを退出する',
     label_withdrawn_post:        'この投稿は表示されません。詳細は主催者へお問い合わせください。',
     label_withdrawal_checkbox:   '参加取りやめ',
     label_signage_checkbox:      'サイネージ端末',
@@ -453,6 +455,8 @@ window.EdgeOpsI18n = {
     // ── Withdrawal（Issue㉓ EO-DEC-0169）──────────────────────────
     heading_withdrawn:           'Your participation has ended',
     desc_withdrawn:              'Please contact the organizer for details.',
+    btn_withdrawn_join_other:    'Join another group',
+    btn_withdrawn_leave:         'Leave this group',
     label_withdrawn_post:        'This post is not displayed. Please contact the organizer for details.',
     label_withdrawal_checkbox:   'Withdrawn',
     label_signage_checkbox:      'Signage',
