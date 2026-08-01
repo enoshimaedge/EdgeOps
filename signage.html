@@ -1263,7 +1263,7 @@ function buildItemHtml(item) {
     `;
   }
   // ── 既存の単独カード描画 ──
-  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt } = _buildItemContext;
+  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt, leftUnreadMap } = _buildItemContext;
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
     : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
@@ -1304,11 +1304,16 @@ function buildItemHtml(item) {
           return true;
         }).length;
       }
-      if (receiverCount === 0) {
+      // [EO-DEC-0174] 参加取りやめのプレースホルダー投稿では既読バッジを出さない
+      //   ★signage-fetch が差し替え時に sender_eo_uid: null にしていることを利用する。
+      //   ★messages.sender_eo_uid IS NULL は 0件であることをDBで事前確認済み（2026/8/1）。
+      if (item.sender_eo_uid == null) {
+        readBadge = '';
+      } else if (receiverCount === 0) {
         // [2026/5/25 1人グループ論理破綻対応 / チャッピー第87回判定GO]
         // 受信者0名(送信時点で送信者以外いない)→ 既読対象なし表示
         readBadge = `<span style="font-size:10px; color:#94a3b8; font-weight:700;">📋 対象者なし</span>`;
-      } else if (readCount >= receiverCount) {
+      } else if ((readCount + (leftUnreadMap[item.id] || 0)) >= receiverCount) {
         readBadge = `<span style="font-size:10px; color:#66bb6a; font-weight:700;">✅ 全員既読</span>`;
       } else {
         readBadge = `<span style="font-size:10px; color:#f9a825; font-weight:700;">⚠ ${readCount}/${receiverCount}人既読</span>`;
@@ -1479,6 +1484,33 @@ async function loadMessage() {
       readCountMap[r.message_id] = (readCountMap[r.message_id] || 0) + 1;
     });
 
+    // [EO-DEC-0172 / 第162回Q4] 未読のまま退出数を算出（スマホ側 index.html と同一式）
+    //   item_receivers（送信時点の受信者スナップショット）に居て、
+    //   read_receipts に無く、現在の approved members にも居ない人を数える。
+    //   ★left_at 列は存在しないが、スナップショット方式のため退出日時は不要。
+    const itemReceivers = _globalSignageData.item_receivers || [];
+    const approvedUidSet = new Set(allMembers.map(m => m.eo_uid));
+    const receiptSetByMsg = {};
+    receipts.forEach(r => {
+      if (!receiptSetByMsg[r.message_id]) receiptSetByMsg[r.message_id] = new Set();
+      receiptSetByMsg[r.message_id].add(r.eo_uid);
+    });
+    const snapshotByMsg = {};
+    itemReceivers.forEach(ir => {
+      if (!ir.receiver_eo_uid) return;
+      if (!snapshotByMsg[ir.item_id]) snapshotByMsg[ir.item_id] = new Set();
+      snapshotByMsg[ir.item_id].add(ir.receiver_eo_uid);
+    });
+    const leftUnreadMap = {};
+    Object.keys(snapshotByMsg).forEach(msgId => {
+      const msgReceiptSet = receiptSetByMsg[msgId] || new Set();
+      let count = 0;
+      snapshotByMsg[msgId].forEach(uid => {
+        if (!msgReceiptSet.has(uid) && !approvedUidSet.has(uid)) count++;
+      });
+      leftUnreadMap[msgId] = count;
+    });
+
     // ── アンケート回答カウントマップを取得（is_survey=true のメッセージのみ対象）──
     // ─── signage-fetch 経由化: アンケート回答もキャッシュから取得 (チャッピー第68回判定 v2) ───
     const surveyResponseCountMap = {};
@@ -1584,6 +1616,7 @@ async function loadMessage() {
       readCountMap, confirmedMap, msgPriorityMap,
       surveyResponseCountMap,
       memberJoinedAt,  // [チャッピー第55-2回判定確定] buildItemHtml の receiver_count NULL フォールバック用
+      leftUnreadMap,   // [EO-DEC-0172] 未読のまま退出した受信者数マップ
       allItemsFlat: [...handoverItems, ...messageItems]
     };
 
