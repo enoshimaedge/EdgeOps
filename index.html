@@ -2351,11 +2351,15 @@ async function applyReadCorrection(targetMessages) {
   // ★ 全メンバー（過去含む・status='left'等も含む）の参加時刻マップを作成
   //    members には status='approved' しか入っていないため、別途全件取得
   const { data: allMembersForJoinedAt } = await supabase.from('group_members')
-    .select('eo_uid, created_at')
+    .select('eo_uid, created_at, display_name')
     .eq('group_session_id', currentGroup.id);
+  // [Issue⑨ EO-DEC-0152] 退出者の名前解決用マップ（members には approved しか入らないため別保持）
+  //   ★このマップは名前解決にのみ使う。既読分母・参加人数・メンバー一覧には一切influenceさせない。
+  window._memberNameMap = {};
   const memberJoinedAt = new Map();
   (allMembersForJoinedAt || []).forEach(m => {
     memberJoinedAt.set(m.eo_uid, new Date(m.created_at).getTime());
+    if (m.eo_uid && m.display_name) window._memberNameMap[m.eo_uid] = m.display_name;
   });
   // [receiver_count NULL フォールバック対応 / 2026-06-29]
   //   描画側(renderMessages)の分母フォールバックで送信後参加者を除外するため、
@@ -4862,6 +4866,7 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   isLoadingMore = false;
   monthOpenState = {};
   window._memberJoinedAt = new Map();
+  window._memberNameMap = {};
   // [Issue㉓ EO-DEC-0169] 取りやめ状態をリセット（グループ切替時）
   window.activeWithdrawnUids = [];
   window.myWithdrawn = false;
