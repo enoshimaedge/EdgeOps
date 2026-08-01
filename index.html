@@ -2179,6 +2179,18 @@ function startPolling() {
     const approvalActive = document.getElementById('screen-approval').classList.contains('active');
     if (homeActive) await loadMessages();
     if (approvalActive) await loadApprovals();
+    // [EO-DEC-0176] 終了画面（screen-withdrawn）に居る間も取りやめ状態だけ確認する。
+    //   ここで loadMessages() は呼ばない（見せない画面のために一覧を取りに行かないため）。
+    //   refreshWithdrawalState() の中身は変更しない。既存関数内でRPCが2本呼ばれるのは許容する。
+    const withdrawnActive = document.getElementById('screen-withdrawn')?.classList.contains('active');
+    if (withdrawnActive) {
+      const wasWithdrawn = window.myWithdrawn === true;   // ★必ず refresh の前に控える
+      await refreshWithdrawalState();
+      if (wasWithdrawn && window.myWithdrawn === false) {
+        showScreen('screen-home');                        // 一覧の最新化は showScreen 側の既存処理に任せる
+        showToast(t('toast_withdrawal_released'));
+      }
+    }
   }, POLL_INTERVAL);
 }
 
