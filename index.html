@@ -459,10 +459,10 @@
       <span class="handover-badge-count" id="handover-badge-count">0</span>
     </div>
     <!-- フィルター -->
-    <div class="home-filter-toggle">
-      <button class="filter-chip active" id="filter-chip-msg" onclick="setHomeFilter('msg')" data-i18n="filter_messages">連絡</button>
-      <button class="filter-chip" id="filter-chip-handover" onclick="setHomeFilter('handover')" data-i18n="filter_handover">引き継ぎ</button>
-      <button class="filter-chip" id="filter-chip-all" onclick="setHomeFilter('all')" data-i18n="filter_all">すべて</button>
+    <div class="home-filter-toggle" role="tablist">
+      <button class="filter-chip" id="filter-chip-all" role="tab" aria-selected="false" onclick="setHomeFilter('all')" data-i18n="filter_all">すべて</button>
+      <button class="filter-chip active" id="filter-chip-msg" role="tab" aria-selected="true" onclick="setHomeFilter('msg')" data-i18n="filter_messages">連絡</button>
+      <button class="filter-chip" id="filter-chip-handover" role="tab" aria-selected="false" onclick="setHomeFilter('handover')" data-i18n="filter_handover">引き継ぎ</button>
     </div>
     <div id="home-messages"></div>
   </div>
@@ -1052,6 +1052,10 @@ function applyEventUiVisibility() {
   const chipAll      = document.getElementById('filter-chip-all');
   if (chipHandover) chipHandover.style.display = ev ? 'none' : '';
   if (chipAll)      chipAll.style.display      = ev ? 'none' : '';
+  // [EO-DEC-0175 条件D] event ではタブが「連絡」1枚になるため列ごと隠す。
+  //   ★通常グループでは必ず再表示すること（'' を入れることで復元される）
+  const tabBar = document.querySelector('.home-filter-toggle');
+  if (tabBar) tabBar.style.display = ev ? 'none' : '';
   // [第13章補完 / Issue㉒-B] 作成画面の「引き継ぎノート」種別トグルも event では出さない(全員)
   const ctypeHandover = document.getElementById('ctype-handover');
   if (ctypeHandover) ctypeHandover.style.display = ev ? 'none' : '';
@@ -2494,7 +2498,10 @@ async function setHomeFilter(f) {
   try { localStorage.setItem('lastHomeFilter', f); } catch (_) {}
   ['msg','handover','all'].forEach(k => {
     const el = document.getElementById('filter-chip-' + k);
-    if (el) el.classList.toggle('active', k === f);
+    if (el) {
+      el.classList.toggle('active', k === f);
+      el.setAttribute('aria-selected', k === f ? 'true' : 'false');
+    }
   });
   if (f === 'handover' || f === 'all') {
     // 引き継ぎデータを最新に更新してから描画
