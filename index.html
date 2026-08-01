@@ -1617,6 +1617,7 @@ async function restoreSession(memberId, groupId) {
           ]);
           isCreator = creatorResult;
           hideLoading();
+          await refreshWithdrawalState();
           // [Issue㉓ EO-DEC-0169] 取りやめ中の本人は終了画面のみ表示
           if (window.myWithdrawn) {
             const wnEl = document.getElementById('withdrawn-group-name');
@@ -1668,6 +1669,7 @@ async function restoreSession(memberId, groupId) {
       ]);
       isCreator = creatorResult;
       hideLoading();
+      await refreshWithdrawalState();
       // [Issue㉓ EO-DEC-0169] 取りやめ中の本人は終了画面のみ表示
       if (window.myWithdrawn) {
         const wnEl = document.getElementById('withdrawn-group-name');
@@ -4865,6 +4867,7 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   // [Issue㉓ EO-DEC-0169] 取りやめ状態をリセット（グループ切替時）
   window.activeWithdrawnUids = [];
   window.myWithdrawn = false;
+  await refreshWithdrawalState();
 
   await loadHome();
   // [Issue㉓ EO-DEC-0169] 取りやめ中の本人は終了画面のみ表示
