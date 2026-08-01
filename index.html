@@ -3788,7 +3788,7 @@ window.setMemberSignage = async function(cb) {
       else if (msg.includes('NOT_ORGANIZER')) showToast('主催者のみが指定できます。');
       else if (msg.includes('CANNOT_TARGET_ORGANIZER')) showToast('主催者をサイネージ端末に指定することはできません。');
       else if (msg.includes('TARGET_NOT_APPROVED')) showToast('参加が承認されたメンバーのみ指定できます。');
-      else showToast('変更に失敗しました。');
+      else { console.error('[setMemberSignage] rpc error', error); showToast('RPC失敗 code=' + (error.code || 'none') + ' msg=' + msg.slice(0, 80)); }
       cb.disabled = false;
       return;
     }
@@ -3799,7 +3799,7 @@ window.setMemberSignage = async function(cb) {
   } catch (e) {
     console.error('[setMemberSignage]', e);
     cb.checked = !v;
-    showToast('変更に失敗しました。');
+    showToast('JS例外 ' + (e && e.message ? e.message.slice(0, 80) : String(e)).slice(0, 80));
     cb.disabled = false;
   }
 };
