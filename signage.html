@@ -1263,7 +1263,8 @@ function buildItemHtml(item) {
     `;
   }
   // ── 既存の単独カード描画 ──
-  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt, leftUnreadMap } = _buildItemContext;
+  const { allMembers, humanMembers, humanCount, readCountMap, confirmedMap, msgPriorityMap, surveyResponseCountMap, memberJoinedAt, leftUnreadMap,
+          allMembersHist } = _buildItemContext;
   const p = item._type === 'handover'
     ? getHandoverLabel(item)
     : (msgPriorityMap[item.priority] || msgPriorityMap.normal);
@@ -1328,8 +1329,12 @@ function buildItemHtml(item) {
       }
     }
   }
-  const senderMember = allMembers.find(m => m.eo_uid === item.sender_eo_uid);
-  const senderName = senderMember ? senderMember.display_name + '　' : '';
+  // [Issue⑩ EO-DEC-0152 / EO-DEC-0177] approved に居ない＝退出者。all_members_hist で名前を解決する
+  //   ★allMembers（approved のみ）を先に見る。表示名が変更された場合に現行値を優先するため。
+  //   ★humanMembers / humanCount / 既読分母には一切影響させない（名前解決のみ）。
+  const senderMember = allMembers.find(m => m.eo_uid === item.sender_eo_uid)
+    || (allMembersHist || []).find(m => m.eo_uid === item.sender_eo_uid && m.display_name);
+  const senderName = senderMember && senderMember.display_name ? senderMember.display_name + '　' : '';
 
   // onclickはdata属性に逃がしてシングルクォート問題を回避（⑧対応）
   const itemIndex = _buildItemContext.allItemsFlat.indexOf(item);
@@ -1617,6 +1622,7 @@ async function loadMessage() {
       surveyResponseCountMap,
       memberJoinedAt,  // [チャッピー第55-2回判定確定] buildItemHtml の receiver_count NULL フォールバック用
       leftUnreadMap,   // [EO-DEC-0172] 未読のまま退出した受信者数マップ
+      allMembersHist,  // [Issue⑩ EO-DEC-0177] 退出者の送信者名を解決するためだけに運ぶ
       allItemsFlat: [...handoverItems, ...messageItems]
     };
 
