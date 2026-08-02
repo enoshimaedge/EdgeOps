@@ -287,7 +287,7 @@ Deno.serve(async (req: Request) => {
       : Promise.resolve({ data: [], error: null }),
     supabase.from('group_members').select('eo_uid, display_name, is_signage, created_at')
       .eq('group_session_id', group.id).eq('status', 'approved'),
-    supabase.from('group_members').select('eo_uid, created_at, is_signage')
+    supabase.from('group_members').select('eo_uid, created_at, is_signage, display_name')
       .eq('group_session_id', group.id),
     surveyMsgIds.length > 0
       ? supabase.from('message_responses').select('message_id, status').in('message_id', surveyMsgIds)
