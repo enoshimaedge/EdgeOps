@@ -1686,11 +1686,55 @@ async function restoreSession(memberId, groupId) {
       showScreen('screen-home');
       // [第127回 EO-DEC-0127] リロード時、直前の主要画面(引き継ぎ/プロフィール)へ差し替え
       restoreLastMajorScreen();
+      // [EO-DEC-0179] 所属している期限切れイベントを知らせる。await しない（起動をブロックしない）
+      void notifyExpiredEvents();
       return;
     }
   } catch (e) {
     // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
     clearEdgeOpsLocalStorage(); hideLoading(); showScreen('screen-start');
+  }
+}
+
+// ═══════════════════════════════════════════
+// [EO-DEC-0179] 期限切れイベントの通知
+// ═══════════════════════════════════════════
+// 所属している event グループのうち、期限切れになったものをトーストで知らせる。
+// 最後に見ていた画面が別グループでも通知が届くようにするための処理。
+//   ★読み取り専用。insert / update / delete / RPC は使わない。
+//   ★group_members はL3保護領域のため、通知済み記録は localStorage に置く。
+//   ★通常グループは期限切れでも通知しない（判定式は EO-DEC-0161 / 0163 と同一）。
+//   ★失敗しても起動やホーム表示を止めない（必ず try/catch）。
+async function notifyExpiredEvents() {
+  try {
+    if (!currentUser?.eo_uid) return;
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('group_session_id, group_sessions(id, group_id, group_name, industry, expires_at)')
+      .eq('eo_uid', currentUser.eo_uid)
+      .eq('status', 'approved')
+      .limit(20);
+    if (error) { console.warn('notifyExpiredEvents query error:', error); return; }
+    const now = new Date();
+    const expired = (data || [])
+      .map(r => r.group_sessions)
+      .filter(g => g
+        && g.industry === 'event'
+        && g.expires_at
+        && new Date(g.expires_at) <= now);
+    // 通知済みキー：group_id を優先し、無ければ id を使う（キーが不安定だと毎回出るため）
+    const keyOf = g => 'sl_expired_notified_' + (g.group_id || g.id);
+    const targets = expired.filter(g => {
+      try { return localStorage.getItem(keyOf(g)) !== '1'; } catch (_) { return false; }
+    });
+    if (targets.length === 0) return;
+    targets.forEach(g => { try { localStorage.setItem(keyOf(g), '1'); } catch (_) {} });
+    const msg = targets.length === 1
+      ? t('toast_event_ended_one', { name: targets[0].group_name || targets[0].group_id || '' })
+      : t('toast_event_ended_many', { count: String(targets.length) });
+    showToast(msg);
+  } catch (e) {
+    console.warn('notifyExpiredEvents failed:', e);
   }
 }
 
