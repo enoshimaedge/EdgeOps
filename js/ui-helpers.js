@@ -112,6 +112,10 @@ function renderHandoverImageLabel(item) {
 function updateExpiryWarningBar() {
   const bar = document.getElementById('expiry-warning-bar');
   if (!bar) return;
+  // [EO-DEC-0180] event は期限で終わることが前提のため警告バーを出さない。
+  //   残り日数はプロフィール画面の「有効期限：◯（残り◯日）」で確認できる。
+  //   ★これにより下の [EO-DEC-0160] の event 用文言は到達しなくなるが、削除しない。
+  if (currentGroup?.industry === 'event') { bar.style.display = 'none'; return; }
   // ST版以外(EO-など)は対象外
   const groupId = currentGroup?.group_id || '';
   if (!groupId.startsWith('SL-')) {

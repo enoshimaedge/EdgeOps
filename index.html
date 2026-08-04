@@ -182,7 +182,7 @@
        グループの有効期限が切れました。<br>新しいグループに参加するか、新規作成してください。
     </div>
     <div id="start-expiry-notice-event" style="display:none; background:#fff3e0; border-left:4px solid #f57c00; color:#7c4a00; padding:14px 16px; margin-bottom:16px; border-radius:6px; font-size:14px; line-height:1.6;">
-      <span data-i18n="notice_event_ended_title">このイベントは終了しました</span><br><span data-i18n="notice_event_ended_body">新しいイベントに参加するか、新規作成してください。</span>
+      <span data-i18n="notice_event_ended_title">イベントは終了しました</span><br><span data-i18n="notice_event_ended_body">新しいイベントに参加するか、新規作成してください。</span>
     </div>
     <div style="text-align:center; padding: 32px 0 24px;">
       <div style="font-size:18px; font-weight:700; margin-bottom:8px;" data-i18n="heading_get_started">はじめましょう</div>
@@ -1072,6 +1072,17 @@ function onIndustryChanged() {
   const isEvent = (v === 'event');
   const box = document.getElementById('form-group-event-expiry');
   if (box) box.style.display = isEvent ? 'block' : 'none';
+  // [EO-DEC-0180] イベントの期限は作成日から1年以内。
+  //   ★UTCずれを避けるため toISOString() を使わずローカル日付で YYYY-MM-DD を作る
+  const dateInput = document.getElementById('input-event-last-day');
+  if (dateInput && isEvent) {
+    const m = new Date();
+    m.setFullYear(m.getFullYear() + 1);
+    const yyyy = m.getFullYear();
+    const mm = String(m.getMonth() + 1).padStart(2, '0');
+    const dd = String(m.getDate()).padStart(2, '0');
+    dateInput.max = `${yyyy}-${mm}-${dd}`;
+  }
   applyEventWording(isEvent);
 }
 
@@ -1659,6 +1670,36 @@ async function restoreSession(memberId, groupId) {
       // ST版(SL-)の期限切れチェック
       if (currentGroup?.group_id?.startsWith('SL-') && currentGroup?.expires_at) {
         if (new Date(currentGroup.expires_at) <= new Date()) {
+          // [EO-DEC-0180] 他に所属があればそちらへ切り替える（leaveGroup L4700-4720 と同一方式）
+          //   ★切替に成功する経路では clearEdgeOpsLocalStorage() を呼ばない（切替先の情報が消えるため）
+          //   ★除外式は E10・EO-DEC-0163 と同一（期限切れ event のみ除外・通常グループは残す）
+          const expiredName = currentGroup.group_name || currentGroup.group_id || '';
+          const expiredIsEvent = (currentGroup?.industry === 'event');
+          const expiredSessionId = currentGroup.id;
+          try {
+            const { data: rest } = await supabase
+              .from('group_members')
+              .select('id, group_session_id, group_sessions(id, industry, expires_at)')
+              .eq('eo_uid', currentUser.eo_uid)
+              .eq('status', 'approved')
+              .neq('group_session_id', expiredSessionId)
+              .order('created_at', { ascending: false })
+              .limit(20);
+            const valid = (rest || []).filter(mem => {
+              const g = mem.group_sessions;
+              if (!g || g.industry !== 'event') return true;
+              return !(g.expires_at && new Date(g.expires_at) <= new Date());
+            });
+            if (valid.length > 0) {
+              hideLoading();
+              await switchGroup(valid[0].group_session_id, valid[0].id);
+              if (expiredIsEvent) showToast(t('toast_event_ended_one', { name: expiredName }));
+              return;
+            }
+          } catch (e) {
+            console.warn('[EO-DEC-0180] expired fallback failed:', e);
+          }
+          // 残りなし or 取得失敗 → 従来動作（以下の既存行は1文字も変更しない）
           // [2026/5/27 第90回判定] localStorage.clear() → clearEdgeOpsLocalStorage() 真因修正
           clearEdgeOpsLocalStorage();
           hideLoading();
@@ -1894,6 +1935,10 @@ async function createGroup() {
       const base = new Date(`${lastDay}T00:00:00`);          // ローカル時刻として解釈
       const today = new Date(); today.setHours(0, 0, 0, 0);
       if (base < today) { showToast(t('toast_event_last_day_past')); return; }
+      // [EO-DEC-0180] 作成日から1年以内。max属性だけでは手入力で抜けられるため必ずJSでも検証する
+      const limit = new Date(); limit.setHours(0, 0, 0, 0);
+      limit.setFullYear(limit.getFullYear() + 1);
+      if (base > limit) { showToast(t('toast_event_last_day_too_far')); return; }
       expiresAt = new Date(base); expiresAt.setDate(expiresAt.getDate() + 1);  // 翌日00:00
     } else {
       expiresAt = new Date(); expiresAt.setFullYear(expiresAt.getFullYear() + 1);

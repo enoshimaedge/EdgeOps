@@ -247,7 +247,7 @@ html {
   display: block;
 }
 .form-input, .form-textarea {
-  width: 100%; padding: 12px 14px;
+  width: 100%; box-sizing: border-box; padding: 12px 14px;   /* [EO-DEC-0180] iPadのはみ出し是正 */
   border: 1.5px solid var(--border); border-radius: var(--eo-radius);
   font-size: 15px; font-family: inherit; color: var(--text);
   background: white; outline: none;
