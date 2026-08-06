@@ -4609,12 +4609,23 @@ function showProfile() {
 async function updateGroupSwitcherBtn() {
   const btn = document.getElementById('group-switch-btn');
   if (!btn || !currentUser?.eo_uid) return;
-  const { count } = await supabase
+  // [EO-DEC-0181] 期限切れ event を件数に含めない（除外式は E10・EO-DEC-0154 の loadMyGroups() と同一）
+  //   ★通常グループは期限切れでも数に含める。有効な event も数に含める。
+  //   ★group_members の行は削除しない（L3保護領域。過去投稿の送信者名解決・既読系に波及するため）
+  const { data, error } = await supabase
     .from('group_members')
-    .select('id', { count: 'exact', head: true })
+    .select('group_session_id, group_sessions(industry, expires_at)')
     .eq('eo_uid', currentUser.eo_uid)
-    .eq('status', 'approved');
-  const others = Math.max(0, (count || 0) - 1);
+    .eq('status', 'approved')
+    .limit(20);
+  if (error) { console.warn('[EO-DEC-0181] updateGroupSwitcherBtn query error:', error); }
+  const now = new Date();
+  const alive = (data || []).filter(m => {
+    const g = m.group_sessions;
+    if (!g || g.industry !== 'event') return true;
+    return !(g.expires_at && new Date(g.expires_at) <= now);
+  });
+  const others = Math.max(0, alive.length - 1);
   btn.textContent = `${t('btn_switch_group')} (${others})`;
 }
 
