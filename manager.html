@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EdgeOps 施設管理</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script>
+const ENV_CONFIG = {
+  prod: {
+    LINE_AUTH_URL: 'https://eomsdvwklntrtiiksnro.supabase.co/functions/v1/line-auth'
+  },
+  staging: {
+    LINE_AUTH_URL: 'https://lxptelyviuucqmwxqxly.supabase.co/functions/v1/line-auth'
+  },
+  dev: {
+    LINE_AUTH_URL: 'https://lxptelyviuucqmwxqxly.supabase.co/functions/v1/line-auth'
+  }
+};
+
+function detectEnvironment() {
+  const host = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+  if (host === 'app.edgeops.jp') return 'prod';
+  if (host.includes('staging') || host === 'staging.edgeops.jp') return 'staging';
+  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return 'dev';
+  // 不明なホストは安全側で prod にフォールバック
+  return 'prod';
+}
+
+const CURRENT_ENV = detectEnvironment();
+const LINE_AUTH_URL = ENV_CONFIG[CURRENT_ENV].LINE_AUTH_URL;
+
+console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window.location.hostname);
+</script>
+<!-- auth.js (認証フロー独立化) [Phase 0 5-2] -->
+<script src="auth.js"></script>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .mg-shell {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--eo-surface-sunken);
+  }
+
+  .mg-header {
+    background: var(--eo-header-bg);
+    color: var(--eo-header-fg);
+    padding: var(--eo-space-3) var(--eo-space-4);
+    box-shadow: var(--eo-shadow);
+  }
+
+  .mg-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .mg-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--eo-space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-4);
+  }
+
+  .mg-card {
+    background: var(--eo-surface);
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    box-shadow: var(--eo-shadow);
+    padding: var(--eo-space-4);
+  }
+
+  .mg-label {
+    display: block;
+    color: var(--eo-text-muted);
+    font-size: 13px;
+    margin-bottom: var(--eo-space-2);
+  }
+
+  .mg-select {
+    width: 100%;
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    background: var(--eo-surface);
+    color: var(--eo-text);
+    font: inherit;
+    padding: var(--eo-space-3) var(--eo-space-4);
+  }
+
+  .mg-details {
+    margin-top: var(--eo-space-4);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--eo-space-3);
+  }
+
+  .mg-detail {
+    display: grid;
+    gap: var(--eo-space-1);
+  }
+
+  .mg-detail-term {
+    color: var(--eo-text-muted);
+    font-size: 13px;
+  }
+
+  .mg-detail-value {
+    color: var(--eo-text);
+    font-size: 15px;
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .mg-actions-reserved {
+    min-height: 44px;
+    margin-top: var(--eo-space-4);
+  }
+
+  .mg-placeholder {
+    border: 1px dashed var(--eo-border);
+    border-radius: var(--eo-radius);
+    background: var(--eo-surface-sunken);
+    color: var(--eo-text-muted);
+    padding: var(--eo-space-4);
+    text-align: center;
+  }
+
+  .mg-state {
+    min-height: 100%;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--eo-space-3);
+    padding: var(--eo-space-5);
+    text-align: center;
+    color: var(--eo-text);
+    background: var(--eo-surface-sunken);
+  }
+
+  .mg-state-title {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .mg-state-text {
+    color: var(--eo-text-muted);
+    line-height: 1.6;
+  }
+
+  .mg-spinner {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 3px solid var(--eo-border);
+    border-top-color: var(--eo-accent);
+    animation: mg-spin 0.9s linear infinite;
+  }
+
+  @keyframes mg-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+<div id="screen-loading" class="screen active">
+  <div class="mg-state">
+    <div class="mg-spinner" aria-hidden="true"></div>
+    <div class="mg-state-title">起動中です</div>
+    <p class="mg-state-text">認証と施設管理者判定を確認しています。</p>
+  </div>
+</div>
+
+<div id="screen-blocked" class="screen">
+  <div class="mg-state">
+    <div class="mg-state-title">LINEアプリ内から開いてください</div>
+    <p class="mg-state-text">この画面はLIFF環境内でのみ利用できます。</p>
+  </div>
+</div>
+
+<div id="screen-denied" class="screen">
+  <div class="mg-state">
+    <div class="mg-state-title">権限がありません</div>
+    <p class="mg-state-text">施設管理者として登録されているアカウントでご利用ください。</p>
+  </div>
+</div>
+
+<div id="screen-main" class="screen">
+  <div class="mg-shell">
+    <header class="mg-header">
+      <h1 class="mg-title">EdgeOps 施設管理</h1>
+    </header>
+    <main class="mg-content">
+      <section class="mg-card">
+        <label class="mg-label" for="facility-select">施設切替</label>
+        <select id="facility-select" class="mg-select"></select>
+        <dl class="mg-details">
+          <div class="mg-detail">
+            <dt class="mg-detail-term">施設名</dt>
+            <dd id="facility-name" class="mg-detail-value"></dd>
+          </div>
+          <div class="mg-detail">
+            <dt class="mg-detail-term">施設コード</dt>
+            <dd id="facility-code" class="mg-detail-value"></dd>
+          </div>
+          <div class="mg-detail">
+            <dt class="mg-detail-term">plan</dt>
+            <dd id="facility-plan" class="mg-detail-value"></dd>
+          </div>
+          <div class="mg-detail">
+            <dt class="mg-detail-term">contract_status</dt>
+            <dd id="facility-contract-status" class="mg-detail-value"></dd>
+          </div>
+        </dl>
+        <div class="mg-actions-reserved" aria-hidden="true"></div>
+      </section>
+      <section class="mg-card">
+        <div class="mg-placeholder">この先の内容は Batch4-② で実装します</div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
+const LIFF_ID = '2009827939-rZo06gWm';
+
+let sb;
+let managerFacilities = [];
+let selectedFacilityId = null;
+
+const screenIds = ['screen-loading', 'screen-blocked', 'screen-denied', 'screen-main'];
+
+function showScreen(screenId) {
+  screenIds.forEach((id) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.classList.toggle('active', id === screenId);
+  });
+}
+
+function setFacilityValue(id, value) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  element.textContent = value == null ? '' : String(value);
+}
+
+function getSelectedFacility() {
+  return managerFacilities.find((facility) => String(facility.facility_id) === String(selectedFacilityId)) || null;
+}
+
+function renderFacilityDetails() {
+  const facility = getSelectedFacility();
+  if (!facility) return;
+  setFacilityValue('facility-name', facility.facility_name);
+  setFacilityValue('facility-code', facility.facility_code);
+  setFacilityValue('facility-plan', facility.plan);
+  setFacilityValue('facility-contract-status', facility.contract_status);
+}
+
+function renderFacilitySelect() {
+  const select = document.getElementById('facility-select');
+  if (!select) return;
+  select.replaceChildren();
+  managerFacilities.forEach((facility) => {
+    const option = document.createElement('option');
+    option.value = String(facility.facility_id);
+    option.textContent = facility.facility_name == null ? '' : String(facility.facility_name);
+    select.appendChild(option);
+  });
+  select.value = String(selectedFacilityId);
+  renderFacilityDetails();
+}
+
+async function ensureManagerLiffContext() {
+  const hasManagerContext = () => {
+    try {
+      if (typeof liff === 'undefined' || typeof liff.isInClient !== 'function' || typeof liff.getContext !== 'function') {
+        return false;
+      }
+      const context = liff.getContext();
+      return Boolean(context) && liff.isInClient();
+    } catch (error) {
+      console.warn('[manager.html] Failed to inspect LIFF context:', error);
+      return false;
+    }
+  };
+
+  if (hasManagerContext()) return true;
+  console.warn('[manager.html] LIFF context unavailable on first check. Retrying once.');
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  return hasManagerContext();
+}
+
+async function init() {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  try {
+    await liff.init({ liffId: LIFF_ID });
+  } catch (error) {
+    console.error('[manager.html] liff.init failed:', error);
+    showScreen('screen-blocked');
+    return;
+  }
+
+  if (!liff.isLoggedIn()) {
+    liff.login();
+    return;
+  }
+
+  if (!await ensureManagerLiffContext()) {
+    console.warn('[manager.html] Access blocked outside LINE client.');
+    showScreen('screen-blocked');
+    return;
+  }
+
+  // ★auth.js の getCurrentFacility() / getCurrentRole() は使わない。
+  //   facility_managers を直接SELECTしており、第189回（EO-DEC-0189）の
+  //   GRANT剥奪後は成立しない。施設判定は manager_get_my_facilities() RPC を使う。
+  try {
+    const authResult = await resolveEoUid(sb);
+    if (!authResult || !authResult.eoUid) {
+      throw new Error('resolveEoUid returned no eoUid');
+    }
+  } catch (error) {
+    console.error('[manager.html] resolveEoUid failed:', error);
+    try {
+      liff.logout();
+    } catch (_) {}
+    liff.login();
+    return;
+  }
+
+  const { data, error } = await sb.rpc('manager_get_my_facilities');
+  if (error) {
+    console.error('[manager.html] manager_get_my_facilities error:', error);
+    showScreen('screen-denied');
+    return;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    console.warn('[manager.html] manager_get_my_facilities returned 0 rows.');
+    showScreen('screen-denied');
+    return;
+  }
+
+  managerFacilities = data;
+  selectedFacilityId = (managerFacilities.find((facility) => facility && facility.is_main) || managerFacilities[0]).facility_id;
+  renderFacilitySelect();
+  showScreen('screen-main');
+}
+
+document.getElementById('facility-select').addEventListener('change', (event) => {
+  selectedFacilityId = event.target.value;
+  renderFacilityDetails();
+});
+
+init();
+</script>
+</body>
+</html>
