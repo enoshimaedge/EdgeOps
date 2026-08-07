@@ -427,6 +427,9 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     <div class="tab-btn" onclick="switchTab('members')">
       <span class="tab-icon">👥</span>メンバー
     </div>
+    <div class="tab-btn" onclick="switchTab('facilities')">
+      <span class="tab-icon">🏬</span>施設
+    </div>
   </div>
 
   <!-- コンテンツ -->
@@ -495,6 +498,12 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     <div id="tab-members" class="tab-panel">
       <input class="search-box" type="text" id="member-search" placeholder="🔍 名前・UIDで検索..." oninput="filterMembers()">
       <div id="member-list">
+        <div class="loading-small">読み込み中...</div>
+      </div>
+    </div>
+
+    <div id="tab-facilities" class="tab-panel">
+      <div id="facility-list">
         <div class="loading-small">読み込み中...</div>
       </div>
     </div>
@@ -576,7 +585,7 @@ async function init() {
 // ── 全データ読み込み ──
 async function loadAllData() {
   // [Phase 4-3] loadStorageUsage を追加(既存3関数と並列実行・既存ロジック非変更)
-  await Promise.all([loadStats(), loadGroups(), loadMembers(), loadStorageUsage()]);
+  await Promise.all([loadStats(), loadGroups(), loadMembers(), loadStorageUsage(), loadFacilities()]);
 }
 
 // ── 統計 ──
@@ -809,6 +818,57 @@ async function loadStorageUsage() {
     summaryEl.innerHTML = '<span style="color:#e53935;">⚠️ Storage使用量の取得に失敗しました</span>';
     listEl.innerHTML = '';
   }
+}
+
+// ═══════════════════════════════════════════
+// [Plus版 Batch3 / 第189回 EO-DEC-0189] 施設タブ（閲覧専用）
+// ═══════════════════════════════════════════
+// データ取得は admin_list_facilities() RPC の1本のみ。
+// 6テーブルは RLS有効・ポリシー0件・GRANT剥奪済みのため直接SELECTは不可。
+// ★DBの値を加工・補正・除外しない。DBに入っている事実をそのまま表示する（第189回 追認）。
+// ═══════════════════════════════════════════
+async function loadFacilities() {
+  const { data, error } = await sb.rpc('admin_list_facilities');
+
+  if (error) {
+    document.getElementById('facility-list').innerHTML =
+      '<div class="empty-state">施設情報を取得できませんでした</div>';
+    console.error('[admin.html] admin_list_facilities error:', error);
+    return;
+  }
+
+  if (!data || !data.length) {
+    document.getElementById('facility-list').innerHTML =
+      '<div class="empty-state">施設がありません</div>';
+    return;
+  }
+
+  document.getElementById('facility-list').innerHTML = data.map(f => {
+    const mains = (f.main_manager_names || []);
+    return `
+      <div class="group-item">
+        <div class="group-item-header">
+          <div class="group-id">${escHtmlAdmin(f.facility_name || '')}</div>
+          <div class="industry-tag">${escHtmlAdmin(f.plan || '')}</div>
+        </div>
+        <div class="group-item-info">
+          <span>🏷️ ${escHtmlAdmin(f.facility_code || '')}</span>
+          <span>📄 契約: ${escHtmlAdmin(f.contract_status || '-')}</span>
+        </div>
+        <div class="group-item-info">
+          <span>👥 管理者: ${escHtmlAdmin(`${f.manager_count}`)}人</span>
+          <span>⭐ 主担当: ${mains.length ? mains.map(escHtmlAdmin).join('、') : 'なし'}</span>
+        </div>
+        <div class="group-item-info">
+          <span>💳 subscription: ${escHtmlAdmin(f.sub_status || '-')}</span>
+          <span>経路: ${escHtmlAdmin(f.billing_source || '-')}</span>
+        </div>
+        <div class="group-item-info">
+          <span>✉️ 招待 未使用 ${escHtmlAdmin(`${f.invite_unused}`)} / 使用済 ${escHtmlAdmin(`${f.invite_used}`)} / 期限切れ ${escHtmlAdmin(`${f.invite_expired}`)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // admin.html 内で使うHTMLエスケープ(共通化)
