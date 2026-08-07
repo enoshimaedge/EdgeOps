@@ -856,7 +856,7 @@ async function loadFacilities() {
           <span>📄 契約: ${escHtmlAdmin(f.contract_status || '-')}</span>
         </div>
         <div class="group-item-info">
-          <span>👥 管理者: ${f.manager_count}人</span>
+          <span>👥 管理者: ${escHtmlAdmin(`${f.manager_count}`)}人</span>
           <span>⭐ 主担当: ${mains.length ? mains.map(escHtmlAdmin).join('、') : 'なし'}</span>
         </div>
         <div class="group-item-info">
@@ -864,7 +864,7 @@ async function loadFacilities() {
           <span>経路: ${escHtmlAdmin(f.billing_source || '-')}</span>
         </div>
         <div class="group-item-info">
-          <span>✉️ 招待 未使用 ${f.invite_unused} / 使用済 ${f.invite_used} / 期限切れ ${f.invite_expired}</span>
+          <span>✉️ 招待 未使用 ${escHtmlAdmin(`${f.invite_unused}`)} / 使用済 ${escHtmlAdmin(`${f.invite_used}`)} / 期限切れ ${escHtmlAdmin(`${f.invite_expired}`)}</span>
         </div>
       </div>
     `;
