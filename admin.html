@@ -595,9 +595,18 @@ async function loadStats() {
     sb.from('group_sessions').select('id, industry, expires_at')
   ]);
 
-  // アクティブグループ（承認済みメンバーが1人以上）
+  // アクティブグループ（承認済みメンバーが1人以上・期限切れeventは除く）
+  // [第188回 EO-DEC-0188] 期限切れevent の除外責任をここへ集約する。
+  //   下流（業種内訳の集計ループ）では再判定しない。
+  //   isExpiredEvent の定義は本ファイル内でここ1か所のみとする。
   const approvedMembers = (allMembers || []).filter(m => m.status === 'approved');
+  const nowTs = Date.now();
+  const isExpiredEvent = (g) =>
+    g.industry === 'event' && g.expires_at && new Date(g.expires_at).getTime() <= nowTs;
   const activeGroupIds = new Set(approvedMembers.map(m => m.group_session_id));
+  (industryData || []).forEach(g => {
+    if (isExpiredEvent(g)) activeGroupIds.delete(g.id);
+  });
   const totalGroups = (allGroups || []).length;
   const activeGroups = activeGroupIds.size;
 
@@ -629,14 +638,10 @@ async function loadStats() {
     note(`全グループの送信メッセージ合計`);
 
   // 業種内訳（7業種対応・アクティブグループのみ集計）
-  // [第19章 19-2] 期限切れの event はアクティブ扱いにしない(通常グループは従来どおり期限を見ない)
+  // [第19章 19-2 → 第188回 EO-DEC-0188] 期限切れの event は activeGroupIds の生成時点で除外済み（ここでは再判定しない）
   const counts = { hotel: 0, commercial: 0, clinic: 0, care: 0, attraction: 0, fitness: 0, club: 0, event: 0 };
-  const nowTs = Date.now();
-  const isExpiredEvent = (g) =>
-    g.industry === 'event' && g.expires_at && new Date(g.expires_at).getTime() <= nowTs;
   (industryData || []).forEach(g => {
     if (!activeGroupIds.has(g.id)) return;
-    if (isExpiredEvent(g)) return;
     if (counts[g.industry] !== undefined) counts[g.industry]++;
   });
   const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
