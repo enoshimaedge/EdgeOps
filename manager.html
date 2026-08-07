@@ -210,11 +210,11 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dd id="facility-code" class="mg-detail-value"></dd>
           </div>
           <div class="mg-detail">
-            <dt class="mg-detail-term">plan</dt>
+            <dt class="mg-detail-term">プラン</dt>
             <dd id="facility-plan" class="mg-detail-value"></dd>
           </div>
           <div class="mg-detail">
-            <dt class="mg-detail-term">contract_status</dt>
+            <dt class="mg-detail-term">契約ステータス</dt>
             <dd id="facility-contract-status" class="mg-detail-value"></dd>
           </div>
         </dl>
@@ -352,17 +352,23 @@ async function init() {
   }
 
   managerFacilities = data;
-  selectedFacilityId = (managerFacilities.find((facility) => facility && facility.is_main) || managerFacilities[0]).facility_id;
+  selectedFacilityId = String((managerFacilities.find((facility) => facility && facility.is_main) || managerFacilities[0]).facility_id);
   renderFacilitySelect();
   showScreen('screen-main');
 }
 
-document.getElementById('facility-select').addEventListener('change', (event) => {
-  selectedFacilityId = event.target.value;
-  renderFacilityDetails();
-});
+const facilitySelectElement = document.getElementById('facility-select');
+if (facilitySelectElement) {
+  facilitySelectElement.addEventListener('change', (event) => {
+    selectedFacilityId = event.target.value;
+    renderFacilityDetails();
+  });
+}
 
-init();
+init().catch((error) => {
+  console.error('[manager.html] init failed unexpectedly:', error);
+  showScreen('screen-denied');
+});
 </script>
 </body>
 </html>
