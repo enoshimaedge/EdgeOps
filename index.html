@@ -2288,6 +2288,22 @@ function stopPolling() {
 }
 
 async function loadMessages() {
+  // ── [第183回 EO-DEC-0183 論点2・案イ] グループ切替の自己防衛 ──
+  //   前回読み込んだグループと異なる場合は、カーソルと集計状態を初期化する。
+  //   switchGroup() 以外の経路（checkApproval / createGroup / joinGroup）でも
+  //   確実に初期化されるよう、状態を使う側で担保する。
+  //   同一グループのポーリングでは成立しないため、第119回の案α挙動は不変。
+  if (window._lastLoadedGroupId !== currentGroup.id) {
+    messages = [];
+    oldestLoadedAt = null;
+    oldestLoadedId = null;
+    hasMore = true;
+    isLoadingMore = false;
+    monthOpenState = {};
+    window._memberJoinedAt = new Map();
+    window._memberNameMap = {};
+    window._lastLoadedGroupId = currentGroup.id;
+  }
   const isFirstLoad = (oldestLoadedAt === null);   // ── Step 5：初回判定（第119回）
   try {
     // messages・members・handover_notesを並列取得（起動速度改善）
