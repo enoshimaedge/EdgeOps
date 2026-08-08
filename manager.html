@@ -754,15 +754,10 @@ function setGroupSectionButtonsDisabled(disabled) {
 
 function getGroupOwnerCandidates(group) {
   const targetFacilityId = String(selectedFacilityId || '');
-  const targetGroupSessionId = String(group.group_session_id || '');
   const targetGroupName = String(group.group_name || '');
   return memberCandidates.filter((candidate) => {
     if (!candidate || String(candidate.out_facility_id) !== targetFacilityId) return false;
     if (!candidate.out_eo_uid) return false;
-    if (candidate.out_is_signage) return false;
-    if (Array.isArray(candidate.out_group_session_ids)) {
-      return candidate.out_group_session_ids.some((id) => String(id) === targetGroupSessionId);
-    }
     const groupNames = Array.isArray(candidate.out_group_names) ? candidate.out_group_names : [];
     return targetGroupName !== '' && groupNames.includes(targetGroupName);
   });
