@@ -285,7 +285,7 @@ async function init() {
   }
 
   if (!liff.isLoggedIn()) {
-    liff.login();
+    liff.login({ redirectUri: window.location.href });
     return;
   }
 
@@ -302,7 +302,7 @@ async function init() {
     try {
       liff.logout();
     } catch (_) {}
-    liff.login();
+    liff.login({ redirectUri: window.location.href });
     return;
   }
 
