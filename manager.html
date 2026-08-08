@@ -247,6 +247,105 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  .mg-group-card {
+    background: var(--eo-surface);
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    box-shadow: var(--eo-shadow);
+    padding: var(--eo-space-4);
+  }
+
+  .mg-group-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--eo-text-muted);
+    margin-bottom: var(--eo-space-3);
+  }
+
+  .mg-group-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-3);
+  }
+
+  .mg-group-row {
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    padding: var(--eo-space-3) var(--eo-space-4);
+    background: var(--eo-surface-sunken);
+  }
+
+  .mg-group-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--eo-text);
+  }
+
+  .mg-group-industry {
+    font-size: 13px;
+    color: var(--eo-text-muted);
+  }
+
+  .mg-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--eo-space-2);
+    flex-wrap: wrap;
+  }
+
+  .mg-group-gid {
+    font-family: var(--eo-font-mono);
+    font-size: 13px;
+    color: var(--eo-text-muted);
+    margin-top: var(--eo-space-1);
+  }
+
+  .mg-group-meta {
+    margin-top: var(--eo-space-2);
+    font-size: 13px;
+    color: var(--eo-text-muted);
+  }
+
+  .mg-group-archived-at {
+    margin-top: var(--eo-space-1);
+    font-size: 12px;
+    color: var(--eo-text-muted);
+  }
+
+  .mg-group-empty {
+    color: var(--eo-text-muted);
+    font-size: 14px;
+    padding: var(--eo-space-3) 0;
+    text-align: center;
+  }
+
+  .mg-archived {
+    margin-top: var(--eo-space-3);
+  }
+
+  .mg-archived-summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--eo-text-muted);
+    padding: var(--eo-space-2) 0;
+    user-select: none;
+  }
+
+  .mg-archived-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-3);
+    margin-top: var(--eo-space-3);
+  }
+
+  .mg-group-note {
+    font-size: 12px;
+    color: var(--eo-text-muted);
+    margin-top: var(--eo-space-3);
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -300,7 +399,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
           </div>
         </dl>
         <div class="mg-actions-reserved" aria-hidden="true">
-          <div class="mg-placeholder">グループ一覧は Batch4-③、施設の管理操作（一斉メッセージ・サブ管理者・施設設定・エクスポート）は Batch4-④以降で実装します</div>
+          <div class="mg-placeholder">施設の管理操作（一斉メッセージ・サブ管理者・施設設定・エクスポート）は Batch4-④以降で実装します</div>
         </div>
       </section>
       <div class="mg-stat-grid">
@@ -318,6 +417,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
           <span id="facility-manager-count" class="mg-stat-value"></span>
         </div>
       </div>
+      <div id="group-list-container" class="mg-group-card"></div>
     </main>
   </div>
 </div>
@@ -334,6 +434,7 @@ const FACILITY_GROUP_LIMIT = 20;
 let sb;
 let managerFacilities = [];
 let selectedFacilityId = null;
+let managerGroups = [];
 
 const screenIds = ['screen-loading', 'screen-denied', 'screen-main'];
 
@@ -382,6 +483,110 @@ function renderFacilityDetails() {
   setFacilityValue('facility-member-count', (facility.member_count != null ? facility.member_count : 0) + '人');
   setFacilityValue('facility-manager-count', (facility.manager_count != null ? facility.manager_count : 0) + '人');
   renderFacilityBanner(facility);
+  renderGroupList();
+}
+
+const INDUSTRY_LABELS = {
+  hotel: 'ホテル・旅館', commercial: '商業施設', clinic: '病院・クリニック',
+  care: '介護施設', attraction: '集客施設', fitness: 'フィットネス施設',
+  club: '部活・クラブ', event: 'イベント・催事'
+};
+
+function buildGroupRow(group) {
+  const row = document.createElement('div');
+  row.className = 'mg-group-row';
+
+  const header = document.createElement('div');
+  header.className = 'mg-group-header';
+
+  const name = document.createElement('span');
+  name.className = 'mg-group-name';
+  name.textContent = group.group_name || '';
+  header.appendChild(name);
+
+  const industry = document.createElement('span');
+  industry.className = 'mg-group-industry';
+  industry.textContent = INDUSTRY_LABELS[group.industry] || group.industry || '';
+  header.appendChild(industry);
+
+  row.appendChild(header);
+
+  const gid = document.createElement('div');
+  gid.className = 'mg-group-gid';
+  gid.textContent = group.group_id || '';
+  row.appendChild(gid);
+
+  const meta = document.createElement('div');
+  meta.className = 'mg-group-meta';
+  let metaText = '👥 ' + (group.member_count != null ? group.member_count : 0) + '人';
+  if (group.signage_count) {
+    metaText += '  📺 ' + group.signage_count + '台';
+  }
+  const creators = Array.isArray(group.creator_names) && group.creator_names.length > 0
+    ? group.creator_names.join('、') : 'なし';
+  metaText += '   管理者: ' + creators;
+  meta.textContent = metaText;
+  row.appendChild(meta);
+
+  return row;
+}
+
+function renderGroupList() {
+  const container = document.getElementById('group-list-container');
+  if (!container) return;
+  container.replaceChildren();
+
+  const facilityGroups = managerGroups.filter((g) => String(g.facility_id) === String(selectedFacilityId));
+  const active = facilityGroups.filter((g) => g.archived_at == null);
+  const archived = facilityGroups.filter((g) => g.archived_at != null);
+
+  const title = document.createElement('div');
+  title.className = 'mg-group-card-title';
+  title.textContent = 'グループ一覧';
+  container.appendChild(title);
+
+  if (facilityGroups.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'mg-group-empty';
+    empty.textContent = 'この施設にはまだグループがありません';
+    container.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'mg-group-list';
+  active.forEach((group) => list.appendChild(buildGroupRow(group)));
+  if (active.length > 0) {
+    container.appendChild(list);
+  }
+
+  if (archived.length > 0) {
+    const details = document.createElement('details');
+    details.className = 'mg-archived';
+
+    const summary = document.createElement('summary');
+    summary.className = 'mg-archived-summary';
+    summary.textContent = 'アーカイブ済み（' + archived.length + '）';
+    details.appendChild(summary);
+
+    const archivedList = document.createElement('div');
+    archivedList.className = 'mg-archived-list';
+    archived.forEach((group) => {
+      const row = buildGroupRow(group);
+      const archivedAt = document.createElement('div');
+      archivedAt.className = 'mg-group-archived-at';
+      archivedAt.textContent = 'アーカイブ日時: ' + new Date(group.archived_at).toLocaleString('ja-JP');
+      row.appendChild(archivedAt);
+      archivedList.appendChild(row);
+    });
+    details.appendChild(archivedList);
+    container.appendChild(details);
+  }
+
+  const note = document.createElement('div');
+  note.className = 'mg-group-note';
+  note.textContent = 'グループごとの管理操作は Batch4-⑤ で実装します';
+  container.appendChild(note);
 }
 
 function renderFacilitySelect() {
@@ -446,6 +651,14 @@ async function init() {
 
   managerFacilities = data;
   selectedFacilityId = String((managerFacilities.find((facility) => facility && facility.is_main) || managerFacilities[0]).facility_id);
+
+  const { data: groupData, error: groupError } = await sb.rpc('manager_list_groups');
+  if (groupError) {
+    console.error('[manager.html] manager_list_groups error:', groupError);
+  } else if (Array.isArray(groupData)) {
+    managerGroups = groupData;
+  }
+
   renderFacilitySelect();
   showScreen('screen-main');
 }
@@ -453,6 +666,7 @@ async function init() {
 async function managerLogout() {
   // ① 画面上のデータを先に消す（一瞬でも他人に見せない）
   managerFacilities = [];
+  managerGroups = [];
   selectedFacilityId = null;
   setFacilityValue('facility-name', '');
   setFacilityValue('facility-code', '');
