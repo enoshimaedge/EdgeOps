@@ -769,7 +769,9 @@ function renderManagerSection() {
   currentErrorEl.hidden = true;
   currentCard.appendChild(currentErrorEl);
 
-  const managers = Array.isArray(facility.managers) ? facility.managers : [];
+  const managers = memberCandidates.filter(
+    (c) => String(c.out_facility_id) === String(selectedFacilityId) && c.out_is_manager
+  );
 
   if (managers.length === 0) {
     const empty = document.createElement('div');
@@ -788,17 +790,11 @@ function renderManagerSection() {
 
       const nameEl = document.createElement('span');
       nameEl.className = 'mg-manager-name';
-      nameEl.textContent = mgr.display_name || '';
+      const displayNames = Array.isArray(mgr.out_display_names) ? mgr.out_display_names : [];
+      nameEl.textContent = displayNames.join(' / ') || '（名前なし）';
       info.appendChild(nameEl);
 
-      if (mgr.is_main) {
-        const badge = document.createElement('span');
-        badge.className = 'mg-manager-badge';
-        badge.textContent = '主担当';
-        nameEl.appendChild(badge);
-      }
-
-      if (currentEoUid && mgr.eo_uid === currentEoUid) {
+      if (currentEoUid && mgr.out_eo_uid === currentEoUid) {
         const selfBadge = document.createElement('span');
         selfBadge.className = 'mg-manager-self-badge';
         selfBadge.textContent = '（あなた）';
@@ -811,15 +807,15 @@ function renderManagerSection() {
       removeBtn.type = 'button';
       removeBtn.className = 'mg-manager-btn';
       removeBtn.textContent = '削除';
-      removeBtn.dataset.eoUid = mgr.eo_uid;
-      removeBtn.dataset.displayName = mgr.display_name || '';
+      removeBtn.dataset.eoUid = mgr.out_eo_uid;
+      removeBtn.dataset.displayName = displayNames.join(' / ') || '';
       removeBtn.addEventListener('click', () => {
         removeFacilityManager(
           removeBtn,
           currentErrorEl,
           String(facility.facility_id),
-          mgr.eo_uid,
-          mgr.display_name || ''
+          mgr.out_eo_uid,
+          displayNames.join(' / ') || ''
         );
       });
       row.appendChild(removeBtn);
@@ -846,7 +842,7 @@ function renderManagerSection() {
   candidateCard.appendChild(candidateErrorEl);
 
   const candidates = memberCandidates.filter(
-    (c) => String(c.out_facility_id) === String(selectedFacilityId)
+    (c) => String(c.out_facility_id) === String(selectedFacilityId) && !c.out_is_manager
   );
 
   if (candidates.length === 0) {
@@ -970,6 +966,7 @@ async function removeFacilityManager(btn, errorEl, facilityId, eoUid, displayNam
     }
     if (isSelf) {
       // 自分を外した場合は権限がなくなるため denied 画面へ
+      await reloadManagerData();
       showScreen('screen-denied');
       return;
     }
