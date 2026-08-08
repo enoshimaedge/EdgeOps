@@ -263,6 +263,15 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     margin-bottom: var(--eo-space-3);
   }
 
+  .mg-group-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--eo-space-3);
+    margin-bottom: var(--eo-space-3);
+    flex-wrap: wrap;
+  }
+
   .mg-group-list {
     display: flex;
     flex-direction: column;
@@ -306,6 +315,100 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     margin-top: var(--eo-space-2);
     font-size: 13px;
     color: var(--eo-text-muted);
+  }
+
+  .mg-group-actions {
+    margin-top: var(--eo-space-3);
+    display: flex;
+    gap: var(--eo-space-2);
+    flex-wrap: wrap;
+  }
+
+  .mg-group-btn {
+    background: transparent;
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    color: var(--eo-text);
+    font: inherit;
+    font-size: 13px;
+    padding: var(--eo-space-2) var(--eo-space-3);
+    min-height: 36px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .mg-group-btn:hover:not(:disabled) {
+    background: var(--eo-surface);
+  }
+
+  .mg-group-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .mg-group-btn-primary {
+    background: var(--eo-accent);
+    color: #FFFFFF;
+    border-color: var(--eo-accent);
+  }
+
+  .mg-group-btn-primary:hover:not(:disabled) {
+    background: var(--eo-accent-hover);
+    border-color: var(--eo-accent-hover);
+  }
+
+  .mg-group-btn-danger {
+    border-color: #DC2626;
+    color: #DC2626;
+  }
+
+  .mg-group-btn-danger:hover:not(:disabled) {
+    background: #FEF2F2;
+  }
+
+  .mg-group-form {
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    background: var(--eo-surface-sunken);
+    padding: var(--eo-space-3);
+    margin-bottom: var(--eo-space-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-2);
+  }
+
+  .mg-group-form-label {
+    font-size: 12px;
+    color: var(--eo-text-muted);
+  }
+
+  .mg-group-input,
+  .mg-group-select {
+    width: 100%;
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    background: var(--eo-surface);
+    color: var(--eo-text);
+    font: inherit;
+    padding: var(--eo-space-2) var(--eo-space-3);
+  }
+
+  .mg-group-form-actions {
+    display: flex;
+    gap: var(--eo-space-2);
+    flex-wrap: wrap;
+  }
+
+  .mg-group-error {
+    color: #DC2626;
+    font-size: 13px;
+    margin-bottom: var(--eo-space-2);
+  }
+
+  .mg-group-info {
+    color: #065F46;
+    font-size: 13px;
+    margin-bottom: var(--eo-space-2);
   }
 
   .mg-group-archived-at {
@@ -569,6 +672,13 @@ let selectedFacilityId = null;
 let managerGroups = [];
 let memberCandidates = [];
 let currentEoUid = null;
+let groupCreateDraft = null;
+let groupRenameTargetId = null;
+let groupRenameDraftName = '';
+let groupOwnerPickerTargetId = null;
+let groupOwnerPickerEoUid = '';
+let groupSectionErrorMessage = '';
+let groupSectionInfoMessage = '';
 
 const screenIds = ['screen-loading', 'screen-denied', 'screen-main'];
 
@@ -627,7 +737,280 @@ const INDUSTRY_LABELS = {
   club: '部活・クラブ', event: 'イベント・催事'
 };
 
-function buildGroupRow(group) {
+function generateGroupId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const part1 = Array.from({length:5}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  const part2 = Array.from({length:4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  return `SL-${part1}-${part2}`;
+}
+
+function setGroupSectionButtonsDisabled(disabled) {
+  const section = document.getElementById('group-list-container');
+  if (!section) return;
+  section.querySelectorAll('button').forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
+function getGroupOwnerCandidates(group) {
+  const targetFacilityId = String(selectedFacilityId || '');
+  const targetGroupSessionId = String(group.group_session_id || '');
+  const targetGroupName = String(group.group_name || '');
+  return memberCandidates.filter((candidate) => {
+    if (!candidate || String(candidate.out_facility_id) !== targetFacilityId) return false;
+    if (!candidate.out_eo_uid) return false;
+    if (candidate.out_is_signage) return false;
+    if (Array.isArray(candidate.out_group_session_ids)) {
+      return candidate.out_group_session_ids.some((id) => String(id) === targetGroupSessionId);
+    }
+    const groupNames = Array.isArray(candidate.out_group_names) ? candidate.out_group_names : [];
+    return targetGroupName !== '' && groupNames.includes(targetGroupName);
+  });
+}
+
+async function reloadManagerDataStrict() {
+  const { data: facilityData, error: facilityError } = await sb.rpc('manager_get_my_facilities');
+  if (facilityError) throw facilityError;
+  managerFacilities = Array.isArray(facilityData) ? facilityData : [];
+
+  const { data: groupData, error: groupError } = await sb.rpc('manager_list_groups');
+  if (groupError) throw groupError;
+  managerGroups = Array.isArray(groupData) ? groupData : [];
+
+  const { data: candidateData, error: candidateError } = await sb.rpc('manager_list_member_candidates');
+  if (candidateError) throw candidateError;
+  memberCandidates = Array.isArray(candidateData) ? candidateData : [];
+}
+
+async function createGroup() {
+  if (!groupCreateDraft) return;
+  const facility = getSelectedFacility();
+  if (!facility) return;
+  const groupName = (groupCreateDraft.groupName || '').trim();
+  const industry = (groupCreateDraft.industry || '').trim();
+  const displayName = (groupCreateDraft.displayName || '').trim();
+  if (!groupName || !industry || !displayName) {
+    groupSectionErrorMessage = '必須項目を入力してください';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const confirmed = window.confirm(
+    '「' + groupName + '」を作成します。\n作成すると、あなたがこのグループの管理者として参加します。'
+  );
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { error } = await sb.rpc('manager_create_group', {
+      p_facility_id: facility.facility_id,
+      p_group_id: generateGroupId(),
+      p_group_name: groupName,
+      p_industry: industry,
+      p_display_name: displayName,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    groupCreateDraft = null;
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+async function renameGroup(group) {
+  const groupName = (groupRenameDraftName || '').trim();
+  if (!groupName) {
+    groupSectionErrorMessage = 'グループ名を入力してください';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const confirmed = window.confirm(
+    '「' + (group.group_name || '') + '」の名前を「' + groupName + '」へ変更します。'
+  );
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { error } = await sb.rpc('manager_rename_group', {
+      p_group_session_id: group.group_session_id,
+      p_group_name: groupName,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    groupRenameTargetId = null;
+    groupRenameDraftName = '';
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+async function archiveGroup(group) {
+  const memberCount = group.member_count != null ? group.member_count : 0;
+  const confirmed = window.confirm(
+    '「' + (group.group_name || '') + '」をアーカイブします。\n' +
+    '現在（' + memberCount + '）人が参加しています。\n' +
+    'アーカイブ後も現場メンバーは引き続きこのグループを利用できます。'
+  );
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { error } = await sb.rpc('manager_archive_group', {
+      p_group_session_id: group.group_session_id,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    groupRenameTargetId = null;
+    groupRenameDraftName = '';
+    groupOwnerPickerTargetId = null;
+    groupOwnerPickerEoUid = '';
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+async function unarchiveGroup(group) {
+  const confirmed = window.confirm('「' + (group.group_name || '') + '」を復帰します。');
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { data, error } = await sb.rpc('manager_unarchive_group', {
+      p_group_session_id: group.group_session_id,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    const first = Array.isArray(data) ? data[0] : data;
+    if (first && first.creator_seeded_member_id != null) {
+      groupSectionInfoMessage = 'グループに管理者がいなかったため、あなたをグループ管理者として登録しました。';
+    }
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+async function reissueGroupGid(group) {
+  const confirmed = window.confirm(
+    '「' + (group.group_name || '') + '」のグループIDを再発行します。\n' +
+    '現在のグループID（' + (group.group_id || '') + '）は使えなくなります。\n' +
+    '一般の利用者には新しいグループIDが伏字で表示されます。\n' +
+    'この操作は元に戻せません。'
+  );
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { error } = await sb.rpc('manager_reissue_group_gid', {
+      p_group_session_id: group.group_session_id,
+      p_new_group_id: generateGroupId(),
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+async function addGroupManager(group) {
+  const candidates = getGroupOwnerCandidates(group);
+  const eoUid = groupOwnerPickerEoUid;
+  if (!eoUid) {
+    groupSectionErrorMessage = '追加する管理者を選択してください';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const target = candidates.find((candidate) => String(candidate.out_eo_uid) === String(eoUid));
+  if (!target) {
+    groupSectionErrorMessage = '候補者の情報を再読み込みしてください';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const displayNames = Array.isArray(target.out_display_names) ? target.out_display_names : [];
+  const targetName = displayNames.join(' / ') || '（名前なし）';
+  const confirmed = window.confirm(
+    '「' + targetName + '」をグループ管理者に追加します。\n追加後もあなたは引き続きこのグループの管理者です。'
+  );
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { error } = await sb.rpc('manager_change_group_owner', {
+      p_group_session_id: group.group_session_id,
+      p_new_owner_eo_uid: eoUid,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    groupOwnerPickerTargetId = null;
+    groupOwnerPickerEoUid = '';
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+function buildGroupRow(group, options = {}) {
   const row = document.createElement('div');
   row.className = 'mg-group-row';
 
@@ -663,6 +1046,179 @@ function buildGroupRow(group) {
   meta.textContent = metaText;
   row.appendChild(meta);
 
+  const groupId = String(group.group_session_id || '');
+  const isArchived = !!options.archived;
+  if (!isArchived) {
+    const actions = document.createElement('div');
+    actions.className = 'mg-group-actions';
+
+    const renameBtn = document.createElement('button');
+    renameBtn.type = 'button';
+    renameBtn.className = 'mg-group-btn';
+    renameBtn.textContent = '名前を変更';
+    renameBtn.addEventListener('click', () => {
+      groupRenameTargetId = groupId;
+      groupRenameDraftName = group.group_name || '';
+      groupOwnerPickerTargetId = null;
+      groupOwnerPickerEoUid = '';
+      groupSectionErrorMessage = '';
+      groupSectionInfoMessage = '';
+      renderGroupList();
+    });
+    actions.appendChild(renameBtn);
+
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'mg-group-btn mg-group-btn-danger';
+    archiveBtn.textContent = 'アーカイブ';
+    archiveBtn.addEventListener('click', () => archiveGroup(group));
+    actions.appendChild(archiveBtn);
+
+    const reissueBtn = document.createElement('button');
+    reissueBtn.type = 'button';
+    reissueBtn.className = 'mg-group-btn';
+    reissueBtn.textContent = 'グループID再発行';
+    reissueBtn.addEventListener('click', () => reissueGroupGid(group));
+    actions.appendChild(reissueBtn);
+
+    const ownerBtn = document.createElement('button');
+    ownerBtn.type = 'button';
+    ownerBtn.className = 'mg-group-btn mg-group-btn-primary';
+    ownerBtn.textContent = 'グループ管理者を追加';
+    ownerBtn.addEventListener('click', () => {
+      if (groupOwnerPickerTargetId === groupId) {
+        groupOwnerPickerTargetId = null;
+        groupOwnerPickerEoUid = '';
+      } else {
+        groupOwnerPickerTargetId = groupId;
+        const candidates = getGroupOwnerCandidates(group);
+        groupOwnerPickerEoUid = candidates.length > 0 ? String(candidates[0].out_eo_uid || '') : '';
+      }
+      groupRenameTargetId = null;
+      groupRenameDraftName = '';
+      groupSectionErrorMessage = '';
+      groupSectionInfoMessage = '';
+      renderGroupList();
+    });
+    actions.appendChild(ownerBtn);
+
+    row.appendChild(actions);
+
+    if (groupRenameTargetId === groupId) {
+      const form = document.createElement('div');
+      form.className = 'mg-group-form';
+
+      const label = document.createElement('label');
+      label.className = 'mg-group-form-label';
+      label.textContent = '新しいグループ名';
+      form.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'mg-group-input';
+      input.value = groupRenameDraftName;
+      input.addEventListener('input', (event) => {
+        groupRenameDraftName = event.target.value;
+      });
+      form.appendChild(input);
+
+      const formActions = document.createElement('div');
+      formActions.className = 'mg-group-form-actions';
+
+      const submitBtn = document.createElement('button');
+      submitBtn.type = 'button';
+      submitBtn.className = 'mg-group-btn mg-group-btn-primary';
+      submitBtn.textContent = '変更を保存';
+      submitBtn.addEventListener('click', () => renameGroup(group));
+      formActions.appendChild(submitBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'mg-group-btn';
+      cancelBtn.textContent = 'キャンセル';
+      cancelBtn.addEventListener('click', () => {
+        groupRenameTargetId = null;
+        groupRenameDraftName = '';
+        groupSectionErrorMessage = '';
+        groupSectionInfoMessage = '';
+        renderGroupList();
+      });
+      formActions.appendChild(cancelBtn);
+
+      form.appendChild(formActions);
+      row.appendChild(form);
+    }
+
+    if (groupOwnerPickerTargetId === groupId) {
+      const picker = document.createElement('div');
+      picker.className = 'mg-group-form';
+
+      const pickerLabel = document.createElement('label');
+      pickerLabel.className = 'mg-group-form-label';
+      pickerLabel.textContent = 'グループ管理者に追加する方';
+      picker.appendChild(pickerLabel);
+
+      const select = document.createElement('select');
+      select.className = 'mg-group-select';
+      const candidates = getGroupOwnerCandidates(group);
+      candidates.forEach((candidate) => {
+        const option = document.createElement('option');
+        option.value = candidate.out_eo_uid;
+        const displayNames = Array.isArray(candidate.out_display_names) ? candidate.out_display_names : [];
+        option.textContent = displayNames.join(' / ') || '（名前なし）';
+        select.appendChild(option);
+      });
+      if (candidates.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = '追加できる候補者はいません';
+        select.appendChild(option);
+      }
+      select.value = groupOwnerPickerEoUid || (candidates[0] ? String(candidates[0].out_eo_uid || '') : '');
+      select.addEventListener('change', (event) => {
+        groupOwnerPickerEoUid = event.target.value;
+      });
+      picker.appendChild(select);
+
+      const pickerActions = document.createElement('div');
+      pickerActions.className = 'mg-group-form-actions';
+
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'mg-group-btn mg-group-btn-primary';
+      addBtn.textContent = 'グループ管理者を追加';
+      addBtn.disabled = candidates.length === 0;
+      addBtn.addEventListener('click', () => addGroupManager(group));
+      pickerActions.appendChild(addBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'mg-group-btn';
+      cancelBtn.textContent = 'キャンセル';
+      cancelBtn.addEventListener('click', () => {
+        groupOwnerPickerTargetId = null;
+        groupOwnerPickerEoUid = '';
+        groupSectionErrorMessage = '';
+        groupSectionInfoMessage = '';
+        renderGroupList();
+      });
+      pickerActions.appendChild(cancelBtn);
+
+      picker.appendChild(pickerActions);
+      row.appendChild(picker);
+    }
+  } else {
+    const actions = document.createElement('div');
+    actions.className = 'mg-group-actions';
+    const restoreBtn = document.createElement('button');
+    restoreBtn.type = 'button';
+    restoreBtn.className = 'mg-group-btn mg-group-btn-primary';
+    restoreBtn.textContent = '復帰';
+    restoreBtn.addEventListener('click', () => unarchiveGroup(group));
+    actions.appendChild(restoreBtn);
+    row.appendChild(actions);
+  }
+
   return row;
 }
 
@@ -675,10 +1231,130 @@ function renderGroupList() {
   const active = facilityGroups.filter((g) => g.archived_at == null);
   const archived = facilityGroups.filter((g) => g.archived_at != null);
 
+  const header = document.createElement('div');
+  header.className = 'mg-group-card-header';
+
   const title = document.createElement('div');
   title.className = 'mg-group-card-title';
   title.textContent = 'グループ一覧';
-  container.appendChild(title);
+  header.appendChild(title);
+
+  const createBtn = document.createElement('button');
+  createBtn.type = 'button';
+  createBtn.className = 'mg-group-btn mg-group-btn-primary';
+  createBtn.textContent = groupCreateDraft ? '入力を閉じる' : 'グループを作成';
+  createBtn.addEventListener('click', () => {
+    if (groupCreateDraft) {
+      groupCreateDraft = null;
+    } else {
+      groupCreateDraft = { groupName: '', industry: '', displayName: '' };
+    }
+    groupRenameTargetId = null;
+    groupRenameDraftName = '';
+    groupOwnerPickerTargetId = null;
+    groupOwnerPickerEoUid = '';
+    groupSectionErrorMessage = '';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+  });
+  header.appendChild(createBtn);
+
+  container.appendChild(header);
+
+  if (groupSectionErrorMessage) {
+    const errorEl = document.createElement('div');
+    errorEl.className = 'mg-group-error';
+    errorEl.textContent = groupSectionErrorMessage;
+    container.appendChild(errorEl);
+  }
+  if (groupSectionInfoMessage) {
+    const infoEl = document.createElement('div');
+    infoEl.className = 'mg-group-info';
+    infoEl.textContent = groupSectionInfoMessage;
+    container.appendChild(infoEl);
+  }
+
+  if (groupCreateDraft) {
+    const form = document.createElement('div');
+    form.className = 'mg-group-form';
+
+    const nameLabel = document.createElement('label');
+    nameLabel.className = 'mg-group-form-label';
+    nameLabel.textContent = 'グループ名（必須）';
+    form.appendChild(nameLabel);
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'mg-group-input';
+    nameInput.value = groupCreateDraft.groupName || '';
+    nameInput.addEventListener('input', (event) => {
+      groupCreateDraft.groupName = event.target.value;
+    });
+    form.appendChild(nameInput);
+
+    const industryLabel = document.createElement('label');
+    industryLabel.className = 'mg-group-form-label';
+    industryLabel.textContent = '業種（必須）';
+    form.appendChild(industryLabel);
+
+    const industrySelect = document.createElement('select');
+    industrySelect.className = 'mg-group-select';
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = '選択してください';
+    industrySelect.appendChild(emptyOption);
+    Object.entries(INDUSTRY_LABELS).forEach(([industryKey, industryLabelText]) => {
+      if (industryKey === 'event') return;
+      const option = document.createElement('option');
+      option.value = industryKey;
+      option.textContent = industryLabelText;
+      industrySelect.appendChild(option);
+    });
+    industrySelect.value = groupCreateDraft.industry || '';
+    industrySelect.addEventListener('change', (event) => {
+      groupCreateDraft.industry = event.target.value;
+    });
+    form.appendChild(industrySelect);
+
+    const displayLabel = document.createElement('label');
+    displayLabel.className = 'mg-group-form-label';
+    displayLabel.textContent = '作成者としての表示名（必須）';
+    form.appendChild(displayLabel);
+
+    const displayInput = document.createElement('input');
+    displayInput.type = 'text';
+    displayInput.className = 'mg-group-input';
+    displayInput.value = groupCreateDraft.displayName || '';
+    displayInput.addEventListener('input', (event) => {
+      groupCreateDraft.displayName = event.target.value;
+    });
+    form.appendChild(displayInput);
+
+    const formActions = document.createElement('div');
+    formActions.className = 'mg-group-form-actions';
+
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'button';
+    submitBtn.className = 'mg-group-btn mg-group-btn-primary';
+    submitBtn.textContent = '作成する';
+    submitBtn.addEventListener('click', () => createGroup());
+    formActions.appendChild(submitBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'mg-group-btn';
+    cancelBtn.textContent = 'キャンセル';
+    cancelBtn.addEventListener('click', () => {
+      groupCreateDraft = null;
+      groupSectionErrorMessage = '';
+      groupSectionInfoMessage = '';
+      renderGroupList();
+    });
+    formActions.appendChild(cancelBtn);
+    form.appendChild(formActions);
+
+    container.appendChild(form);
+  }
 
   if (facilityGroups.length === 0) {
     const empty = document.createElement('div');
@@ -690,7 +1366,7 @@ function renderGroupList() {
 
   const list = document.createElement('div');
   list.className = 'mg-group-list';
-  active.forEach((group) => list.appendChild(buildGroupRow(group)));
+  active.forEach((group) => list.appendChild(buildGroupRow(group, { archived: false })));
   if (active.length > 0) {
     container.appendChild(list);
   }
@@ -707,7 +1383,7 @@ function renderGroupList() {
     const archivedList = document.createElement('div');
     archivedList.className = 'mg-archived-list';
     archived.forEach((group) => {
-      const row = buildGroupRow(group);
+      const row = buildGroupRow(group, { archived: true });
       const archivedAt = document.createElement('div');
       archivedAt.className = 'mg-group-archived-at';
       archivedAt.textContent = 'アーカイブ日時: ' + new Date(group.archived_at).toLocaleString('ja-JP');
@@ -718,10 +1394,6 @@ function renderGroupList() {
     container.appendChild(details);
   }
 
-  const note = document.createElement('div');
-  note.className = 'mg-group-note';
-  note.textContent = 'グループごとの管理操作は Batch4-⑤ で実装します';
-  container.appendChild(note);
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -733,6 +1405,16 @@ const MANAGER_ERROR_MESSAGES = {
   ALREADY_MANAGER: 'この方はすでに施設管理者です',
   TARGET_NOT_APPROVED_MEMBER: 'この方は施設のグループに参加していないため追加できません',
   NOT_FACILITY_MANAGER: '権限がありません',
+  DUPLICATE_GROUP_ID: 'グループIDが重複しました。もう一度お試しください',
+  FACILITY_GROUP_LIMIT: 'この施設のグループ数が上限（20）に達しています',
+  GROUP_NOT_FOUND: 'グループが見つかりません',
+  ALREADY_ARCHIVED: 'このグループはすでにアーカイブされています',
+  NOT_ARCHIVED: 'このグループはアーカイブされていません',
+  NOT_AUTHORIZED: '権限がありません',
+  INVALID_GID_FORMAT: 'グループIDの形式が正しくありません',
+  SIGNAGE_CANNOT_BE_OWNER: 'サイネージ端末はグループ管理者にできません',
+  ALREADY_OWNER: 'この方はすでにこのグループの管理者です',
+  FACILITY_NOT_FOUND: '施設が見つかりません',
 };
 
 function managerErrorMessage(error) {
@@ -910,6 +1592,10 @@ async function reloadManagerData() {
   const { data: facilityData, error: facilityError } = await sb.rpc('manager_get_my_facilities');
   if (!facilityError && Array.isArray(facilityData)) {
     managerFacilities = facilityData;
+  }
+  const { data: groupData, error: groupError } = await sb.rpc('manager_list_groups');
+  if (!groupError && Array.isArray(groupData)) {
+    managerGroups = groupData;
   }
   const { data: candidateData, error: candidateError } = await sb.rpc('manager_list_member_candidates');
   if (!candidateError && Array.isArray(candidateData)) {
