@@ -218,6 +218,22 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     line-height: 1.6;
   }
 
+  .mg-state-action {
+    background: var(--eo-accent);
+    color: #FFFFFF;
+    border: none;
+    border-radius: var(--eo-radius);
+    font: inherit;
+    font-size: 15px;
+    padding: var(--eo-space-3) var(--eo-space-5);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .mg-state-action:hover {
+    background: var(--eo-accent-hover);
+  }
+
   .mg-spinner {
     width: 32px;
     height: 32px;
@@ -246,6 +262,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
   <div class="mg-state">
     <div class="mg-state-title">権限がありません</div>
     <p class="mg-state-text">施設管理者として登録されているアカウントでご利用ください。</p>
+    <button type="button" class="mg-state-action" onclick="managerLogout()">別のアカウントでログイン</button>
   </div>
 </div>
 
