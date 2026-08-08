@@ -177,13 +177,6 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
   </div>
 </div>
 
-<div id="screen-blocked" class="screen">
-  <div class="mg-state">
-    <div class="mg-state-title">LINEアプリ内から開いてください</div>
-    <p class="mg-state-text">この画面はLIFF環境内でのみ利用できます。</p>
-  </div>
-</div>
-
 <div id="screen-denied" class="screen">
   <div class="mg-state">
     <div class="mg-state-title">権限がありません</div>
@@ -195,6 +188,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
   <div class="mg-shell">
     <header class="mg-header">
       <h1 class="mg-title">EdgeOps 施設管理</h1>
+      <button type="button" class="mg-logout" onclick="managerLogout()">ログアウト</button>
     </header>
     <main class="mg-content">
       <section class="mg-card">
@@ -236,7 +230,7 @@ let sb;
 let managerFacilities = [];
 let selectedFacilityId = null;
 
-const screenIds = ['screen-loading', 'screen-blocked', 'screen-denied', 'screen-main'];
+const screenIds = ['screen-loading', 'screen-denied', 'screen-main'];
 
 function showScreen(screenId) {
   screenIds.forEach((id) => {
@@ -279,26 +273,6 @@ function renderFacilitySelect() {
   renderFacilityDetails();
 }
 
-async function ensureManagerLiffContext() {
-  const hasManagerContext = () => {
-    try {
-      if (typeof liff === 'undefined' || typeof liff.isInClient !== 'function' || typeof liff.getContext !== 'function') {
-        return false;
-      }
-      const context = liff.getContext();
-      return Boolean(context) && liff.isInClient();
-    } catch (error) {
-      console.warn('[manager.html] Failed to inspect LIFF context:', error);
-      return false;
-    }
-  };
-
-  if (hasManagerContext()) return true;
-  console.warn('[manager.html] LIFF context unavailable on first check. Retrying once.');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return hasManagerContext();
-}
-
 async function init() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -306,18 +280,12 @@ async function init() {
     await liff.init({ liffId: LIFF_ID });
   } catch (error) {
     console.error('[manager.html] liff.init failed:', error);
-    showScreen('screen-blocked');
+    showScreen('screen-denied');
     return;
   }
 
   if (!liff.isLoggedIn()) {
     liff.login();
-    return;
-  }
-
-  if (!await ensureManagerLiffContext()) {
-    console.warn('[manager.html] Access blocked outside LINE client.');
-    showScreen('screen-blocked');
     return;
   }
 
@@ -355,6 +323,44 @@ async function init() {
   selectedFacilityId = String((managerFacilities.find((facility) => facility && facility.is_main) || managerFacilities[0]).facility_id);
   renderFacilitySelect();
   showScreen('screen-main');
+}
+
+async function managerLogout() {
+  // ① 画面上のデータを先に消す（一瞬でも他人に見せない）
+  managerFacilities = [];
+  selectedFacilityId = null;
+  setFacilityValue('facility-name', '');
+  setFacilityValue('facility-code', '');
+  setFacilityValue('facility-plan', '');
+  setFacilityValue('facility-contract-status', '');
+  const select = document.getElementById('facility-select');
+  if (select) select.replaceChildren();
+  showScreen('screen-loading');
+
+  // ② Supabase セッション終了 ＋ EdgeOps 認証キャッシュ消去
+  try {
+    await clearAuthCache(sb);
+  } catch (e) {
+    console.warn('[manager.html] clearAuthCache failed (continue):', e);
+  }
+
+  // ③ sessionStorage のトークンを明示的に消す
+  try {
+    sessionStorage.removeItem('edgeops_access_token');
+    sessionStorage.removeItem('edgeops_refresh_token');
+  } catch (e) {
+    console.warn('[manager.html] sessionStorage clear failed (continue):', e);
+  }
+
+  // ④ LINE のログアウト（最後）
+  try {
+    liff.logout();
+  } catch (e) {
+    console.warn('[manager.html] liff.logout failed (continue):', e);
+  }
+
+  // ⑤ 認証前の状態へ戻す（再読み込み）
+  window.location.replace(window.location.pathname);
 }
 
 const facilitySelectElement = document.getElementById('facility-select');
