@@ -890,7 +890,8 @@ function renderManagerSection() {
             addBtn,
             candidateErrorEl,
             String(facility.facility_id),
-            c.out_eo_uid
+            c.out_eo_uid,
+            displayNames.join(' / ') || ''
           );
         });
         row.appendChild(addBtn);
@@ -916,8 +917,19 @@ async function reloadManagerData() {
   }
 }
 
-async function addFacilityManager(btn, errorEl, facilityId, eoUid) {
-  btn.disabled = true;
+function setManagerSectionButtonsDisabled(disabled) {
+  const section = document.querySelector('.mg-manager-section');
+  if (!section) return;
+  section.querySelectorAll('button').forEach((button) => {
+    button.disabled = disabled;
+  });
+}
+
+async function addFacilityManager(btn, errorEl, facilityId, eoUid, displayName) {
+  const confirmed = window.confirm((displayName || '（名前なし）') + ' を施設管理者に追加しますか？');
+  if (!confirmed) return;
+
+  setManagerSectionButtonsDisabled(true);
   errorEl.hidden = true;
   try {
     const { error } = await sb.rpc('manager_add_facility_manager', {
@@ -927,7 +939,6 @@ async function addFacilityManager(btn, errorEl, facilityId, eoUid) {
     if (error) {
       errorEl.textContent = managerErrorMessage(error);
       errorEl.hidden = false;
-      btn.disabled = false;
       return;
     }
     await reloadManagerData();
@@ -935,7 +946,8 @@ async function addFacilityManager(btn, errorEl, facilityId, eoUid) {
   } catch (e) {
     errorEl.textContent = managerErrorMessage(e);
     errorEl.hidden = false;
-    btn.disabled = false;
+  } finally {
+    setManagerSectionButtonsDisabled(false);
   }
 }
 
@@ -951,7 +963,7 @@ async function removeFacilityManager(btn, errorEl, facilityId, eoUid, displayNam
     if (!confirmed) return;
   }
 
-  btn.disabled = true;
+  setManagerSectionButtonsDisabled(true);
   errorEl.hidden = true;
   try {
     const { error } = await sb.rpc('manager_remove_facility_manager', {
@@ -961,7 +973,6 @@ async function removeFacilityManager(btn, errorEl, facilityId, eoUid, displayNam
     if (error) {
       errorEl.textContent = managerErrorMessage(error);
       errorEl.hidden = false;
-      btn.disabled = false;
       return;
     }
     if (isSelf) {
@@ -975,7 +986,8 @@ async function removeFacilityManager(btn, errorEl, facilityId, eoUid, displayNam
   } catch (e) {
     errorEl.textContent = managerErrorMessage(e);
     errorEl.hidden = false;
-    btn.disabled = false;
+  } finally {
+    setManagerSectionButtonsDisabled(false);
   }
 }
 
