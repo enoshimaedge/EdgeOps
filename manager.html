@@ -50,11 +50,30 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     color: var(--eo-header-fg);
     padding: var(--eo-space-3) var(--eo-space-4);
     box-shadow: var(--eo-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
   .mg-title {
     font-size: 16px;
     font-weight: 700;
+  }
+
+  .mg-logout {
+    background: transparent;
+    border: 1px solid var(--eo-header-fg);
+    border-radius: var(--eo-radius);
+    color: var(--eo-header-fg);
+    font: inherit;
+    font-size: 14px;
+    padding: var(--eo-space-2) var(--eo-space-3);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .mg-logout:hover {
+    background: rgba(255, 255, 255, 0.12);
   }
 
   .mg-content {
@@ -64,6 +83,52 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     display: flex;
     flex-direction: column;
     gap: var(--eo-space-4);
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+  }
+
+  .mg-banner {
+    border-left: 4px solid var(--eo-priority-caution);
+    background: #FEF3C7;
+    color: var(--eo-priority-caution);
+    border-radius: var(--eo-radius);
+    padding: var(--eo-space-3) var(--eo-space-4);
+    font-size: 14px;
+  }
+
+  .mg-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--eo-space-3);
+  }
+
+  .mg-stat-card {
+    background: var(--eo-surface);
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    box-shadow: var(--eo-shadow);
+    padding: var(--eo-space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-1);
+  }
+
+  .mg-stat-label {
+    color: var(--eo-text-muted);
+    font-size: 13px;
+  }
+
+  .mg-stat-value {
+    color: var(--eo-text);
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .mg-stat-sub {
+    color: var(--eo-text-muted);
+    font-size: 12px;
   }
 
   .mg-card {
@@ -191,6 +256,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
       <button type="button" class="mg-logout" onclick="managerLogout()">ログアウト</button>
     </header>
     <main class="mg-content">
+      <div id="facility-banner" class="mg-banner" hidden></div>
       <section class="mg-card">
         <label class="mg-label" for="facility-select">施設切替</label>
         <select id="facility-select" class="mg-select"></select>
@@ -211,12 +277,30 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dt class="mg-detail-term">契約ステータス</dt>
             <dd id="facility-contract-status" class="mg-detail-value"></dd>
           </div>
+          <div class="mg-detail">
+            <dt class="mg-detail-term">サブステータス</dt>
+            <dd id="facility-sub-status" class="mg-detail-value"></dd>
+          </div>
         </dl>
-        <div class="mg-actions-reserved" aria-hidden="true"></div>
+        <div class="mg-actions-reserved" aria-hidden="true">
+          <div class="mg-placeholder">グループ一覧は Batch4-③、施設の管理操作（一斉メッセージ・サブ管理者・施設設定・エクスポート）は Batch4-④以降で実装します</div>
+        </div>
       </section>
-      <section class="mg-card">
-        <div class="mg-placeholder">この先の内容は Batch4-② で実装します</div>
-      </section>
+      <div class="mg-stat-grid">
+        <div class="mg-stat-card">
+          <span class="mg-stat-label">グループ</span>
+          <span id="facility-group-count" class="mg-stat-value"></span>
+          <span id="facility-archived-count" class="mg-stat-sub"></span>
+        </div>
+        <div class="mg-stat-card">
+          <span class="mg-stat-label">メンバー</span>
+          <span id="facility-member-count" class="mg-stat-value"></span>
+        </div>
+        <div class="mg-stat-card">
+          <span class="mg-stat-label">管理者</span>
+          <span id="facility-manager-count" class="mg-stat-value"></span>
+        </div>
+      </div>
     </main>
   </div>
 </div>
@@ -225,6 +309,10 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
 const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
 const LIFF_ID = '2009827939-rZo06gWm';
+
+// 1施設あたりのグループ数上限（Plus版の確定仕様・設計書6-4）
+// ★将来プラン別上限が必要になればDB/RPCへ移す。その際もこの1か所を置き換えればよい。
+const FACILITY_GROUP_LIMIT = 20;
 
 let sb;
 let managerFacilities = [];
@@ -250,6 +338,19 @@ function getSelectedFacility() {
   return managerFacilities.find((facility) => String(facility.facility_id) === String(selectedFacilityId)) || null;
 }
 
+function renderFacilityBanner(facility) {
+  const banner = document.getElementById('facility-banner');
+  if (!banner) return;
+  const status = facility && facility.contract_status;
+  if (status && status !== 'active') {
+    banner.textContent = 'この施設の契約状態は「' + status + '」です。管理操作が制限される場合があります。';
+    banner.hidden = false;
+  } else {
+    banner.textContent = '';
+    banner.hidden = true;
+  }
+}
+
 function renderFacilityDetails() {
   const facility = getSelectedFacility();
   if (!facility) return;
@@ -257,6 +358,13 @@ function renderFacilityDetails() {
   setFacilityValue('facility-code', facility.facility_code);
   setFacilityValue('facility-plan', facility.plan);
   setFacilityValue('facility-contract-status', facility.contract_status);
+  // sub_status は表示のみ（凍結判定には使わない）
+  setFacilityValue('facility-sub-status', facility.sub_status);
+  setFacilityValue('facility-group-count', (facility.group_count != null ? facility.group_count : 0) + ' / ' + FACILITY_GROUP_LIMIT);
+  setFacilityValue('facility-archived-count', 'アーカイブ ' + (facility.archived_count != null ? facility.archived_count : 0));
+  setFacilityValue('facility-member-count', (facility.member_count != null ? facility.member_count : 0) + '人');
+  setFacilityValue('facility-manager-count', (facility.manager_count != null ? facility.manager_count : 0) + '人');
+  renderFacilityBanner(facility);
 }
 
 function renderFacilitySelect() {
@@ -333,6 +441,13 @@ async function managerLogout() {
   setFacilityValue('facility-code', '');
   setFacilityValue('facility-plan', '');
   setFacilityValue('facility-contract-status', '');
+  setFacilityValue('facility-sub-status', '');
+  setFacilityValue('facility-group-count', '');
+  setFacilityValue('facility-archived-count', '');
+  setFacilityValue('facility-member-count', '');
+  setFacilityValue('facility-manager-count', '');
+  const bannerEl = document.getElementById('facility-banner');
+  if (bannerEl) { bannerEl.textContent = ''; bannerEl.hidden = true; }
   const select = document.getElementById('facility-select');
   if (select) select.replaceChildren();
   showScreen('screen-loading');
