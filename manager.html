@@ -346,6 +346,139 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     margin-top: var(--eo-space-3);
     text-align: center;
   }
+
+  /* ---- サブ管理者管理セクション (Batch4-④) ---- */
+  .mg-manager-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-4);
+  }
+
+  .mg-manager-card {
+    background: var(--eo-surface);
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    box-shadow: var(--eo-shadow);
+    padding: var(--eo-space-4);
+  }
+
+  .mg-manager-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--eo-text-muted);
+    margin-bottom: var(--eo-space-3);
+  }
+
+  .mg-manager-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-2);
+  }
+
+  .mg-manager-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--eo-space-3);
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    padding: var(--eo-space-3) var(--eo-space-4);
+    background: var(--eo-surface-sunken);
+    flex-wrap: wrap;
+  }
+
+  .mg-manager-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--eo-space-1);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mg-manager-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--eo-text);
+  }
+
+  .mg-manager-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--eo-accent);
+    color: #FFFFFF;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-left: var(--eo-space-2);
+    vertical-align: middle;
+  }
+
+  .mg-manager-self-badge {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--eo-text-muted);
+    margin-left: var(--eo-space-2);
+    vertical-align: middle;
+  }
+
+  .mg-manager-btn {
+    background: transparent;
+    border: 1px solid var(--eo-border);
+    border-radius: var(--eo-radius);
+    color: var(--eo-text);
+    font: inherit;
+    font-size: 13px;
+    padding: var(--eo-space-2) var(--eo-space-3);
+    min-height: 36px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .mg-manager-btn:hover:not(:disabled) {
+    background: var(--eo-surface);
+  }
+
+  .mg-manager-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .mg-manager-btn-add {
+    background: var(--eo-accent);
+    color: #FFFFFF;
+    border-color: var(--eo-accent);
+  }
+
+  .mg-manager-btn-add:hover:not(:disabled) {
+    background: var(--eo-accent-hover);
+    border-color: var(--eo-accent-hover);
+  }
+
+  .mg-manager-added-label {
+    font-size: 13px;
+    color: var(--eo-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .mg-manager-groups {
+    font-size: 12px;
+    color: var(--eo-text-muted);
+  }
+
+  .mg-manager-empty {
+    color: var(--eo-text-muted);
+    font-size: 14px;
+    padding: var(--eo-space-3) 0;
+    text-align: center;
+  }
+
+  .mg-manager-error {
+    color: #DC2626;
+    font-size: 13px;
+    margin-top: var(--eo-space-2);
+  }
 </style>
 </head>
 <body>
@@ -398,9 +531,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dd id="facility-sub-status" class="mg-detail-value"></dd>
           </div>
         </dl>
-        <div class="mg-actions-reserved" aria-hidden="true">
-          <div class="mg-placeholder">施設の管理操作（一斉メッセージ・サブ管理者・施設設定・エクスポート）は Batch4-④以降で実装します</div>
-        </div>
+        <div class="mg-actions-reserved" aria-hidden="true"></div>
       </section>
       <div class="mg-stat-grid">
         <div class="mg-stat-card">
@@ -418,6 +549,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
         </div>
       </div>
       <div id="group-list-container" class="mg-group-card"></div>
+      <div id="manager-section-container"></div>
     </main>
   </div>
 </div>
@@ -435,6 +567,8 @@ let sb;
 let managerFacilities = [];
 let selectedFacilityId = null;
 let managerGroups = [];
+let memberCandidates = [];
+let currentEoUid = null;
 
 const screenIds = ['screen-loading', 'screen-denied', 'screen-main'];
 
@@ -484,6 +618,7 @@ function renderFacilityDetails() {
   setFacilityValue('facility-manager-count', (facility.manager_count != null ? facility.manager_count : 0) + '人');
   renderFacilityBanner(facility);
   renderGroupList();
+  renderManagerSection();
 }
 
 const INDUSTRY_LABELS = {
@@ -589,6 +724,261 @@ function renderGroupList() {
   container.appendChild(note);
 }
 
+/* ─────────────────────────────────────────────────────────
+   サブ管理者管理セクション（Batch4-④）
+──────────────────────────────────────────────────────── */
+
+const MANAGER_ERROR_MESSAGES = {
+  LAST_MANAGER_CANNOT_BE_REMOVED: '施設の管理者が0人になるため、この操作はできません',
+  ALREADY_MANAGER: 'この方はすでに施設管理者です',
+  TARGET_NOT_APPROVED_MEMBER: 'この方は施設のグループに参加していないため追加できません',
+  NOT_FACILITY_MANAGER: '権限がありません',
+};
+
+function managerErrorMessage(error) {
+  if (!error) return '処理できませんでした。時間をおいて再度お試しください';
+  const code = (error.code || error.message || '');
+  for (const key of Object.keys(MANAGER_ERROR_MESSAGES)) {
+    if (code.includes(key)) return MANAGER_ERROR_MESSAGES[key];
+  }
+  return '処理できませんでした。時間をおいて再度お試しください';
+}
+
+function renderManagerSection() {
+  const container = document.getElementById('manager-section-container');
+  if (!container) return;
+  container.replaceChildren();
+
+  const facility = getSelectedFacility();
+  if (!facility) return;
+
+  const section = document.createElement('div');
+  section.className = 'mg-manager-section';
+
+  // ── 現在の管理者一覧 ──
+  const currentCard = document.createElement('div');
+  currentCard.className = 'mg-manager-card';
+
+  const currentTitle = document.createElement('div');
+  currentTitle.className = 'mg-manager-card-title';
+  currentTitle.textContent = '施設管理者';
+  currentCard.appendChild(currentTitle);
+
+  const currentErrorEl = document.createElement('div');
+  currentErrorEl.className = 'mg-manager-error';
+  currentErrorEl.hidden = true;
+  currentCard.appendChild(currentErrorEl);
+
+  const managers = memberCandidates.filter(
+    (c) => String(c.out_facility_id) === String(selectedFacilityId) && c.out_is_manager
+  );
+
+  if (managers.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'mg-manager-empty';
+    empty.textContent = '管理者情報がありません';
+    currentCard.appendChild(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'mg-manager-list';
+    managers.forEach((mgr) => {
+      const row = document.createElement('div');
+      row.className = 'mg-manager-row';
+
+      const info = document.createElement('div');
+      info.className = 'mg-manager-info';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'mg-manager-name';
+      const displayNames = Array.isArray(mgr.out_display_names) ? mgr.out_display_names : [];
+      nameEl.textContent = displayNames.join(' / ') || '（名前なし）';
+      info.appendChild(nameEl);
+
+      if (currentEoUid && mgr.out_eo_uid === currentEoUid) {
+        const selfBadge = document.createElement('span');
+        selfBadge.className = 'mg-manager-self-badge';
+        selfBadge.textContent = '（あなた）';
+        nameEl.appendChild(selfBadge);
+      }
+
+      row.appendChild(info);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'mg-manager-btn';
+      removeBtn.textContent = '削除';
+      removeBtn.dataset.eoUid = mgr.out_eo_uid;
+      removeBtn.dataset.displayName = displayNames.join(' / ') || '';
+      removeBtn.addEventListener('click', () => {
+        removeFacilityManager(
+          removeBtn,
+          currentErrorEl,
+          String(facility.facility_id),
+          mgr.out_eo_uid,
+          displayNames.join(' / ') || ''
+        );
+      });
+      row.appendChild(removeBtn);
+
+      list.appendChild(row);
+    });
+    currentCard.appendChild(list);
+  }
+
+  section.appendChild(currentCard);
+
+  // ── 管理者候補リスト ──
+  const candidateCard = document.createElement('div');
+  candidateCard.className = 'mg-manager-card';
+
+  const candidateTitle = document.createElement('div');
+  candidateTitle.className = 'mg-manager-card-title';
+  candidateTitle.textContent = '管理者候補';
+  candidateCard.appendChild(candidateTitle);
+
+  const candidateErrorEl = document.createElement('div');
+  candidateErrorEl.className = 'mg-manager-error';
+  candidateErrorEl.hidden = true;
+  candidateCard.appendChild(candidateErrorEl);
+
+  const candidates = memberCandidates.filter(
+    (c) => String(c.out_facility_id) === String(selectedFacilityId) && !c.out_is_manager
+  );
+
+  if (candidates.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'mg-manager-empty';
+    empty.textContent = '追加できる候補者はいません';
+    candidateCard.appendChild(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'mg-manager-list';
+    candidates.forEach((c) => {
+      const row = document.createElement('div');
+      row.className = 'mg-manager-row';
+
+      const info = document.createElement('div');
+      info.className = 'mg-manager-info';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'mg-manager-name';
+      const displayNames = Array.isArray(c.out_display_names) ? c.out_display_names : [];
+      nameEl.textContent = displayNames.join(' / ') || '（名前なし）';
+      info.appendChild(nameEl);
+
+      const groupsEl = document.createElement('div');
+      groupsEl.className = 'mg-manager-groups';
+      const groupNames = Array.isArray(c.out_group_names) ? c.out_group_names : [];
+      groupsEl.textContent = groupNames.join('、') || '';
+      info.appendChild(groupsEl);
+
+      row.appendChild(info);
+
+      if (c.out_is_manager) {
+        const addedLabel = document.createElement('span');
+        addedLabel.className = 'mg-manager-added-label';
+        addedLabel.textContent = '追加済み';
+        row.appendChild(addedLabel);
+      } else {
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'mg-manager-btn mg-manager-btn-add';
+        addBtn.textContent = '追加';
+        addBtn.dataset.eoUid = c.out_eo_uid;
+        addBtn.addEventListener('click', () => {
+          addFacilityManager(
+            addBtn,
+            candidateErrorEl,
+            String(facility.facility_id),
+            c.out_eo_uid
+          );
+        });
+        row.appendChild(addBtn);
+      }
+
+      list.appendChild(row);
+    });
+    candidateCard.appendChild(list);
+  }
+
+  section.appendChild(candidateCard);
+  container.appendChild(section);
+}
+
+async function reloadManagerData() {
+  const { data: facilityData, error: facilityError } = await sb.rpc('manager_get_my_facilities');
+  if (!facilityError && Array.isArray(facilityData)) {
+    managerFacilities = facilityData;
+  }
+  const { data: candidateData, error: candidateError } = await sb.rpc('manager_list_member_candidates');
+  if (!candidateError && Array.isArray(candidateData)) {
+    memberCandidates = candidateData;
+  }
+}
+
+async function addFacilityManager(btn, errorEl, facilityId, eoUid) {
+  btn.disabled = true;
+  errorEl.hidden = true;
+  try {
+    const { error } = await sb.rpc('manager_add_facility_manager', {
+      p_facility_id: facilityId,
+      p_new_eo_uid: eoUid,
+    });
+    if (error) {
+      errorEl.textContent = managerErrorMessage(error);
+      errorEl.hidden = false;
+      btn.disabled = false;
+      return;
+    }
+    await reloadManagerData();
+    renderManagerSection();
+  } catch (e) {
+    errorEl.textContent = managerErrorMessage(e);
+    errorEl.hidden = false;
+    btn.disabled = false;
+  }
+}
+
+async function removeFacilityManager(btn, errorEl, facilityId, eoUid, displayName) {
+  const isSelf = currentEoUid && eoUid === currentEoUid;
+  if (isSelf) {
+    const confirmed = window.confirm(
+      '自分を施設管理者から外すと、この施設の管理画面を利用できなくなります。よろしいですか？'
+    );
+    if (!confirmed) return;
+  } else {
+    const confirmed = window.confirm(displayName + ' を施設管理者から削除しますか？');
+    if (!confirmed) return;
+  }
+
+  btn.disabled = true;
+  errorEl.hidden = true;
+  try {
+    const { error } = await sb.rpc('manager_remove_facility_manager', {
+      p_facility_id: facilityId,
+      p_target_eo_uid: eoUid,
+    });
+    if (error) {
+      errorEl.textContent = managerErrorMessage(error);
+      errorEl.hidden = false;
+      btn.disabled = false;
+      return;
+    }
+    if (isSelf) {
+      // 自分を外した場合は権限がなくなるため denied 画面へ
+      await reloadManagerData();
+      showScreen('screen-denied');
+      return;
+    }
+    await reloadManagerData();
+    renderManagerSection();
+  } catch (e) {
+    errorEl.textContent = managerErrorMessage(e);
+    errorEl.hidden = false;
+    btn.disabled = false;
+  }
+}
+
 function renderFacilitySelect() {
   const select = document.getElementById('facility-select');
   if (!select) return;
@@ -627,6 +1017,7 @@ async function init() {
     if (!authResult || !authResult.eoUid) {
       throw new Error('resolveEoUid returned no eoUid');
     }
+    currentEoUid = authResult.eoUid;
   } catch (error) {
     console.error('[manager.html] resolveEoUid failed:', error);
     try {
@@ -659,6 +1050,13 @@ async function init() {
     managerGroups = groupData;
   }
 
+  const { data: candidateData, error: candidateError } = await sb.rpc('manager_list_member_candidates');
+  if (candidateError) {
+    console.warn('[manager.html] manager_list_member_candidates error:', candidateError);
+  } else if (Array.isArray(candidateData)) {
+    memberCandidates = candidateData;
+  }
+
   renderFacilitySelect();
   showScreen('screen-main');
 }
@@ -667,7 +1065,9 @@ async function managerLogout() {
   // ① 画面上のデータを先に消す（一瞬でも他人に見せない）
   managerFacilities = [];
   managerGroups = [];
+  memberCandidates = [];
   selectedFacilityId = null;
+  currentEoUid = null;
   setFacilityValue('facility-name', '');
   setFacilityValue('facility-code', '');
   setFacilityValue('facility-plan', '');
