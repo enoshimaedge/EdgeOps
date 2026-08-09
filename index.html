@@ -2155,7 +2155,10 @@ async function cancelRequest() {
   const confirmed = confirm('申請を取り消しますか？\nCancel your join request?');
   if (!confirmed) return;
   try {
-    await supabase.from('group_members').delete().eq('id', currentMemberId);
+    const { error } = await supabase.rpc('member_cancel_request', {
+      p_member_id: currentMemberId
+    });
+    if (error) { showToast('申請の取り消しに失敗しました。'); return; }
     currentMemberId = null;
 
     // ═══════════════════════════════════════════
@@ -3934,18 +3937,17 @@ async function approveMember(memberId, displayName) {
     return;
   }
   try {
-    await supabase.from('group_members').update({ status: 'approved', approved_at: new Date().toISOString() }).eq('id', memberId);
+    const { data: approvedMemberResult, error: approveError } = await supabase.rpc('member_approve', {
+      p_member_id: memberId
+    });
+    if (approveError) throw approveError;
+    const approvedMember = Array.isArray(approvedMemberResult) ? approvedMemberResult[0] : approvedMemberResult;
 
     // [2026/5/27 課題② 設計書 §11-6 の盲点解消・チャッピー第89回判定 案(b) GO]
     // 承認対象が is_signage=true の場合、DB から最新 signage_token を SELECT してから判定
     // (currentGroup キャッシュが古い場合に新トークン上書きする懸念を回避)
     // UPDATE 時も .is('signage_token', null) を付けて二重発行防止
     // この自動発行は「初回発行補助」であり、generateSignageToken の再生成フローとは別扱い
-    const { data: approvedMember } = await supabase
-      .from('group_members')
-      .select('is_signage')
-      .eq('id', memberId)
-      .single();
     if (approvedMember?.is_signage) {
       const { data: latestGroup, error: groupFetchError } = await supabase
         .from('group_sessions')
@@ -4002,10 +4004,10 @@ async function rejectMember(memberId, displayName) {
   }
   if (!confirm(`${displayName}さんの参加申請を却下しますか?\n本人には通知されません。`)) return;
   try {
-    await supabase.from('group_members')
-      .update({ status: 'rejected' })
-      .eq('id', memberId)
-      .eq('status', 'pending');
+    const { error } = await supabase.rpc('member_reject', {
+      p_member_id: memberId
+    });
+    if (error) throw error;
     showToast(`${displayName}さんを却下しました`);
     await loadApprovals(); await loadMessages();
   } catch (e) { showToast('エラーが発生しました。'); }
@@ -4544,7 +4546,11 @@ async function updateDisplayName() {
   const newName = document.getElementById('profile-new-name').value.trim();
   if (!newName) { showToast(t('toast_enter_new_name')); return; }
   try {
-    await supabase.from('group_members').update({ display_name: newName }).eq('id', currentMemberId);
+    const { error } = await supabase.rpc('member_update_display_name', {
+      p_member_id: currentMemberId,
+      p_display_name: newName
+    });
+    if (error) throw error;
     currentUser.display_name = newName;
     document.getElementById('profile-name').textContent = newName;
     document.getElementById('profile-new-name').value = '';
@@ -4713,11 +4719,9 @@ async function generateSignageToken() {
       .eq('id', currentGroup.id);
     if (error) throw error;
     // [Phase 0 後 追加] セキュリティ目的: 全サイネージ端末を強制退出(チャッピー承認済み)
-    const { error: leaveError } = await supabase.from('group_members')
-      .update({ status: 'left', is_signage: false })
-      .eq('group_session_id', currentGroup.id)
-      .eq('is_signage', true)
-      .neq('status', 'left');
+    const { error: leaveError } = await supabase.rpc('signage_force_leave', {
+      p_group_session_id: currentGroup.id
+    });
     if (leaveError) throw leaveError;
     currentGroup.signage_token = token;
     currentGroup.signage_enabled = true;
@@ -4738,26 +4742,10 @@ async function leaveGroup() {
   try {
     stopPolling();
     // [EO-DEC-0162] 退出時の機械既読は廃止。未読のまま退出した事実はそのまま表示する(第162回判定)。
-    // 管理者が退出する場合、在籍中の最古参メンバーにis_creatorを引き継ぐ
-    if (isCreator) {
-      // [EO-DEC-0160 案イ] サイネージ端末は主催者昇格の対象外(NULL は人間扱い)
-      const { data: remainingMembers } = await supabase
-        .from('group_members')
-        .select('id, created_at')
-        .eq('group_session_id', currentGroup.id)
-        .eq('status', 'approved')
-        .neq('id', currentMemberId)
-        .or('is_signage.eq.false,is_signage.is.null')
-        .order('created_at', { ascending: true })
-        .limit(1);
-      if (remainingMembers && remainingMembers.length > 0) {
-        // 最古参メンバーにis_creator=trueを付与
-        await supabase.from('group_members')
-          .update({ is_creator: true })
-          .eq('id', remainingMembers[0].id);
-      }
-    }
-    await supabase.from('group_members').update({ status: 'left', is_creator: false, is_signage: false }).eq('id', currentMemberId);
+    const { error: leaveError } = await supabase.rpc('member_leave', {
+      p_member_id: currentMemberId
+    });
+    if (leaveError) throw leaveError;
     // ── 設計書 16-A-6 に準拠：メンバー脱退時に当該UIDのアンケート回答を削除（集計から完全に消す） ──
     // [2026/5/16 課題⑨修正・チャッピー第40回判定GO] group_session_id 限定削除
     // message_responses に group_session_id カラムが存在しないため messages 経由で2クエリに分割
