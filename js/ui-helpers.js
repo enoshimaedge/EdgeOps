@@ -109,6 +109,27 @@ function renderHandoverImageLabel(item) {
   return '';
 }
 
+// [EO-DEC-0202] 1年期限制度の適用対象かを判定する共通関数。期限切れ判定はしない。
+function isExpiryManaged(group) {
+  if (!group) return false;
+  if (!('facility_id' in group) || !('archived_at' in group)) {
+    console.warn('[EO-DEC-0202] isExpiryManaged: facility_id / archived_at が未取得です。取得経路の修正対象です。', group.group_id);
+    return false;
+  }
+  if (!(group.group_id || '').startsWith('SL-')) return false;
+  return group.facility_id === null && group.archived_at === null;
+}
+
+// [EO-DEC-0201] GID表示用共通関数。gid_masked=true のグループは伏字を返す。
+function formatGroupIdForDisplay(groupId, gidMasked) {
+  if (gidMasked === undefined) {
+    console.warn('[EO-DEC-0201] formatGroupIdForDisplay: gid_masked が未取得です。取得経路の修正対象です。', groupId);
+    return groupId || '';
+  }
+  if (gidMasked === true) return 'SL-●●●●●-●●●●';
+  return groupId || '';
+}
+
 function updateExpiryWarningBar() {
   const bar = document.getElementById('expiry-warning-bar');
   if (!bar) return;
@@ -116,12 +137,7 @@ function updateExpiryWarningBar() {
   //   残り日数はプロフィール画面の「有効期限：◯（残り◯日）」で確認できる。
   //   ★これにより下の [EO-DEC-0160] の event 用文言は到達しなくなるが、削除しない。
   if (currentGroup?.industry === 'event') { bar.style.display = 'none'; return; }
-  // ST版以外(EO-など)は対象外
-  const groupId = currentGroup?.group_id || '';
-  if (!groupId.startsWith('SL-')) {
-    bar.style.display = 'none';
-    return;
-  }
+  if (!isExpiryManaged(currentGroup)) { bar.style.display = 'none'; return; }
   if (!currentGroup?.expires_at) {
     bar.style.display = 'none';
     return;
