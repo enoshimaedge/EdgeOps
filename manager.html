@@ -131,6 +131,11 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     font-size: 12px;
   }
 
+  .mg-stat-sub-alert {
+    color: #C62828;
+    font-weight: 700;
+  }
+
   .mg-card {
     background: var(--eo-surface);
     border: 1px solid var(--eo-border);
@@ -315,6 +320,18 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     margin-top: var(--eo-space-2);
     font-size: 13px;
     color: var(--eo-text-muted);
+  }
+
+  .mg-group-noowner {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 9px;
+    background: #FDECEA;
+    color: #C62828;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
   }
 
   .mg-group-actions {
@@ -641,6 +658,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
           <span class="mg-stat-label">グループ</span>
           <span id="facility-group-count" class="mg-stat-value"></span>
           <span id="facility-archived-count" class="mg-stat-sub"></span>
+          <span id="facility-noowner-count" class="mg-stat-sub mg-stat-sub-alert"></span>
         </div>
         <div class="mg-stat-card">
           <span class="mg-stat-label">メンバー</span>
@@ -724,6 +742,13 @@ function renderFacilityDetails() {
   setFacilityValue('facility-sub-status', facility.sub_status);
   setFacilityValue('facility-group-count', (facility.group_count != null ? facility.group_count : 0) + ' / ' + FACILITY_GROUP_LIMIT);
   setFacilityValue('facility-archived-count', 'アーカイブ ' + (facility.archived_count != null ? facility.archived_count : 0));
+  const noOwnerCount = managerGroups.filter((group) => (
+    String(group.facility_id) === String(facility.facility_id)
+    && !group.archived_at
+    && Array.isArray(group.creator_names)
+    && group.creator_names.length === 0
+  )).length;
+  setFacilityValue('facility-noowner-count', noOwnerCount > 0 ? '管理者なし ' + noOwnerCount : '');
   setFacilityValue('facility-member-count', (facility.member_count != null ? facility.member_count : 0) + '人');
   setFacilityValue('facility-manager-count', (facility.manager_count != null ? facility.manager_count : 0) + '人');
   renderFacilityBanner(facility);
@@ -1035,11 +1060,20 @@ function buildGroupRow(group, options = {}) {
   if (group.signage_count) {
     metaText += '  📺 ' + group.signage_count + '台';
   }
-  const creators = Array.isArray(group.creator_names) && group.creator_names.length > 0
-    ? group.creator_names.join('、') : 'なし';
-  metaText += '   管理者: ' + creators;
+  const hasCreators = Array.isArray(group.creator_names) && group.creator_names.length > 0;
+  if (hasCreators) {
+    metaText += '   管理者: ' + group.creator_names.join('、');
+  }
   meta.textContent = metaText;
   row.appendChild(meta);
+
+  if (!options.archived && Array.isArray(group.creator_names) && group.creator_names.length === 0) {
+    const noOwnerBadge = document.createElement('span');
+    noOwnerBadge.className = 'mg-group-noowner';
+    noOwnerBadge.textContent = '管理者なし';
+    noOwnerBadge.setAttribute('role', 'status');
+    row.appendChild(noOwnerBadge);
+  }
 
   const groupId = String(group.group_session_id || '');
   const isArchived = !!options.archived;
@@ -1768,6 +1802,7 @@ async function managerLogout() {
   setFacilityValue('facility-sub-status', '');
   setFacilityValue('facility-group-count', '');
   setFacilityValue('facility-archived-count', '');
+  setFacilityValue('facility-noowner-count', '');
   setFacilityValue('facility-member-count', '');
   setFacilityValue('facility-manager-count', '');
   const bannerEl = document.getElementById('facility-banner');
