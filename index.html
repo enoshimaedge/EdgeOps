@@ -921,6 +921,7 @@
       <button class="btn btn-secondary" onclick="updateDisplayName()" data-i18n="btn_update_name">表示名を更新</button>
     </div>
     <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;" data-i18n="btn_leave_group">グループを退出する</button>
+    <div id="facility-manager-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openManagerPanel()" style="background:var(--eo-accent);color:white;width:100%;"><span data-i18n="btn_facility_manager">施設管理</span></button></div>
     <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;"><span data-i18n="btn_super_admin">超管理者ダッシュボード</span></button></div>
     <div style="text-align:center; padding: 20px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
@@ -946,7 +947,7 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=20260729-1"></script>   <!-- ← 追加。必ず最初 -->
+<script src="js/i18n.js?v=20260811-1"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260809-1"></script>
 <script src="js/image.js?v=20260728-1"></script>
 <script src="js/templates.js?v=20260704-3"></script>
@@ -4645,6 +4646,8 @@ function showProfile() {
 
   // 超管理者ボタン表示チェック
   checkSuperAdmin();
+  // [EO-DEC-0208] 施設管理ボタン表示チェック（起動時ではなくプロフィール表示時に判定する）
+  checkFacilityManager();
   showScreen('screen-profile');
 }
 
@@ -4672,6 +4675,28 @@ async function updateGroupSwitcherBtn() {
 }
 
 
+
+// [2026/8/11 EO-DEC-0208] 施設管理画面への導線
+// 論点1＝案ア:既存の manager_get_my_facilities() を再利用する（軽量RPCは新設しない）
+// 論点2＝案イ:起動時には呼ばず showProfile() から毎回呼ぶ
+// 追加条件:判定開始時に一旦非表示へ倒し、1行以上返ったときだけ表示する（結果をキャッシュしない）
+async function checkFacilityManager() {
+  const btn = document.getElementById("facility-manager-btn");
+  if (!btn) return;
+  btn.style.display = "none";
+  try {
+    const { data, error } = await supabase.rpc("manager_get_my_facilities");
+    if (error) {
+      console.warn("[EO-DEC-0208] manager_get_my_facilities error:", error);
+      return;
+    }
+    if (Array.isArray(data) && data.length > 0) {
+      btn.style.display = "block";
+    }
+  } catch (e) {
+    console.warn("[EO-DEC-0208] checkFacilityManager failed:", e);
+  }
+}
 
 async function checkSuperAdmin() {
   const SUPER_ADMIN_UID = "Uf476a68d2f6f8ccc8d539e3fd109cfa5";
@@ -4704,6 +4729,12 @@ function openAdminPanel() {
   //       LIFF コンテキストが保持される可能性が高い。
   // ロールバック:この行を liff.openWindow({ url: "https://app.edgeops.jp/admin.html" }); に戻すだけ。
   window.location.href = "https://app.edgeops.jp/admin.html";
+}
+
+// [2026/8/11 EO-DEC-0208 論点3＝案ア] openAdminPanel() と同方式
+// liff.openWindow は LIFF 文脈が切れるため使わない（第77回判定）
+function openManagerPanel() {
+  window.location.href = "https://app.edgeops.jp/manager.html";
 }
 
 // ── サイネージURL管理 ──

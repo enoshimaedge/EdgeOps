@@ -76,6 +76,41 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     background: rgba(255, 255, 255, 0.12);
   }
 
+  .mg-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--eo-space-2);
+  }
+
+  .mg-back {
+    background: transparent;
+    border: 1px solid var(--eo-header-fg);
+    border-radius: var(--eo-radius);
+    color: var(--eo-header-fg);
+    font: inherit;
+    font-size: 14px;
+    padding: var(--eo-space-2) var(--eo-space-3);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .mg-back:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .mg-state-back {
+    background: transparent;
+    border: 1px solid var(--eo-accent);
+    border-radius: var(--eo-radius);
+    color: var(--eo-accent);
+    font: inherit;
+    font-size: 15px;
+    padding: var(--eo-space-3) var(--eo-space-5);
+    min-height: 44px;
+    cursor: pointer;
+    margin-top: var(--eo-space-2);
+  }
+
   .mg-content {
     flex: 1;
     overflow-y: auto;
@@ -615,6 +650,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     <div class="mg-state-title">権限がありません</div>
     <p class="mg-state-text">施設管理者として登録されているアカウントでご利用ください。</p>
     <button type="button" class="mg-state-action" onclick="managerLogout()">別のアカウントでログイン</button>
+    <button type="button" id="back-to-edgeops-denied" class="mg-state-back" onclick="backToEdgeOps()" hidden>EdgeOpsへ戻る</button>
   </div>
 </div>
 
@@ -622,7 +658,10 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
   <div class="mg-shell">
     <header class="mg-header">
       <h1 class="mg-title">EdgeOps 施設管理</h1>
-      <button type="button" class="mg-logout" onclick="managerLogout()">ログアウト</button>
+      <div class="mg-header-actions">
+        <button type="button" id="back-to-edgeops" class="mg-back" onclick="backToEdgeOps()" hidden>EdgeOpsへ戻る</button>
+        <button type="button" class="mg-logout" onclick="managerLogout()">ログアウト</button>
+      </div>
     </header>
     <main class="mg-content">
       <div id="facility-banner" class="mg-banner" hidden></div>
@@ -1731,6 +1770,10 @@ async function init() {
     return;
   }
 
+  // [EO-DEC-0208] liff.init 成功直後に1回だけ判定する。
+  //   これ以降のすべての screen-denied 経路より前に置くこと。
+  applyBackToEdgeOpsVisibility();
+
   if (!liff.isLoggedIn()) {
     liff.login({ redirectUri: window.location.href });
     return;
@@ -1786,6 +1829,28 @@ async function init() {
 
   renderFacilitySelect();
   showScreen('screen-main');
+}
+
+// [2026/8/11 EO-DEC-0208 論点3＝案ア] EdgeOps 本体へ戻る導線
+// index.html は liff.isInClient() が false だと全画面の遮断画面を出して操作を止める（第64回判定）。
+// manager.html は PC ブラウザでも動作するため、LINEアプリ内で開かれているときだけ表示する。
+// PC では従来どおりログアウトのみを出口とする。
+function backToEdgeOps() {
+  window.location.href = 'https://app.edgeops.jp/index.html';
+}
+
+function applyBackToEdgeOpsVisibility() {
+  let inClient = false;
+  try {
+    inClient = (typeof liff !== 'undefined' && typeof liff.isInClient === 'function' && liff.isInClient());
+  } catch (e) {
+    console.warn('[EO-DEC-0208] isInClient check failed:', e);
+    inClient = false;
+  }
+  ['back-to-edgeops', 'back-to-edgeops-denied'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !inClient;
+  });
 }
 
 async function managerLogout() {
