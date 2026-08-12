@@ -2047,7 +2047,14 @@ async function createGroup() {
     await loadHome(); showScreen('screen-home'); showToast('グループを作成しました！');
   } catch (e) {
     console.error(e);
-    showToast('エラーが発生しました。再試行してください。');
+    // [EO-DEC-0222] レート制限に達した場合は専用の案内を出す。
+    //   ★具体的な件数・残り時間は表示しない（EO-DEC-0221）。
+    const rateMsg = (e && (e.message || e.code)) || '';
+    if (rateMsg.includes('RATE_LIMIT_EXCEEDED')) {
+      showToast('短時間に多くのグループを作成したため、現在は新しいグループを作成できません。しばらく時間をおいてから、もう一度お試しください。');
+    } else {
+      showToast('エラーが発生しました。再試行してください。');
+    }
   }
 }
 async function joinGroup() {

@@ -1560,6 +1560,8 @@ const MANAGER_ERROR_MESSAGES = {
   SIGNAGE_CANNOT_BE_OWNER: 'サイネージ端末はグループ管理者にできません',
   ALREADY_OWNER: 'この方はすでにこのグループの管理者です',
   FACILITY_NOT_FOUND: '施設が見つかりません',
+  // [EO-DEC-0222] レート制限。★具体的な件数・残り時間は表示しない（EO-DEC-0221）。
+  RATE_LIMIT_EXCEEDED: '短時間に多くのグループを作成したため、現在は新しいグループを作成できません。しばらく時間をおいてから、もう一度お試しください。',
 };
 
 function managerErrorMessage(error) {
