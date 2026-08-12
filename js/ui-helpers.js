@@ -191,7 +191,12 @@ function applyHandoverPriorityUI(p) {
   });
 }
 
-async function updateHandoverBadge() {
+// [EO-DEC-0214 論点D] 呼び出し元が既に取得済みのデータを渡せるようにする。
+//   notesArg   … handover_notes（72時間以内・id と sender_eo_uid を含むもの）
+//   confirmsArg… handover_confirmations（handover_id / eo_uid / action を含むもの）
+//   ★どちらも省略可。省略時は従来どおり自分でDBから取得する（既存経路の動作は不変）。
+//   ★バッジの計算式（confirmedIds / completedIds / unconfirmedCount）は変更しない。
+async function updateHandoverBadge(notesArg, confirmsArg) {
   try {
     // [第13章] event では引き継ぎ未確認バッジを表示しない
     if (currentGroup?.industry === 'event') {
@@ -200,9 +205,15 @@ async function updateHandoverBadge() {
       return;
     }
     // 72時間以内の引き継ぎを取得（sender_eo_uidも含めて取得）
-    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    const { data: notes } = await supabase.from('handover_notes').select('id, sender_eo_uid')
-      .eq('group_session_id', currentGroup.id).gte('created_at', cutoff);
+    let notes;
+    if (notesArg !== undefined) {
+      notes = notesArg || [];
+    } else {
+      const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase.from('handover_notes').select('id, sender_eo_uid')
+        .eq('group_session_id', currentGroup.id).gte('created_at', cutoff);
+      notes = data;
+    }
     if (!notes || notes.length === 0) {
       document.getElementById('handover-badge-bar').style.display = 'none';
       return;
@@ -234,8 +245,16 @@ async function updateHandoverBadge() {
     }
     const noteIds = targetNotes.map(n => n.id);
     // 全confirmationsを取得（確認済み＋完了済み判定に使う）
-    const { data: allConfirms } = await supabase.from('handover_confirmations').select('handover_id, eo_uid, action')
-      .in('handover_id', noteIds);
+    let allConfirms;
+    if (confirmsArg !== undefined) {
+      // 渡された配列は noteIds より広い範囲を含み得るため、既存の計算へ渡す前に同じ範囲へ絞る
+      const noteIdSet = new Set(noteIds);
+      allConfirms = (confirmsArg || []).filter(c => noteIdSet.has(c.handover_id));
+    } else {
+      const { data } = await supabase.from('handover_confirmations').select('handover_id, eo_uid, action')
+        .in('handover_id', noteIds);
+      allConfirms = data;
+    }
     // 誰かが確認済みのID
     const confirmedIds = new Set((allConfirms || []).map(c => c.handover_id));
     // 誰かがtakeover/doneを押した完了済みのID（バッジカウントから除外）
