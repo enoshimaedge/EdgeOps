@@ -404,6 +404,80 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   margin-top: 20px;
   border-color: rgba(255,255,255,0.35);
 }
+/* [第224回 EO-DEC-0224 段階2] 監査ログタブ */
+.audit-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #5a6a80;
+}
+.audit-filter select {
+  padding: 6px 10px;
+  border: 1px solid #d5dbe3;
+  border-radius: 9px;
+  font-size: 13px;
+  background: #fff;
+}
+.audit-item {
+  background: #fff;
+  border: 1px solid #e3e8ee;
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.audit-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.audit-action {
+  font-weight: 600;
+  font-size: 14px;
+  color: #16324f;
+}
+.audit-role {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 9px;
+  background: #eef2f7;
+  color: #46586e;
+}
+.audit-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: #8b98a8;
+  white-space: nowrap;
+}
+.audit-item-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12px;
+  color: #5a6a80;
+}
+.audit-detail {
+  margin-top: 8px;
+}
+.audit-detail summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #2b6cb0;
+}
+.audit-json {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: #f6f8fa;
+  border-radius: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #3d4a5c;
+}
 </style>
 </head>
 <body>
@@ -447,6 +521,9 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     </div>
     <div class="tab-btn" onclick="switchTab('facilities')">
       <span class="tab-icon">🏬</span>施設
+    </div>
+    <div class="tab-btn" onclick="switchTab('audit')">
+      <span class="tab-icon">📜</span>監査ログ
     </div>
   </div>
 
@@ -522,6 +599,18 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
 
     <div id="tab-facilities" class="tab-panel">
       <div id="facility-list">
+        <div class="loading-small">読み込み中...</div>
+      </div>
+    </div>
+
+    <div id="tab-audit" class="tab-panel">
+      <div class="audit-filter">
+        <label for="audit-facility-filter">施設で絞り込む</label>
+        <select id="audit-facility-filter" onchange="loadAuditLogs()">
+          <option value="">すべての施設</option>
+        </select>
+      </div>
+      <div id="audit-list">
         <div class="loading-small">読み込み中...</div>
       </div>
     </div>
@@ -604,7 +693,7 @@ async function init() {
 // ── 全データ読み込み ──
 async function loadAllData() {
   // [Phase 4-3] loadStorageUsage を追加(既存3関数と並列実行・既存ロジック非変更)
-  await Promise.all([loadStats(), loadGroups(), loadMembers(), loadStorageUsage(), loadFacilities()]);
+  await Promise.all([loadStats(), loadGroups(), loadMembers(), loadStorageUsage(), loadFacilities(), loadAuditLogs()]);
 }
 
 // ── 統計 ──
@@ -901,12 +990,126 @@ async function loadFacilities() {
       </div>
     `;
   }).join('');
+  buildAuditFacilityFilter(data);
 }
 
 // admin.html 内で使うHTMLエスケープ(共通化)
 function escHtmlAdmin(str) {
   return String(str == null ? '' : str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════
+// [第224回 EO-DEC-0224 段階2] 監査ログタブ
+// ═══════════════════════════════════════════
+// データ取得は admin_list_audit_logs() RPC の1本のみ。
+// audit_logs は authenticated から権限を剥奪済み（2026/8/7）のため直接SELECTは不可。
+// ★target_display_name は「現在のDB上で分かる表示名」であり、
+//   記録された当時の名称とは限らない。target_id も必ず併記する。
+// ═══════════════════════════════════════════
+
+// action の日本語ラベル（15値）
+const AUDIT_ACTION_LABELS = {
+  manager_add: '施設管理者を追加',
+  manager_remove: '施設管理者を外す',
+  group_create: 'グループを作成',
+  group_rename: 'グループ名を変更',
+  group_archive: 'グループをアーカイブ',
+  group_unarchive: 'グループを復帰',
+  group_owner_change: 'グループ管理者を変更',
+  facility_update: '施設情報を変更',
+  group_migrate: 'グループを施設へ移行',
+  gid_reissue: 'グループIDを再発行',
+  join_approve: '参加申請を承認',
+  gid_mask_set: 'グループIDの伏字を切替',
+  facility_create: '施設を作成',
+  contract_status_change: '契約状態を変更',
+  invite_issue: '招待コードを発行'
+};
+
+// actor_role の日本語ラベル（6値）
+const AUDIT_ROLE_LABELS = {
+  super_admin: '超管理者',
+  facility_manager: '施設管理者',
+  group_creator: 'グループ管理者',
+  group_member: '一般メンバー',
+  invitee: '招待コード利用者',
+  system: 'システム'
+};
+
+function _formatDateTimeAdmin(v) {
+  if (v === null || v === undefined) return '—';
+  const dt = new Date(v);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' })
+    + ' ' + dt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadAuditLogs() {
+  const listEl = document.getElementById('audit-list');
+  listEl.innerHTML = '<div class="loading-small">読み込み中...</div>';
+
+  const sel = document.getElementById('audit-facility-filter');
+  const fid = sel && sel.value ? sel.value : null;
+
+  const { data, error } = await sb.rpc('admin_list_audit_logs',
+    fid ? { p_facility_id: fid } : {});
+
+  if (error) {
+    listEl.innerHTML = '<div class="empty-state">監査ログを取得できませんでした</div>';
+    console.error('[admin.html] admin_list_audit_logs error:', error);
+    return;
+  }
+
+  if (!data || !data.length) {
+    listEl.innerHTML = '<div class="empty-state">記録がありません</div>';
+    return;
+  }
+
+  listEl.innerHTML = data.map(r => {
+    const actionLabel = AUDIT_ACTION_LABELS[r.action] || r.action;
+    const roleLabel = AUDIT_ROLE_LABELS[r.actor_role] || _dashAdmin(r.actor_role);
+    const before = (r.before_state === null || r.before_state === undefined)
+      ? 'なし' : JSON.stringify(r.before_state, null, 2);
+    const after = (r.after_state === null || r.after_state === undefined)
+      ? 'なし' : JSON.stringify(r.after_state, null, 2);
+    return `
+      <div class="audit-item">
+        <div class="audit-item-header">
+          <span class="audit-action">${escHtmlAdmin(actionLabel)}</span>
+          <span class="audit-role">${escHtmlAdmin(roleLabel)}</span>
+          <span class="audit-time">${escHtmlAdmin(_formatDateTimeAdmin(r.created_at))}</span>
+        </div>
+        <div class="audit-item-info">
+          <span>👤 ${escHtmlAdmin(_dashAdmin(r.actor_eo_uid))}</span>
+          <span>🏬 ${escHtmlAdmin(_dashAdmin(r.facility_name))}</span>
+        </div>
+        <div class="audit-item-info">
+          <span>🎯 ${escHtmlAdmin(_dashAdmin(r.target_type))}: ${escHtmlAdmin(_dashAdmin(r.target_display_name))}</span>
+        </div>
+        <details class="audit-detail">
+          <summary>詳細を見る</summary>
+          <div class="audit-item-info" style="margin-top:6px;">
+            <span>ログID: ${escHtmlAdmin(`${r.log_id}`)}</span>
+            <span>対象ID: ${escHtmlAdmin(_dashAdmin(r.target_id))}</span>
+          </div>
+          <pre class="audit-json">変更前: ${escHtmlAdmin(before)}</pre>
+          <pre class="audit-json">変更後: ${escHtmlAdmin(after)}</pre>
+        </details>
+      </div>
+    `;
+  }).join('');
+}
+
+// 施設フィルタの選択肢を作る。★新しいクエリは増やさない。
+// admin_list_facilities() が返した施設をそのまま使う。
+function buildAuditFacilityFilter(facilities) {
+  const sel = document.getElementById('audit-facility-filter');
+  if (!sel || !facilities || !facilities.length) return;
+  const opts = facilities.map(f =>
+    `<option value="${escHtmlAdmin(f.facility_id)}">${escHtmlAdmin(f.facility_name || f.facility_code || '')}</option>`
+  ).join('');
+  sel.innerHTML = '<option value="">すべての施設</option>' + opts;
 }
 
 // ═══════════════════════════════════════════
