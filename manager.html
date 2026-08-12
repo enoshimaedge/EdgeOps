@@ -369,6 +369,19 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     line-height: 1.4;
   }
 
+  .mg-group-masked-badge {
+    display: inline-block;
+    margin-top: 6px;
+    margin-left: 6px;
+    padding: 3px 10px;
+    border-radius: 9px;
+    background: #E3F2FD;
+    color: #1565C0;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
   .mg-group-actions {
     margin-top: var(--eo-space-3);
     display: flex;
@@ -1021,6 +1034,55 @@ async function reissueGroupGid(group) {
   }
 }
 
+async function setGidMask(group) {
+  const willMask = !group.gid_masked;
+  let confirmMsg;
+  if (willMask) {
+    confirmMsg =
+      '「' + (group.group_name || '') + '」のグループIDを伏字にします。\n' +
+      '一般の利用者には SL-●●●●●-●●●● と表示されます。\n\n' +
+      '★これは表示を隠すだけで、グループIDそのものは変わりません。\n' +
+      '利用者の画面には次回起動時に反映されます。';
+  } else {
+    confirmMsg =
+      '「' + (group.group_name || '') + '」のグループIDの伏字を解除します。\n' +
+      '一般の利用者に実際のグループIDが表示されます。\n\n' +
+      '★一度表示されたグループIDは、再び伏字にしても、すでに確認した利用者には\n' +
+      '　無効になりません。締め直す場合はグループIDを再発行してください。\n\n' +
+      '利用者の画面には次回起動時に反映されます。';
+  }
+  const confirmed = window.confirm(confirmMsg);
+  if (!confirmed) return;
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { data, error } = await sb.rpc('manager_set_gid_mask', {
+      p_group_session_id: group.group_session_id,
+      p_gid_masked: willMask,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    if (data && data.changed === false) {
+      groupSectionInfoMessage = 'すでにその状態です';
+      renderGroupList();
+      return;
+    }
+    groupSectionInfoMessage = willMask ? '伏字にしました' : '伏字を解除しました';
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
 async function addGroupManager(group) {
   const candidates = getGroupOwnerCandidates(group);
   const eoUid = groupOwnerPickerEoUid;
@@ -1114,6 +1176,14 @@ function buildGroupRow(group, options = {}) {
     row.appendChild(noOwnerBadge);
   }
 
+  if (group.gid_masked === true) {
+    const maskedBadge = document.createElement('span');
+    maskedBadge.className = 'mg-group-masked-badge';
+    maskedBadge.textContent = '伏字中';
+    maskedBadge.setAttribute('role', 'status');
+    row.appendChild(maskedBadge);
+  }
+
   const groupId = String(group.group_session_id || '');
   const isArchived = !!options.archived;
   if (!isArchived) {
@@ -1148,6 +1218,13 @@ function buildGroupRow(group, options = {}) {
     reissueBtn.textContent = 'グループID再発行';
     reissueBtn.addEventListener('click', () => reissueGroupGid(group));
     actions.appendChild(reissueBtn);
+
+    const maskBtn = document.createElement('button');
+    maskBtn.type = 'button';
+    maskBtn.className = 'mg-group-btn';
+    maskBtn.textContent = group.gid_masked ? '伏字を解除' : '伏字にする';
+    maskBtn.addEventListener('click', () => setGidMask(group));
+    actions.appendChild(maskBtn);
 
     const ownerBtn = document.createElement('button');
     ownerBtn.type = 'button';
