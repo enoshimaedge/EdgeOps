@@ -1369,6 +1369,14 @@ let isCreator = false;
 //   null = 未確定（まだ今回の members から計算していない／グループ切替直後）。
 //   ★未確定のときは安全側＝「イベント一般参加者」として扱い、既読と承認導線を出さない。
 window._amCreatorForRender = null;
+// [EO-DEC-0217] 直前に完走した loadMessages() に続く、showScreen() 側の重複取得を
+//   一度だけ捨てるための資格（有効期限つき・ワンショット）。
+//   ★これは鮮度キャッシュではない。「最近取得したから再利用する」ためのものではなく、
+//     await loadMessages() の直後に連続して起きる重複取得だけを対象とする。
+//   ★閾値が 100ms である理由：記録するのは開始時ではなく「完走時」であり、
+//     完走から showScreen() までは数ミリ秒しか空かない。人が詳細画面を開いて
+//     戻る操作が 100ms 以内に終わることは無いため、戻るボタンの最新化は保たれる。
+let _loadMessagesFreshUntil = 0;
 let messages = [];
 let members = [];
 let pollTimer = null;
@@ -2550,6 +2558,10 @@ async function loadMessages() {
     // [EO-DEC-0214 論点D] 直前に取得済みの handover_notes / handover_confirmations を渡し、
     //   updateHandoverBadge() 内の supabase.from(...) 再取得（2クエリ）を省く。
     await updateHandoverBadge(handoverNotes, hwConfsForBadge);
+    // [EO-DEC-0217] ★必要な取得と描画までを正常に完了したときだけ skip資格を立てる。
+    //   途中で例外になった場合・取りやめで早期 return した場合には立てない
+    //   （1周目が失敗したのに2周目まで捨てると、回復の機会を奪うため）。
+    _loadMessagesFreshUntil = Date.now() + 100;
   } catch (e) {
     console.error(e);
     // [EO-DEC-0218 / EO-DEC-0219] 操作起点のときだけ利用者へ知らせる。
@@ -2560,6 +2572,9 @@ async function loadMessages() {
     }
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// 既読補正（既存ロジックをそのまま関数化。中身は変更しない）
 //   [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
 //   A. 分母は送信時点で approved だった人間メンバーのみ
 //   B. サイネージ端末(is_signage=true)は分母・分子から除外
@@ -4952,6 +4967,16 @@ async function leaveGroup() {
 // URLをタップ可能なリンクに変換（連絡・引き継ぎ共用）
 
 // URLかどうか判定してヘッダータイトルを返す
+// [EO-DEC-0217] 連絡一覧のスクロール位置を復元する。
+//   従来は loadMessages().then() の中にあったため、取得を省くと復元まで消えてしまう。
+//   取得した場合・省いた場合の双方から必ず呼ぶこと。
+function restoreHomeScrollPos() {
+  const saved = sessionStorage.getItem('scrollPos_screen-home');
+  if (saved !== null) {
+    window.scrollTo(0, parseInt(saved, 10));
+  }
+}
+
 function showScreen(id) {
   // [EO-DEC-0178] 初期画面へ戻るときはイベント表記を必ず解除する。
   //   applyEventWording() は data-i18n 属性を書き換えるため、
@@ -4993,12 +5018,17 @@ function showScreen(id) {
     if (id === 'screen-approval') loadApprovals();
     if (id === 'screen-home') {
       // ★ バグ② 修正: loadMessages完了後にスクロール位置を復元
-      loadMessages().then(() => {
-        const saved = sessionStorage.getItem('scrollPos_screen-home');
-        if (saved !== null) {
-          window.scrollTo(0, parseInt(saved, 10));
-        }
-      });
+      // [EO-DEC-0217] 直前に自分で完走した1周に続く重複取得だけを、一度だけ捨てる。
+      //   ★資格は「使ったかどうか」に関わらずここで必ず消す。次の画面遷移へ持ち越さない。
+      const _skipReload = (Date.now() < _loadMessagesFreshUntil);
+      _loadMessagesFreshUntil = 0;
+      if (_skipReload) {
+        restoreHomeScrollPos();
+      } else {
+        loadMessages().then(() => {
+          restoreHomeScrollPos();
+        });
+      }
     }
     if (id === 'screen-handover') loadHandoverNotes();
     if (id === 'screen-compose') { selectedPriority = 'info'; selectPriority('info'); selectedComposeType = 'msg'; applyComposeType('msg'); selectedHandoverPriority = 'action'; applyHandoverPriorityUI('action'); loadGroupTemplates().then(() => { renderTemplates(); applyComposeType(selectedComposeType); }); }
