@@ -1372,6 +1372,11 @@ window._amCreatorForRender = null;
 let messages = [];
 let members = [];
 let pollTimer = null;
+// [EO-DEC-0219] いま走っている loadMessages() が30秒ポーリング起点かどうかの目印。
+//   ★立てる／戻す責務は startPolling() だけが持つ。loadMessages() は読むだけで書き換えない。
+//   ★用途は「取得に失敗したときトーストを出すかどうか」の判定のみ。
+//     通信の悪い場所で30秒ごとにトーストが出続けるのを防ぐために使う。
+let _isPollingTick = false;
 
 // [Issue㉓ EO-DEC-0169] 参加取りやめ状態
 window.activeWithdrawnUids = []; // 取りやめ中の eo_uid 配列
@@ -2330,7 +2335,16 @@ function startPolling() {
   pollTimer = setInterval(async () => {
     const homeActive = document.getElementById('screen-home').classList.contains('active');
     const approvalActive = document.getElementById('screen-approval').classList.contains('active');
-    if (homeActive) await loadMessages();
+    // [EO-DEC-0219] ポーリング起点であることを loadMessages() へ伝える。
+    //   ★ポーリングから loadMessages() を呼ぶのはこの1箇所だけである。
+    if (homeActive) {
+      _isPollingTick = true;
+      try {
+        await loadMessages();
+      } finally {
+        _isPollingTick = false;
+      }
+    }
     if (approvalActive) await loadApprovals();
     // [EO-DEC-0176] 終了画面（screen-withdrawn）に居る間も取りやめ状態だけ確認する。
     //   ここで loadMessages() は呼ばない（見せない画面のために一覧を取りに行かないため）。
@@ -2352,6 +2366,12 @@ function stopPolling() {
 }
 
 async function loadMessages() {
+  // [EO-DEC-0219] この呼び出しがポーリング起点かどうかを、開始時点で確定させる。
+  //   ★必ず最初の await より前に退避すること。
+  //     ポーリング中に利用者の操作で loadMessages() が重なって走った場合、
+  //     エラー時点のグローバル値を見ると起点が混ざる。呼び出しごとに固定する。
+  //   ★グローバル _isPollingTick をここで書き換えてはならない（責務は startPolling() 側）。
+  const isPollingLoad = _isPollingTick;
   // ── [第183回 EO-DEC-0183 論点2・案イ] グループ切替の自己防衛 ──
   //   前回読み込んだグループと異なる場合は、カーソルと集計状態を初期化する。
   //   switchGroup() 以外の経路（checkApproval / createGroup / joinGroup）でも
@@ -2376,7 +2396,7 @@ async function loadMessages() {
     const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
     let hwConfsForBadge = [];   // [EO-DEC-0214 論点D] updateHandoverBadge へ渡す
     const [
-      { data },
+      { data, error: messagesError },
       { data: memberData },
       { data: hwData },
       { count }
@@ -2396,6 +2416,10 @@ async function loadMessages() {
       supabase.from('group_members').select('*', { count: 'exact', head: true })
         .eq('group_session_id', currentGroup.id).eq('status', 'pending')
     ]);
+    // [EO-DEC-0218] 一覧本体の取得に失敗したら、ここで打ち切って catch へ渡す。
+    //   ★空配列で上書きしないため、messages への代入より前に置くこと。
+    //   ★Supabase は error を throw しないので、明示的に throw する必要がある。
+    if (messagesError) throw messagesError;
     messages = data || [];
     members = memberData || [];
     // [EO-DEC-0216] 今回取得した approved members から、この描画サイクル用の creator を確定させる。
@@ -2526,11 +2550,16 @@ async function loadMessages() {
     // [EO-DEC-0214 論点D] 直前に取得済みの handover_notes / handover_confirmations を渡し、
     //   updateHandoverBadge() 内の supabase.from(...) 再取得（2クエリ）を省く。
     await updateHandoverBadge(handoverNotes, hwConfsForBadge);
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    console.error(e);
+    // [EO-DEC-0218 / EO-DEC-0219] 操作起点のときだけ利用者へ知らせる。
+    //   ★30秒ポーリング起点では出さない。通信の悪い場所でトーストが出続けるため。
+    //   ★エラー時点のグローバルではなく、冒頭で退避したローカル値を見る。
+    if (!isPollingLoad) {
+      showToast('連絡を取得できませんでした。通信状況をご確認ください。');
+    }
+  }
 }
-
-// ────────────────────────────────────────────────────────────
-// 既読補正（既存ロジックをそのまま関数化。中身は変更しない）
 //   [既読・確認集計仕様 / チャッピー第55-2回判定確定 / 2026-05-18]
 //   A. 分母は送信時点で approved だった人間メンバーのみ
 //   B. サイネージ端末(is_signage=true)は分母・分子から除外
