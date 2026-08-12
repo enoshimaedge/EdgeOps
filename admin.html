@@ -388,6 +388,22 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     margin-left: 6px;
     vertical-align: middle;
   }
+/* [第223回 EO-DEC-0223] EdgeOpsへ戻る導線 */
+.back-to-edgeops {
+  display: none;                 /* 既定は非表示。JSがLINEアプリ内のときだけ出す */
+  padding: 8px 14px;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 9px;            /* 角丸9px＝第116回①の統一値 */
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#screen-denied .back-to-edgeops {
+  margin-top: 20px;
+  border-color: rgba(255,255,255,0.35);
+}
 </style>
 </head>
 <body>
@@ -403,6 +419,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   <div class="denied-icon">🚫</div>
   <div class="denied-title">アクセス拒否</div>
   <div class="denied-text">このページは超管理者専用です。<br>権限のないアカウントではアクセスできません。</div>
+  <button type="button" class="back-to-edgeops" onclick="backToEdgeOps()">EdgeOpsへ戻る</button>
 </div>
 
 <!-- メイン画面 -->
@@ -414,6 +431,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
       <div class="header-sub">EdgeOps Admin Panel</div>
     </div>
     <div class="admin-badge">ADMIN</div>
+    <button type="button" class="back-to-edgeops" onclick="backToEdgeOps()">EdgeOpsへ戻る</button>
   </div>
 
   <!-- タブバー -->
@@ -537,6 +555,7 @@ async function init() {
   // 必ずliff.getProfile()のみで認証（?uid=パラメータ方式は廃止・セキュリティ強化）
   try {
     await liff.init({ liffId: LIFF_ID });
+    applyBackToEdgeOpsVisibility();
     if (!liff.isLoggedIn()) {
       liff.login();
       return;
@@ -865,6 +884,19 @@ async function loadFacilities() {
         </div>
         <div class="group-item-info">
           <span>✉️ 招待 未使用 ${escHtmlAdmin(`${f.invite_unused}`)} / 使用済 ${escHtmlAdmin(`${f.invite_used}`)} / 期限切れ ${escHtmlAdmin(`${f.invite_expired}`)}</span>
+          <span>⏳ 次回失効: ${escHtmlAdmin(_formatDateAdmin(f.invite_next_expires_at))}</span>
+        </div>
+        <div class="group-item-info">
+          <span>🏭 ${escHtmlAdmin(INDUSTRY_LABELS[f.industry] || _dashAdmin(f.industry))}</span>
+          <span>📍 ${escHtmlAdmin(_dashAdmin(f.region))}</span>
+        </div>
+        <div class="group-item-info">
+          <span>🗓️ 次回請求日: ${escHtmlAdmin(_formatDateAdmin(f.current_period_end))}</span>
+          <span>💴 次回課金: ${escHtmlAdmin(_formatDateAdmin(f.next_billing_at))}</span>
+        </div>
+        <div class="group-item-info">
+          <span>📅 作成: ${escHtmlAdmin(_formatDateAdmin(f.facility_created_at))}</span>
+          <span>⏸️ 停止: ${escHtmlAdmin(_formatDateAdmin(f.suspended_at))}</span>
         </div>
       </div>
     `;
@@ -875,6 +907,47 @@ async function loadFacilities() {
 function escHtmlAdmin(str) {
   return String(str == null ? '' : str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ═══════════════════════════════════════════
+// [第223回 EO-DEC-0223] EdgeOpsへ戻る導線
+// ═══════════════════════════════════════════
+// index.html は liff.isInClient() が false だと遮断画面を出して操作を止めるため、
+// PCブラウザでボタンを出すと利用者が自分から行き止まりへ移動できてしまう。
+// よって LINEアプリ内のときだけ表示する（第208回 manager.html と同一方式）。
+function backToEdgeOps() {
+  window.location.href = 'index.html';
+}
+window.backToEdgeOps = backToEdgeOps;
+
+function applyBackToEdgeOpsVisibility() {
+  let inClient = false;
+  try {
+    inClient = (typeof liff !== 'undefined' && liff.isInClient() === true);
+  } catch (_) {
+    inClient = false;            // 判定できないときは安全側＝非表示のまま
+  }
+  document.querySelectorAll('.back-to-edgeops').forEach(function (el) {
+    el.style.display = inClient ? 'inline-block' : 'none';
+  });
+}
+window.applyBackToEdgeOpsVisibility = applyBackToEdgeOpsVisibility;
+
+// ═══════════════════════════════════════════
+// [第223回 EO-DEC-0223] 施設タブの表示ヘルパー
+// ═══════════════════════════════════════════
+// ★判定の追加条件：null / undefined だけを「—」にする。
+//   0・false・空文字を「|| '—'」でまとめて落とす書き方はしないこと。
+//   将来 0 や false が意味を持つ列が増えたときに壊れるため。
+function _dashAdmin(v) {
+  return (v === null || v === undefined) ? '—' : v;
+}
+
+function _formatDateAdmin(v) {
+  if (v === null || v === undefined) return '—';
+  const dt = new Date(v);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' });
 }
 
 // ── グループ一覧 ──
