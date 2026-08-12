@@ -2244,11 +2244,15 @@ async function loadHome() {
   // [UI改善② LINKボタン] currentGroup.link_url が設定されているグループのみLINKボタン表示
   updateLinkButton();
 
+  await loadMessages();
+
   // is_signage=trueのメンバーのみサイネージボタンを表示
+  // [EO-DEC-0214 論点C] 自分1行だけを取り直していたクエリを削除し、
+  //   loadMessages() が取得済みの members（同一グループ・status='approved'）から判定する。
+  //   ★判定に使う値・表示条件は変更していない。取得元を変えただけ。
   const signageBtn = document.getElementById('signage-btn');
   if (signageBtn) {
-    const { data: myMember } = await supabase.from('group_members')
-      .select('is_signage').eq('id', currentMemberId).single();
+    const myMember = members.find(m => m.id === currentMemberId);
     if (myMember && myMember.is_signage) {
       signageBtn.style.display = 'flex';
       signageBtn.style.alignItems = 'center';
@@ -2257,7 +2261,6 @@ async function loadHome() {
     }
   }
 
-  await loadMessages();
   startPolling();
 }
 
@@ -2331,6 +2334,7 @@ async function loadMessages() {
     // messages・members・handover_notesを並列取得（起動速度改善）
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    let hwConfsForBadge = [];   // [EO-DEC-0214 論点D] updateHandoverBadge へ渡す
     const [
       { data },
       { data: memberData },
@@ -2402,6 +2406,7 @@ async function loadMessages() {
     if (handoverNotes.length > 0) {
       const hwIds = handoverNotes.map(n => n.id);
       const { data: hwConfs } = await supabase.from('handover_confirmations').select('*').in('handover_id', hwIds);
+      hwConfsForBadge = hwConfs || [];
       // 全メンバー(過去含む)取得 - サイネージ判定・参加時刻判定用
       const { data: allMembersForHw } = await supabase.from('group_members')
         .select('eo_uid, created_at, is_signage')
@@ -2475,7 +2480,9 @@ async function loadMessages() {
       approvalBtn.style.display = isEventGeneralMember() ? 'none' : '';
     }
     // 引き継ぎ未確認バッジ更新
-    await updateHandoverBadge();
+    // [EO-DEC-0214 論点D] 直前に取得済みの handover_notes / handover_confirmations を渡し、
+    //   updateHandoverBadge() 内の supabase.from(...) 再取得（2クエリ）を省く。
+    await updateHandoverBadge(handoverNotes, hwConfsForBadge);
   } catch (e) { console.error(e); }
 }
 
