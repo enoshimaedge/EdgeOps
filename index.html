@@ -1365,6 +1365,10 @@ let currentGroup = null;
 let profileFormGroupId = null; // プロフィール編集フォームが表示しているグループの id
 let currentMemberId = null;
 let isCreator = false;
+// [EO-DEC-0216] 当該描画サイクル専用の creator 判定。グローバル isCreator とは別物。
+//   null = 未確定（まだ今回の members から計算していない／グループ切替直後）。
+//   ★未確定のときは安全側＝「イベント一般参加者」として扱い、既読と承認導線を出さない。
+window._amCreatorForRender = null;
 let messages = [];
 let members = [];
 let pollTimer = null;
@@ -1812,6 +1816,32 @@ async function resolveIsCreator(groupSessionId, myMemberId) {
 }
 
 // ═══════════════════════════════════════════
+// [EO-DEC-0215 / EO-DEC-0216] DBアクセスを伴わない管理者判定ヘルパー
+//   ★EO-DEC-0160 の resolveIsCreator() と同一判定規則。片方だけ変更してはならない。
+//     管理者判定規則を変更する場合は、resolveIsCreator() と本関数を同一判定で更新すること。
+//   ★戻り値の意味は「渡された approved members のスナップショットに基づく、
+//     当該描画サイクル用の creator 判定」であり、EdgeOps 全体における
+//     現在ユーザーの管理者権限（グローバル isCreator）ではない。混同しないこと。
+// ═══════════════════════════════════════════
+function resolveIsCreatorFromMembers(memberList, myMemberId) {
+  if (!Array.isArray(memberList) || memberList.length === 0) return false;
+  // is_creator=true が1人でもいればDBの値を使う
+  const hasCreator = memberList.some(m => m.is_creator);
+  if (hasCreator) {
+    return memberList.find(m => m.id === myMemberId)?.is_creator || false;
+  }
+  // 誰もTRUEでなければ最古の人間メンバーを管理者とみなす（フォールバック）
+  // [EO-DEC-0160 案イ] サイネージ端末は対象外(NULL は人間扱い)。人間がいなければ昇格させない
+  // ★呼び出し元の members には order 指定が無いため、ここで created_at 昇順を保証する。
+  // ★元の配列を破壊しないため、コピーしてから並べ替える（EO-DEC-0216 条件）。
+  const humanMembers = [...memberList]
+    .filter(m => m.is_signage !== true)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  if (humanMembers.length === 0) return false;
+  return humanMembers[0].id === myMemberId;
+}
+
+// ═══════════════════════════════════════════
 // 既存所属への自動復帰(LINE側キャッシュリセット対策・学び13)
 // ═══════════════════════════════════════════
 // 2026/5/14 午後 LINE側キャッシュリセット事案対応・チャッピー第22回判定承認済み
@@ -1852,8 +1882,12 @@ async function restoreExistingMembershipIfAny() {
     applyEventUiVisibility();
     syncProfileForm();
     currentUser.display_name = m.display_name;
-    isCreator = await resolveIsCreator(m.group_session_id, m.id);
-    await loadHome();
+    // [EO-DEC-0215] 既存3経路と同じ Promise.all 方式へ統一（起動速度改善）
+    const [creatorResult] = await Promise.all([
+      resolveIsCreator(m.group_session_id, m.id),
+      loadHome()
+    ]);
+    isCreator = creatorResult;
     showScreen('screen-home');
     showToast('既存のグループに復帰しました');
     return true;
@@ -2145,8 +2179,13 @@ async function checkApproval() {
       currentUser.display_name = member.display_name; currentGroup = member.group_sessions;
       applyEventWording(currentGroup?.industry === 'event');
       applyEventUiVisibility();
-      isCreator = await resolveIsCreator(member.group_sessions.id, member.id);
-      await loadHome(); showScreen('screen-home'); showToast('参加が承認されました！');
+      // [EO-DEC-0215] 既存3経路と同じ Promise.all 方式へ統一（起動速度改善）
+      const [creatorResult] = await Promise.all([
+        resolveIsCreator(member.group_sessions.id, member.id),
+        loadHome()
+      ]);
+      isCreator = creatorResult;
+      showScreen('screen-home'); showToast('参加が承認されました！');
     } else { showToast('まだ承認されていません。しばらくお待ちください。'); }
   } catch (e) { showToast('確認中にエラーが発生しました。'); }
 }
@@ -2327,6 +2366,7 @@ async function loadMessages() {
     monthOpenState = {};
     window._memberJoinedAt = new Map();
     window._memberNameMap = {};
+    window._amCreatorForRender = null;   // [EO-DEC-0216] 前グループの判定を持ち越さない
     window._lastLoadedGroupId = currentGroup.id;
   }
   const isFirstLoad = (oldestLoadedAt === null);   // ── Step 5：初回判定（第119回）
@@ -2358,6 +2398,9 @@ async function loadMessages() {
     ]);
     messages = data || [];
     members = memberData || [];
+    // [EO-DEC-0216] 今回取得した approved members から、この描画サイクル用の creator を確定させる。
+    //   順序は必ず「members 取得 → 判定 → 描画専用状態へ設定 → 表示判定」とすること。
+    window._amCreatorForRender = resolveIsCreatorFromMembers(members, currentMemberId);
     handoverNotes = hwData || [];
 
     // ── Step 5：カーソルを更新（第119回） ──
@@ -2477,7 +2520,7 @@ async function loadMessages() {
     if (count > 0) { badge.textContent = count; badge.style.display = ''; }
     else { badge.style.display = 'none'; }
     if (approvalBtn) {
-      approvalBtn.style.display = isEventGeneralMember() ? 'none' : '';
+      approvalBtn.style.display = isEventGeneralMemberForRender() ? 'none' : '';
     }
     // 引き継ぎ未確認バッジ更新
     // [EO-DEC-0214 論点D] 直前に取得済みの handover_notes / handover_confirmations を渡し、
@@ -2759,7 +2802,7 @@ function eoReceiverCountOf(msg) {
 
 function eoReadHtmlOf(msg) {
   // [E7・案サ / EO-DEC-0157] event の一般参加者には既読表示を出さない
-  if (isEventGeneralMember()) return '';
+  if (isEventGeneralMemberForRender()) return '';
   const receiverCount = eoReceiverCountOf(msg);
   const readCount = Math.min(msg.read_count || 0, receiverCount);
   return ((readCount + (window._leftUnreadMap?.[msg.id] || 0)) >= receiverCount) // [EO-DEC-0162]
@@ -3017,7 +3060,7 @@ function renderMessages() {
       let readHtml = isDone
         ? `<span class="eo-msg__read eo-msg__read--done">${t('read_all')}</span>`
         : `<span class="eo-msg__read">${t('read_count', { read: readCount, total: receiverCount })}</span>`;
-      if (isEventGeneralMember()) readHtml = '';
+      if (isEventGeneralMemberForRender()) readHtml = '';
       const senderName = getMemberName(msg.sender_eo_uid);
       const timeStr = formatTime(msg.created_at);
       const p = msg.priority || 'info';
@@ -4591,6 +4634,20 @@ function isEventGeneralMember() {
   return isEventGroup() && !isCreator;
 }
 
+// [EO-DEC-0216] 描画サイクル専用の「イベントの一般参加者か」判定。
+//   isEventGeneralMember() と規則は同じだが、参照するのは
+//   グローバル isCreator ではなく window._amCreatorForRender（当該描画サイクルの確定値）。
+//   ★未確定（null）のときは安全側＝一般参加者として扱う。
+//     E7（EO-DEC-0157 案サ）が守るのは「一般参加者に既読を見せない」ことであるため、
+//     不明なときは見せない方向へ倒す。
+//   ★この関数は loadHome() 下流の描画3箇所だけが使う。操作起点の箇所は
+//     従来どおり isEventGeneralMember() を使うこと。
+function isEventGeneralMemberForRender() {
+  if (!isEventGroup()) return false;
+  if (window._amCreatorForRender === null || window._amCreatorForRender === undefined) return true;
+  return !window._amCreatorForRender;
+}
+
 function showProfile() {
   document.getElementById('profile-name').textContent = currentUser.display_name || '---';
   document.getElementById('profile-line-name').textContent = 'LINE: ' + (currentUser.line_name || '');
@@ -5064,6 +5121,7 @@ async function switchGroup(newGroupSessionId, newMemberId) {
   monthOpenState = {};
   window._memberJoinedAt = new Map();
   window._memberNameMap = {};
+  window._amCreatorForRender = null;   // [EO-DEC-0216] 前グループの判定を持ち越さない
   // [Issue㉓ EO-DEC-0169] 取りやめ状態をリセット（グループ切替時）
   window.activeWithdrawnUids = [];
   window.myWithdrawn = false;
