@@ -450,6 +450,7 @@ function copySignageUrl() {
 }
 
 function copyGroupId() {
+  if (currentGroup?.gid_masked === true) return;
   const id = currentGroup?.group_id;
   if (!id) return;
   const p = navigator.clipboard?.writeText?.(id);
