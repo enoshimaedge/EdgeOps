@@ -518,7 +518,15 @@ html {
   padding: 10px 20px; border-radius: 20px;
   font-size: 13px; opacity: 0;
   transition: all 0.3s; pointer-events: none;
-  white-space: nowrap; z-index: 999;
+  /* [EO-DEC-0222 実装時に是正] 長い文言が画面からはみ出していたため nowrap を解除。
+     ★短い文言の見た目は変わらない（width: max-content により内容ぴったりの幅を保つ）。
+     長文のときだけ折り返して複数行になる。 */
+  white-space: normal;
+  max-width: calc(100vw - 40px);
+  width: max-content;
+  text-align: center;
+  line-height: 1.5;
+  z-index: 999;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
