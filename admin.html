@@ -1657,7 +1657,7 @@ async function execFacilityCreate() {
   await Promise.all([loadFacilities(), loadAuditLogs()]);
 }
 
-function openOrganizationCreate() {
+async function openOrganizationCreate() {
   const nameEl = document.getElementById('oc-name');
   const errEl = document.getElementById('oc-error');
   const execEl = document.getElementById('oc-exec');
@@ -1673,10 +1673,8 @@ function openOrganizationCreate() {
   organizationCreatePending = true;
   organizationCreateOverrideName = '';
   document.getElementById('organization-create').classList.add('open');
-
-  sb.rpc('admin_list_organizations').then(function(result) {
-    const data = result.data;
-    const error = result.error;
+  try {
+    const { data, error } = await sb.rpc('admin_list_organizations');
     if (error) {
       organizationRowsCache = [];
       errEl.textContent = '組織一覧を読み込めませんでした。時間をおいてから、もう一度お試しください。';
@@ -1694,7 +1692,14 @@ function openOrganizationCreate() {
     organizationRowsCache = rows.slice();
     execEl.disabled = false;
     execEl.textContent = '作成する';
-  });
+  } catch (error) {
+    organizationRowsCache = [];
+    errEl.textContent = '組織一覧を読み込めませんでした。時間をおいてから、もう一度お試しください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] admin_list_organizations error:', error);
+    execEl.disabled = false;
+    execEl.textContent = '作成する';
+  }
 }
 
 function closeOrganizationCreate() {
