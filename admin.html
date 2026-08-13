@@ -559,6 +559,19 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
 .confirm-btn-exec { background: var(--red); color: #fff; }
 .confirm-btn-exec.resume { background: var(--green); }
 .confirm-btn:disabled { opacity: 0.5; cursor: default; }
+.facility-create-bar { margin-bottom: 12px; }
+.fac-create-btn {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 9px;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.fc-note { font-size: 11px; color: var(--text-light); line-height: 1.7; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -679,6 +692,9 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     </div>
 
     <div id="tab-facilities" class="tab-panel">
+      <div class="facility-create-bar">
+        <button type="button" class="fac-create-btn" onclick="openFacilityCreate()">＋ 施設を作成</button>
+      </div>
       <div id="facility-list">
         <div class="loading-small">読み込み中...</div>
       </div>
@@ -719,6 +735,31 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   </div>
 </div>
 
+<div id="facility-create" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">施設を作成</div>
+    <div class="confirm-text">作成先の組織と施設情報を入力してください。</div>
+    <select class="confirm-reason" id="fc-organization" disabled>
+      <option value="">読み込み中...</option>
+    </select>
+    <input class="confirm-reason" type="text" id="fc-name" placeholder="施設名（必須）" maxlength="100">
+    <select class="confirm-reason" id="fc-industry"></select>
+    <input class="confirm-reason" type="text" id="fc-region" placeholder="地域（任意）" maxlength="50">
+    <div class="fc-note">
+      作成される施設は次の状態になります。<br>
+      プラン: plus ／ 契約状態: 停止中（suspended）<br>
+      請求経路: 紙請求書（manual_invoice） ／ 課金状態: 入金待ち（pending）<br>
+      入金確認後、施設一覧の「契約を再開」で利用開始できます。<br>
+      施設IDは自動採番されます。
+    </div>
+    <div class="confirm-error" id="fc-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel" id="fc-cancel" onclick="closeFacilityCreate()">キャンセル</button>
+      <button type="button" class="confirm-btn confirm-btn-exec" id="fc-exec" onclick="execFacilityCreate()">作成する</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
@@ -736,6 +777,15 @@ const INDUSTRY_LABELS = {
   fitness: '🏋️ フィットネス施設',
   club: '🏆 部活・クラブ',
   event: '🎪 イベント・催事'
+};
+const FACILITY_INDUSTRY_OPTIONS =
+  ['hotel','commercial','clinic','care','attraction','fitness','club'];
+const FACILITY_CREATE_ERROR_LABELS = {
+  AUTH_REQUIRED: 'ログイン状態を確認できませんでした。開き直してください。',
+  NOT_SUPER_ADMIN: '超管理者の権限がありません。',
+  INVALID_FACILITY_NAME: '施設名を入力してください。',
+  ORGANIZATION_NOT_FOUND: '選択した組織が見つかりません。開き直してください。',
+  FACILITY_CODE_GENERATION_FAILED: '施設IDを採番できませんでした。もう一度お試しください。'
 };
 
 // ── 初期化 ──
@@ -1249,6 +1299,7 @@ const CONTRACT_ERROR_LABELS = {
 
 // 確認ダイアログで保留中の操作。実行後・キャンセル後は必ず null へ戻す。
 let contractPending = null;
+let facilityCreatePending = true;
 
 // 施設カードの操作行を作る。
 // ★DBの値を加工・補正しない（第189回 追認）。操作できない理由はそのまま文言で出す。
@@ -1368,6 +1419,159 @@ async function execContractStatusChange() {
   cancelEl.disabled = false;
 
   // ★取り直す。画面の値を手で書き換えない（第189回 追認）。
+  await Promise.all([loadFacilities(), loadAuditLogs()]);
+}
+
+function _buildIndustryOptions() {
+  const options = ['<option value="">（未設定）</option>'];
+  FACILITY_INDUSTRY_OPTIONS.forEach(function(industry) {
+    const label = INDUSTRY_LABELS[industry] || industry;
+    options.push(
+      '<option value="' + escHtmlAdmin(String(industry)) + '">' + escHtmlAdmin(String(label)) + '</option>'
+    );
+  });
+  return options.join('');
+}
+
+async function openFacilityCreate() {
+  const orgEl = document.getElementById('fc-organization');
+  const nameEl = document.getElementById('fc-name');
+  const industryEl = document.getElementById('fc-industry');
+  const regionEl = document.getElementById('fc-region');
+  const errEl = document.getElementById('fc-error');
+  const execEl = document.getElementById('fc-exec');
+  const cancelEl = document.getElementById('fc-cancel');
+
+  nameEl.value = '';
+  regionEl.value = '';
+  industryEl.innerHTML = _buildIndustryOptions();
+  industryEl.value = '';
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+  facilityCreatePending = true;
+
+  orgEl.disabled = true;
+  orgEl.innerHTML = '<option value="">読み込み中...</option>';
+  execEl.disabled = false;
+  execEl.textContent = '作成する';
+  cancelEl.disabled = false;
+  document.getElementById('facility-create').classList.add('open');
+
+  const { data, error } = await sb.rpc('admin_list_organizations');
+  if (error) {
+    orgEl.disabled = true;
+    execEl.disabled = true;
+    errEl.textContent = '組織一覧を読み込めませんでした。時間をおいてから、もう一度お試しください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] admin_list_organizations error:', error);
+    return;
+  }
+
+  const rows = Array.isArray(data) ? data.slice() : [];
+  rows.sort(function(a, b) {
+    return String(a?.out_organization_code || '').localeCompare(String(b?.out_organization_code || ''));
+  });
+
+  const options = ['<option value="">組織を選んでください</option>'];
+  rows.forEach(function(row) {
+    const orgId = String(row?.out_organization_id || '');
+    if (!orgId) return;
+    const orgCode = String(row?.out_organization_code || '');
+    const orgName = String(row?.out_organization_name || '');
+    const facilityCount = String(row?.out_facility_count ?? 0);
+    options.push(
+      '<option value="' + escHtmlAdmin(orgId) + '">'
+      + escHtmlAdmin(orgCode) + ' ' + escHtmlAdmin(orgName) + '（' + escHtmlAdmin(facilityCount) + '施設）'
+      + '</option>'
+    );
+  });
+
+  orgEl.innerHTML = options.join('');
+  orgEl.disabled = false;
+  execEl.disabled = false;
+
+  if (options.length === 1) {
+    execEl.disabled = true;
+    errEl.textContent = '作成可能な組織が見つかりませんでした。';
+    errEl.classList.add('open');
+  }
+}
+
+function closeFacilityCreate() {
+  facilityCreatePending = true;
+  document.getElementById('facility-create').classList.remove('open');
+}
+
+async function execFacilityCreate() {
+  if (!facilityCreatePending) { closeFacilityCreate(); return; }
+
+  const orgEl = document.getElementById('fc-organization');
+  const nameEl = document.getElementById('fc-name');
+  const industryEl = document.getElementById('fc-industry');
+  const regionEl = document.getElementById('fc-region');
+  const errEl = document.getElementById('fc-error');
+  const execEl = document.getElementById('fc-exec');
+  const cancelEl = document.getElementById('fc-cancel');
+
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  const organizationId = String(orgEl.value || '');
+  const facilityName = (nameEl.value || '').trim();
+  const industry = String(industryEl.value || '').trim();
+  const region = (regionEl.value || '').trim();
+
+  if (!facilityName) {
+    errEl.textContent = FACILITY_CREATE_ERROR_LABELS.INVALID_FACILITY_NAME;
+    errEl.classList.add('open');
+    return;
+  }
+  if (!organizationId) {
+    errEl.textContent = '組織を選んでください。';
+    errEl.classList.add('open');
+    return;
+  }
+
+  execEl.disabled = true;
+  cancelEl.disabled = true;
+  execEl.textContent = '作成中...';
+
+  const { data, error } = await sb.rpc('admin_create_facility', {
+    p_organization_id: organizationId,
+    p_facility_name: facilityName,
+    p_industry: industry || null,
+    p_region: region || null
+  });
+
+  if (error) {
+    const msg = String(error.message || '');
+    const key = Object.keys(FACILITY_CREATE_ERROR_LABELS).find(function(k) { return msg.indexOf(k) >= 0; });
+    errEl.textContent = key
+      ? FACILITY_CREATE_ERROR_LABELS[key]
+      : '作成できませんでした。時間をおいてから、もう一度お試しください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] admin_create_facility error:', error);
+    execEl.disabled = false;
+    cancelEl.disabled = false;
+    execEl.textContent = '作成する';
+    return;
+  }
+
+  let facilityCode = '';
+  if (Array.isArray(data) && data[0] && data[0].facility_code) {
+    facilityCode = String(data[0].facility_code || '');
+  } else if (data && typeof data === 'object' && data.facility_code) {
+    facilityCode = String(data.facility_code || '');
+  }
+
+  errEl.textContent = facilityCode
+    ? '施設を作成しました。施設ID: ' + facilityCode
+    : '施設を作成しました。';
+  errEl.classList.add('open');
+  execEl.textContent = '閉じる';
+  execEl.disabled = false;
+  cancelEl.disabled = false;
+  facilityCreatePending = false;
   await Promise.all([loadFacilities(), loadAuditLogs()]);
 }
 
