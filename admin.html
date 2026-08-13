@@ -1038,27 +1038,27 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
       <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy" onclick="copyInviteCode()">コードをコピー</button>
       <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy-msg" onclick="copyInviteMessage()">案内文をコピー</button>
       <button type="button" class="confirm-btn confirm-btn-exec" id="ir-close" onclick="closeInviteResult()">閉じる</button>
-    </div>
   </div>
-  </div>
+</div>
+</div>
 
-  <div id="bulk-confirm" class="confirm-overlay">
-    <div class="confirm-box">
-      <div class="confirm-title" id="bulk-confirm-title">契約状態をまとめて変更します</div>
-      <div class="confirm-text" id="bulk-confirm-text"></div>
-      <div class="bulk-warn" id="bulk-confirm-warn" style="display:none;"></div>
-      <input class="confirm-reason" type="text" id="bulk-confirm-reason"
-             placeholder="理由（任意・監査ログに残ります）" maxlength="200">
-      <div class="bulk-result-list" id="bulk-result-list" style="display:none;"></div>
-      <div class="bulk-summary" id="bulk-summary" style="display:none;"></div>
-      <div class="confirm-error" id="bulk-confirm-error"></div>
-      <div class="confirm-actions">
-        <button type="button" class="confirm-btn confirm-btn-cancel"
-                id="bulk-confirm-cancel" onclick="closeBulkConfirm()">キャンセル</button>
-        <button type="button" class="confirm-btn confirm-btn-exec"
-                id="bulk-confirm-exec" onclick="execBulkContractChange()">実行する</button>
-      </div>
+<div id="bulk-confirm" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="bulk-confirm-title">契約状態をまとめて変更します</div>
+    <div class="confirm-text" id="bulk-confirm-text"></div>
+    <div class="bulk-warn" id="bulk-confirm-warn" style="display:none;"></div>
+    <input class="confirm-reason" type="text" id="bulk-confirm-reason"
+           placeholder="理由（任意・監査ログに残ります）" maxlength="200">
+    <div class="bulk-result-list" id="bulk-result-list" style="display:none;"></div>
+    <div class="bulk-summary" id="bulk-summary" style="display:none;"></div>
+    <div class="confirm-error" id="bulk-confirm-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel"
+              id="bulk-confirm-cancel" onclick="closeBulkConfirm()">キャンセル</button>
+      <button type="button" class="confirm-btn confirm-btn-exec"
+              id="bulk-confirm-exec" onclick="execBulkContractChange()">実行する</button>
     </div>
+  </div>
 </div>
 
 <script>
@@ -2299,6 +2299,7 @@ async function copyInviteMessage() {
 
 let bulkPending = null;   // { newStatus, facilities: [{id, name}] }
 let bulkRunning = false;
+let bulkReadyToClose = false;
 
 function _bulkCheckboxes() {
   return Array.from(document.querySelectorAll('#facility-list input[data-facility-id]'));
@@ -2333,6 +2334,7 @@ function openBulkConfirm(newStatus) {
   if (!list.length) return;
 
   bulkPending = { newStatus: newStatus, facilities: list };
+  bulkReadyToClose = false;
 
   const verb = (newStatus === 'suspended') ? '【停止】' : '【再開】';
   document.getElementById('bulk-confirm-title').textContent =
@@ -2376,6 +2378,7 @@ function openBulkConfirm(newStatus) {
 function closeBulkConfirm() {
   if (bulkRunning) return;   // ★実行中は閉じさせない（判定の条件）
   bulkPending = null;
+  bulkReadyToClose = false;
   document.getElementById('bulk-confirm').classList.remove('open');
 }
 
@@ -2395,6 +2398,11 @@ function _setBulkLocked(locked) {
 }
 
 async function execBulkContractChange() {
+  if (bulkReadyToClose) {
+    closeBulkConfirm();
+    onBulkCheckChanged();
+    return;
+  }
   if (!bulkPending) { closeBulkConfirm(); return; }
 
   const execEl = document.getElementById('bulk-confirm-exec');
@@ -2443,7 +2451,8 @@ async function execBulkContractChange() {
       nFailed++;
       console.error('[admin.html] bulk admin_set_contract_status error:', t.id, error);
     } else {
-      const r = (data && data.result) ? data.result : '';
+      const resultRow = Array.isArray(data) ? data[0] : data;
+      const r = (resultRow && resultRow.result) ? resultRow.result : '';
       if (r === 'unchanged') {
         const st = CONTRACT_STATUS_LABELS[newStatus] || newStatus;
         row.innerHTML = '<span class="bulk-result-name">' + escHtmlAdmin(t.name)
@@ -2472,6 +2481,7 @@ async function execBulkContractChange() {
   } finally {
     _setBulkLocked(false);
     bulkPending = null;
+    bulkReadyToClose = true;
     execEl.disabled = false;
     execEl.textContent = '閉じる';
   }
