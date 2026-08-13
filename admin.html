@@ -1299,6 +1299,7 @@ const CONTRACT_ERROR_LABELS = {
 
 // 確認ダイアログで保留中の操作。実行後・キャンセル後は必ず null へ戻す。
 let contractPending = null;
+let facilityCreatePending = true;
 
 // 施設カードの操作行を作る。
 // ★DBの値を加工・補正しない（第189回 追認）。操作できない理由はそのまま文言で出す。
@@ -1447,6 +1448,7 @@ async function openFacilityCreate() {
   industryEl.value = '';
   errEl.textContent = '';
   errEl.classList.remove('open');
+  facilityCreatePending = true;
 
   orgEl.disabled = true;
   orgEl.innerHTML = '<option value="">読み込み中...</option>';
@@ -1496,10 +1498,13 @@ async function openFacilityCreate() {
 }
 
 function closeFacilityCreate() {
+  facilityCreatePending = true;
   document.getElementById('facility-create').classList.remove('open');
 }
 
 async function execFacilityCreate() {
+  if (!facilityCreatePending) { closeFacilityCreate(); return; }
+
   const orgEl = document.getElementById('fc-organization');
   const nameEl = document.getElementById('fc-name');
   const industryEl = document.getElementById('fc-industry');
@@ -1559,13 +1564,15 @@ async function execFacilityCreate() {
     facilityCode = String(data.facility_code || '');
   }
 
-  closeFacilityCreate();
+  errEl.textContent = facilityCode
+    ? '施設を作成しました。施設ID: ' + facilityCode
+    : '施設を作成しました。';
+  errEl.classList.add('open');
+  execEl.textContent = '閉じる';
+  execEl.disabled = false;
+  cancelEl.disabled = false;
+  facilityCreatePending = false;
   await Promise.all([loadFacilities(), loadAuditLogs()]);
-  if (facilityCode) {
-    window.alert('施設を作成しました。施設ID: ' + escHtmlAdmin(facilityCode));
-  } else {
-    window.alert('施設を作成しました。');
-  }
 }
 
 
