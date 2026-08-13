@@ -662,6 +662,54 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   margin: 6px 0 6px 20px;
 }
 .ops-caution { font-size: 11px; line-height: 1.7; color: var(--text-light); margin-left: 20px; }
+.bulk-bar {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.bulk-bar.open { display: block; }
+.bulk-bar-count { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.bulk-bar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.bulk-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+}
+.bulk-btn-stop { background: var(--red); }
+.bulk-btn-resume { background: var(--green); }
+.bulk-btn-clear { background: var(--bg); color: var(--text-mid); }
+.bulk-btn:disabled { background: #c8cfda; color: #fff; cursor: default; }
+
+.fac-check { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.fac-check input { width: 17px; height: 17px; accent-color: var(--green); cursor: pointer; flex-shrink: 0; }
+.fac-check input:disabled { cursor: default; }
+.fac-check label { font-size: 11px; color: var(--text-light); cursor: pointer; }
+
+.bulk-result-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+}
+.bulk-result-row { font-size: 12px; line-height: 1.7; color: var(--text-mid); padding: 3px 0; }
+.bulk-result-row.ng { color: var(--red); }
+.bulk-result-name { font-weight: 700; color: var(--text); }
+.bulk-summary { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.bulk-warn { font-size: 12px; font-weight: 700; color: var(--red); line-height: 1.6; margin-bottom: 10px; }
 .fc-note { font-size: 11px; color: var(--text-light); line-height: 1.7; margin-bottom: 10px; }
 </style>
 </head>
@@ -857,6 +905,17 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
       <div class="facility-create-bar">
         <button type="button" class="fac-create-btn" onclick="openFacilityCreate()">＋ 施設を作成</button>
       </div>
+      <div class="bulk-bar" id="bulk-bar">
+        <div class="bulk-bar-count" id="bulk-bar-count">選択中 0件</div>
+        <div class="bulk-bar-actions">
+          <button type="button" class="bulk-btn bulk-btn-stop" id="bulk-stop"
+                  onclick="openBulkConfirm('suspended')">まとめて停止</button>
+          <button type="button" class="bulk-btn bulk-btn-resume" id="bulk-resume"
+                  onclick="openBulkConfirm('active')">まとめて再開</button>
+          <button type="button" class="bulk-btn bulk-btn-clear" id="bulk-clear"
+                  onclick="clearBulkSelection()">選択を解除</button>
+        </div>
+      </div>
       <div id="facility-list">
         <div class="loading-small">読み込み中...</div>
       </div>
@@ -979,6 +1038,25 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
       <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy" onclick="copyInviteCode()">コードをコピー</button>
       <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy-msg" onclick="copyInviteMessage()">案内文をコピー</button>
       <button type="button" class="confirm-btn confirm-btn-exec" id="ir-close" onclick="closeInviteResult()">閉じる</button>
+  </div>
+</div>
+</div>
+
+<div id="bulk-confirm" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="bulk-confirm-title">契約状態をまとめて変更します</div>
+    <div class="confirm-text" id="bulk-confirm-text"></div>
+    <div class="bulk-warn" id="bulk-confirm-warn" style="display:none;"></div>
+    <input class="confirm-reason" type="text" id="bulk-confirm-reason"
+           placeholder="理由（任意・監査ログに残ります）" maxlength="200">
+    <div class="bulk-result-list" id="bulk-result-list" style="display:none;"></div>
+    <div class="bulk-summary" id="bulk-summary" style="display:none;"></div>
+    <div class="confirm-error" id="bulk-confirm-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel"
+              id="bulk-confirm-cancel" onclick="closeBulkConfirm()">キャンセル</button>
+      <button type="button" class="confirm-btn confirm-btn-exec"
+              id="bulk-confirm-exec" onclick="execBulkContractChange()">実行する</button>
     </div>
   </div>
 </div>
@@ -1335,8 +1413,17 @@ async function loadFacilities() {
 
   document.getElementById('facility-list').innerHTML = data.map(f => {
     const mains = (f.main_manager_names || []);
+    const canBulk = (f.billing_source === 'manual_invoice')
+                 && (f.contract_status === 'active' || f.contract_status === 'suspended');
     return `
       <div class="group-item">
+        <div class="fac-check">
+          <input type="checkbox" id="bulk-${escHtmlAdmin(f.facility_id)}"
+                 ${canBulk ? '' : 'disabled'}
+                 onchange="onBulkCheckChanged()"
+                 data-facility-id="${escHtmlAdmin(f.facility_id)}">
+          <label for="bulk-${escHtmlAdmin(f.facility_id)}">${canBulk ? 'まとめ操作の対象にする' : 'まとめ操作の対象外'}</label>
+        </div>
         <div class="group-item-header">
           <div class="group-id">${escHtmlAdmin(f.facility_name || '')}</div>
           <div class="industry-tag">${escHtmlAdmin(f.plan || '')}</div>
@@ -1374,6 +1461,7 @@ async function loadFacilities() {
     `;
   }).join('');
   buildAuditFacilityFilter(data);
+  onBulkCheckChanged();
 }
 
 // admin.html 内で使うHTMLエスケープ(共通化)
@@ -2198,6 +2286,204 @@ async function copyInviteMessage() {
     errEl.textContent = '案内文をコピーできませんでした。コードを控えてから、手順を手でお送りください。';
     errEl.classList.add('open');
     console.error('[admin.html] clipboard error:', e);
+  }
+}
+
+// ═══════════════════════════════════════════
+// [2026/8/13 EO-DEC-0232 段階6] 複数施設のまとめ操作
+// ═══════════════════════════════════════════
+// ★専用の一括RPCは作らない（第224回 28-3）。既存 admin_set_contract_status を
+//   施設ごとに直列で呼ぶ。1件失敗しても止めず、全件を必ず試行する（論点C）。
+// ★既に同じ状態の施設をフロントで除外しない。RPCへ渡して unchanged として出す（論点B）。
+// ★単体操作の openContractConfirm / execContractStatusChange は変更しない。
+
+let bulkPending = null;   // { newStatus, facilities: [{id, name}] }
+let bulkRunning = false;
+let bulkReadyToClose = false;
+
+function _bulkCheckboxes() {
+  return Array.from(document.querySelectorAll('#facility-list input[data-facility-id]'));
+}
+
+function _bulkSelected() {
+  return _bulkCheckboxes()
+    .filter(el => el.checked && !el.disabled)
+    .map(el => {
+      const id = el.getAttribute('data-facility-id');
+      const f = (allFacilities || []).find(x => String(x.facility_id) === String(id));
+      return { id: id, name: (f && (f.facility_name || f.facility_code)) || '（名称不明）' };
+    });
+}
+
+function onBulkCheckChanged() {
+  if (bulkRunning) return;
+  const n = _bulkSelected().length;
+  document.getElementById('bulk-bar-count').textContent = '選択中 ' + n + '件';
+  document.getElementById('bulk-bar').classList.toggle('open', n > 0);
+}
+
+function clearBulkSelection() {
+  if (bulkRunning) return;
+  _bulkCheckboxes().forEach(el => { el.checked = false; });
+  onBulkCheckChanged();
+}
+
+function openBulkConfirm(newStatus) {
+  if (bulkRunning) return;
+  const list = _bulkSelected();
+  if (!list.length) return;
+
+  bulkPending = { newStatus: newStatus, facilities: list };
+  bulkReadyToClose = false;
+
+  const verb = (newStatus === 'suspended') ? '【停止】' : '【再開】';
+  document.getElementById('bulk-confirm-title').textContent =
+    (newStatus === 'suspended') ? '契約をまとめて停止します' : '契約をまとめて再開します';
+  document.getElementById('bulk-confirm-text').innerHTML =
+    '選択した <strong>' + list.length + '件</strong> の施設を '
+    + escHtmlAdmin(verb) + ' します。よろしいですか？<br>'
+    + '既にその状態の施設は「変更なし」として結果に表示されます。';
+
+  const warnEl = document.getElementById('bulk-confirm-warn');
+  if (list.length > 20) {
+    warnEl.textContent = list.length + '施設をまとめて変更します。処理の完了まで時間がかかる場合があります。';
+    warnEl.style.display = 'block';
+  } else {
+    warnEl.textContent = '';
+    warnEl.style.display = 'none';
+  }
+
+  const reasonEl = document.getElementById('bulk-confirm-reason');
+  reasonEl.value = '';
+  reasonEl.disabled = false;
+  reasonEl.style.display = 'block';
+
+  document.getElementById('bulk-result-list').style.display = 'none';
+  document.getElementById('bulk-result-list').innerHTML = '';
+  document.getElementById('bulk-summary').style.display = 'none';
+  document.getElementById('bulk-summary').textContent = '';
+
+  const errEl = document.getElementById('bulk-confirm-error');
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  const execEl = document.getElementById('bulk-confirm-exec');
+  execEl.disabled = false;
+  execEl.textContent = '実行する';
+  document.getElementById('bulk-confirm-cancel').disabled = false;
+
+  document.getElementById('bulk-confirm').classList.add('open');
+}
+
+function closeBulkConfirm() {
+  if (bulkRunning) return;   // ★実行中は閉じさせない（判定の条件）
+  bulkPending = null;
+  bulkReadyToClose = false;
+  document.getElementById('bulk-confirm').classList.remove('open');
+}
+
+// 実行中は再操作をすべて止める
+function _setBulkLocked(locked) {
+  bulkRunning = locked;
+  ['bulk-stop', 'bulk-resume', 'bulk-clear'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = locked;
+  });
+  _bulkCheckboxes().forEach(el => {
+    if (locked) { el.dataset.wasDisabled = el.disabled ? '1' : '0'; el.disabled = true; }
+    else if (el.dataset.wasDisabled === '0') { el.disabled = false; }
+  });
+  document.getElementById('bulk-confirm-cancel').disabled = locked;
+  document.getElementById('bulk-confirm-reason').disabled = locked;
+}
+
+async function execBulkContractChange() {
+  if (bulkReadyToClose) {
+    closeBulkConfirm();
+    onBulkCheckChanged();
+    return;
+  }
+  if (!bulkPending) { closeBulkConfirm(); return; }
+
+  const execEl = document.getElementById('bulk-confirm-exec');
+  const listEl = document.getElementById('bulk-result-list');
+  const sumEl = document.getElementById('bulk-summary');
+  const errEl = document.getElementById('bulk-confirm-error');
+
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  const reason = (document.getElementById('bulk-confirm-reason').value || '').trim();
+  const targets = bulkPending.facilities;
+  const newStatus = bulkPending.newStatus;
+
+  _setBulkLocked(true);
+  execEl.disabled = true;
+
+  listEl.innerHTML = '';
+  listEl.style.display = 'block';
+
+  let nChanged = 0, nUnchanged = 0, nFailed = 0;
+
+  // ★直列。1件失敗しても止めない（論点C）
+  for (let i = 0; i < targets.length; i++) {
+    execEl.textContent = '実行中 ' + (i + 1) + ' / ' + targets.length;
+
+    const t = targets[i];
+    const row = document.createElement('div');
+    row.className = 'bulk-result-row';
+
+    const { data, error } = await sb.rpc('admin_set_contract_status', {
+      p_facility_id: t.id,
+      p_new_status: newStatus,
+      p_reason: reason || null
+    });
+
+    if (error) {
+      const msg = String(error.message || '');
+      const key = Object.keys(CONTRACT_ERROR_LABELS).find(k => msg.indexOf(k) >= 0);
+      const label = key
+        ? CONTRACT_ERROR_LABELS[key]
+        : '変更できませんでした。時間をおいてから、もう一度お試しください。';
+      row.className = 'bulk-result-row ng';
+      row.innerHTML = '<span class="bulk-result-name">' + escHtmlAdmin(t.name)
+                    + '</span>　失敗：' + escHtmlAdmin(label);
+      nFailed++;
+      console.error('[admin.html] bulk admin_set_contract_status error:', t.id, error);
+    } else {
+      const resultRow = Array.isArray(data) ? data[0] : data;
+      const r = (resultRow && resultRow.result) ? resultRow.result : '';
+      if (r === 'unchanged') {
+        const st = CONTRACT_STATUS_LABELS[newStatus] || newStatus;
+        row.innerHTML = '<span class="bulk-result-name">' + escHtmlAdmin(t.name)
+                      + '</span>　変更なし（既に「' + escHtmlAdmin(st) + '」です）';
+        nUnchanged++;
+      } else {
+        row.innerHTML = '<span class="bulk-result-name">' + escHtmlAdmin(t.name)
+                      + '</span>　変更しました';
+        nChanged++;
+      }
+    }
+
+    listEl.appendChild(row);
+    listEl.scrollTop = listEl.scrollHeight;
+  }
+
+  sumEl.textContent = targets.length + '件中　' + nChanged + '件変更・'
+                    + nUnchanged + '件変更なし・' + nFailed + '件失敗';
+  sumEl.style.display = 'block';
+
+  document.getElementById('bulk-confirm-reason').style.display = 'none';
+
+  // ★再読込は全件終了後に1回だけ（判定の条件）
+  try {
+    await Promise.all([loadFacilities(), loadAuditLogs()]);
+  } finally {
+    _setBulkLocked(false);
+    bulkPending = null;
+    bulkReadyToClose = true;
+    execEl.disabled = false;
+    execEl.textContent = '閉じる';
   }
 }
 
