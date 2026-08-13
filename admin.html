@@ -584,6 +584,29 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   font-family: inherit;
   text-align: left;
 }
+.fac-btn-invite { background: var(--blue, #2f6fd0); }
+.invite-code-box {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 14px 8px;
+  margin-bottom: 10px;
+  word-break: break-all;
+  user-select: all;
+}
+.invite-warn {
+  font-size: 12px;
+  color: var(--red);
+  font-weight: 700;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
 .fc-note { font-size: 11px; color: var(--text-light); line-height: 1.7; margin-bottom: 10px; }
 </style>
 </head>
@@ -786,6 +809,48 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     <div class="confirm-actions">
       <button type="button" class="confirm-btn confirm-btn-cancel" id="oc-cancel" onclick="closeOrganizationCreate()">キャンセル</button>
       <button type="button" class="confirm-btn confirm-btn-exec resume" id="oc-exec" onclick="execOrganizationCreate()">作成する</button>
+    </div>
+  </div>
+</div>
+
+<div id="invite-issue" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">招待コードを発行</div>
+    <div class="confirm-text" id="ii-text"></div>
+    <select class="confirm-reason" id="ii-days">
+      <option value="7">有効期限: 7日</option>
+      <option value="14" selected>有効期限: 14日（既定）</option>
+      <option value="30">有効期限: 30日</option>
+      <option value="60">有効期限: 60日</option>
+      <option value="90">有効期限: 90日</option>
+    </select>
+    <div class="fc-note">
+      既に有効な招待コードがある場合、そのコードは失効します。<br>
+      発行できるコードは1施設につき1本です。<br>
+      コードは英数字12桁です。区切り記号は入りません。
+    </div>
+    <div class="confirm-error" id="ii-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel" id="ii-cancel" onclick="closeInviteIssue()">キャンセル</button>
+      <button type="button" class="confirm-btn confirm-btn-exec" id="ii-exec" onclick="execInviteIssue()">発行する</button>
+    </div>
+  </div>
+</div>
+
+<div id="invite-result" class="confirm-overlay confirm-overlay-top">
+  <div class="confirm-box">
+    <div class="confirm-title">招待コードを発行しました</div>
+    <div class="confirm-text" id="ir-facility"></div>
+    <div class="invite-code-box" id="ir-code"></div>
+    <div class="invite-warn">
+      この画面を閉じると、二度と表示できません。<br>
+      失くした場合は、もう一度発行してください。
+    </div>
+    <div class="fc-note" id="ir-note"></div>
+    <div class="confirm-error" id="ir-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy" onclick="copyInviteCode()">コードをコピー</button>
+      <button type="button" class="confirm-btn confirm-btn-exec" id="ir-close" onclick="closeInviteResult()">閉じる</button>
     </div>
   </div>
 </div>
@@ -1357,12 +1422,17 @@ function _contractActionsHtml(f) {
   const next = (cur === 'active') ? 'suspended' : 'active';
   const label = (next === 'suspended') ? '契約を停止' : '契約を再開';
   const cls = (next === 'suspended') ? 'fac-btn-stop' : 'fac-btn-resume';
+  const canInvite = (cur === 'active');
   const note = isManual ? '' : '<span class="fac-note">紙請求書の施設のみ操作できます</span>';
+  const inviteBtn = `
+          <button type="button" class="fac-btn fac-btn-invite"${canInvite ? '' : ' disabled'}
+                  onclick="openInviteIssue('${escHtmlAdmin(f.facility_id)}')">招待コードを発行</button>`;
 
   return `
         <div class="facility-actions">
           <button type="button" class="fac-btn ${cls}"${isManual ? '' : ' disabled'}
                   onclick="openContractConfirm('${escHtmlAdmin(f.facility_id)}','${next}')">${label}</button>
+          ${inviteBtn}
           ${note}
         </div>`;
 }
@@ -1801,6 +1871,141 @@ async function execOrganizationCreate() {
       ? '組織は作成しましたが、組織一覧を再読み込みできなかったため自動選択していません。'
       : '組織は作成しましたが、組織一覧で確認できなかったため自動選択していません。');
   facilityErrEl.classList.add('open');
+}
+
+// ===== 招待コード発行（EO-DEC-0229 段階5）=====
+// 書き込みは admin_issue_facility_invite() RPC の1本のみ（migration_log id=116）。
+// ★平文コードは戻り値でしか手に入らない。DBにも監査ログにも保存されない（論点G）。
+
+const INVITE_ERROR_LABELS = {
+  AUTH_REQUIRED: 'ログインが確認できません。開き直してください。',
+  NOT_SUPER_ADMIN: '超管理者の権限がありません。',
+  INVALID_EXPIRES_DAYS: '有効期限は1日から90日までで指定してください。',
+  FACILITY_NOT_FOUND: '対象の施設が見つかりません。',
+  FACILITY_NOT_ACTIVE: '契約が「利用中」の施設だけに発行できます。先に契約を再開してください。',
+  INVITE_CODE_GENERATION_FAILED: 'コードを作れませんでした。もう一度お試しください。'
+};
+
+let invitePending = null;
+let inviteIssuedCode = '';
+
+function openInviteIssue(facilityId) {
+  const f = (allFacilities || []).find(x => String(x.facility_id) === String(facilityId));
+  if (!f) return;
+
+  invitePending = { facilityId: facilityId };
+
+  const name = f.facility_name || f.facility_code || '（名称不明）';
+  document.getElementById('ii-text').innerHTML =
+    escHtmlAdmin(name) + ' の施設管理者になってもらう方へ渡すコードを発行します。';
+
+  document.getElementById('ii-days').value = '14';
+  document.getElementById('ii-days').disabled = false;
+
+  const errEl = document.getElementById('ii-error');
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  const execEl = document.getElementById('ii-exec');
+  execEl.disabled = false;
+  execEl.textContent = '発行する';
+  document.getElementById('ii-cancel').disabled = false;
+
+  document.getElementById('invite-issue').classList.add('open');
+}
+
+function closeInviteIssue() {
+  invitePending = null;
+  document.getElementById('invite-issue').classList.remove('open');
+}
+
+async function execInviteIssue() {
+  if (!invitePending) { closeInviteIssue(); return; }
+
+  const execEl = document.getElementById('ii-exec');
+  const cancelEl = document.getElementById('ii-cancel');
+  const daysEl = document.getElementById('ii-days');
+  const errEl = document.getElementById('ii-error');
+
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+  execEl.disabled = true;
+  cancelEl.disabled = true;
+  daysEl.disabled = true;
+  execEl.textContent = '発行中...';
+
+  const days = parseInt(daysEl.value, 10) || 14;
+
+  const { data, error } = await sb.rpc('admin_issue_facility_invite', {
+    p_facility_id: invitePending.facilityId,
+    p_expires_days: days
+  });
+
+  if (error) {
+    const msg = String(error.message || '');
+    const key = Object.keys(INVITE_ERROR_LABELS).find(k => msg.indexOf(k) >= 0);
+    errEl.textContent = key
+      ? INVITE_ERROR_LABELS[key]
+      : '発行できませんでした。時間をおいてから、もう一度お試しください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] admin_issue_facility_invite error:', error);
+    execEl.disabled = false;
+    cancelEl.disabled = false;
+    daysEl.disabled = false;
+    execEl.textContent = '発行する';
+    return;
+  }
+
+  const row = Array.isArray(data) ? (data[0] || {}) : (data || {});
+  const code = String(row.invite_code || '');
+  const revoked = Number(row.revoked_count || 0);
+  const revokedLabel = escHtmlAdmin(String(revoked));
+
+  inviteIssuedCode = code;
+  invitePending = null;
+
+  document.getElementById('ir-facility').innerHTML =
+    escHtmlAdmin(String(row.facility_name || '')) + ' の招待コードです。';
+  document.getElementById('ir-code').textContent = code;
+
+  const expires = _formatDateAdmin(row.expires_at);
+  document.getElementById('ir-note').innerHTML =
+    '有効期限: ' + escHtmlAdmin(expires) + '<br>'
+    + (revoked > 0
+        ? '以前の招待コード' + revokedLabel + '件を失効し、新しいコードを発行しました。'
+        : '失効した招待コードはありません。');
+
+  const irErr = document.getElementById('ir-error');
+  irErr.textContent = '';
+  irErr.classList.remove('open');
+
+  document.getElementById('invite-issue').classList.remove('open');
+  document.getElementById('invite-result').classList.add('open');
+
+  await Promise.all([loadFacilities(), loadAuditLogs()]);
+}
+
+async function copyInviteCode() {
+  const errEl = document.getElementById('ir-error');
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  try {
+    await navigator.clipboard.writeText(inviteIssuedCode);
+    errEl.textContent = 'コピーしました。';
+    errEl.classList.add('open');
+  } catch (e) {
+    errEl.textContent = 'コピーできませんでした。コードを選んで手でコピーしてください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] clipboard error:', e);
+  }
+}
+
+function closeInviteResult() {
+  if (!confirm('コードを控えましたか？ この画面を閉じると二度と表示できません。')) return;
+  inviteIssuedCode = '';
+  document.getElementById('ir-code').textContent = '';
+  document.getElementById('invite-result').classList.remove('open');
 }
 
 
