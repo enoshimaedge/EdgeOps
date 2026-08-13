@@ -1682,7 +1682,7 @@ function openOrganizationCreate() {
       errEl.textContent = '組織一覧を読み込めませんでした。時間をおいてから、もう一度お試しください。';
       errEl.classList.add('open');
       console.error('[admin.html] admin_list_organizations error:', error);
-      execEl.disabled = true;
+      execEl.disabled = false;
       execEl.textContent = '作成する';
       return;
     }
