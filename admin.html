@@ -478,6 +478,87 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   word-break: break-all;
   color: #3d4a5c;
 }
+
+/* [第224回 EO-DEC-0224 段階3] 契約状態の操作（6D-1(A)） */
+.facility-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.fac-btn {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+}
+.fac-btn-stop { background: var(--red); }
+.fac-btn-resume { background: var(--green); }
+.fac-btn:disabled { background: #c8cfda; cursor: default; }
+.fac-btn:active:not(:disabled) { opacity: 0.85; }
+.fac-note { font-size: 11px; color: var(--text-light); line-height: 1.4; }
+
+.confirm-overlay {
+  display: none;
+  position: fixed;
+  top: 0; bottom: 0; left: 0; right: 0;
+  background: rgba(15,30,53,0.55);
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-overlay.open { display: flex; }
+.confirm-box {
+  background: var(--white);
+  border-radius: 9px;
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.confirm-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.confirm-text { font-size: 13px; color: var(--text-mid); line-height: 1.7; margin-bottom: 14px; }
+.confirm-text strong { color: var(--red); }
+.confirm-reason {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 13px;
+  font-family: inherit;
+  margin-bottom: 14px;
+}
+.confirm-reason:focus { border-color: var(--green); outline: none; }
+.confirm-error {
+  display: none;
+  font-size: 12px;
+  color: var(--red);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.confirm-error.open { display: block; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-btn {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.confirm-btn-cancel { background: var(--bg); color: var(--text-mid); }
+.confirm-btn-exec { background: var(--red); color: #fff; }
+.confirm-btn-exec.resume { background: var(--green); }
+.confirm-btn:disabled { opacity: 0.5; cursor: default; }
 </style>
 </head>
 <body>
@@ -615,6 +696,26 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- [第224回 EO-DEC-0224 段階3] 契約状態変更の確認ダイアログ
+     6D-2＝確認ステップは本画面のダイアログだけで行う。RPC側に確認トークン等の
+     二段階機構は持ち込まない。RPCは実行時に超管理者・対象の存在・許可された遷移を
+     独立して再検証する（防御の本丸はRPC側）。 -->
+<div id="contract-confirm" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="contract-confirm-title">契約状態の変更</div>
+    <div class="confirm-text" id="contract-confirm-text"></div>
+    <input class="confirm-reason" type="text" id="contract-confirm-reason"
+           placeholder="理由（任意・監査ログに残ります）" maxlength="200">
+    <div class="confirm-error" id="contract-confirm-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel"
+              id="contract-confirm-cancel" onclick="closeContractConfirm()">キャンセル</button>
+      <button type="button" class="confirm-btn confirm-btn-exec"
+              id="contract-confirm-exec" onclick="execContractStatusChange()">実行する</button>
+    </div>
   </div>
 </div>
 
@@ -951,6 +1052,8 @@ async function loadFacilities() {
     return;
   }
 
+  allFacilities = data;
+
   document.getElementById('facility-list').innerHTML = data.map(f => {
     const mains = (f.main_manager_names || []);
     return `
@@ -987,6 +1090,7 @@ async function loadFacilities() {
           <span>📅 作成: ${escHtmlAdmin(_formatDateAdmin(f.facility_created_at))}</span>
           <span>⏸️ 停止: ${escHtmlAdmin(_formatDateAdmin(f.suspended_at))}</span>
         </div>
+        ${_contractActionsHtml(f)}
       </div>
     `;
   }).join('');
@@ -1111,6 +1215,162 @@ function buildAuditFacilityFilter(facilities) {
   ).join('');
   sel.innerHTML = '<option value="">すべての施設</option>' + opts;
 }
+
+// ═══════════════════════════════════════════
+// [第224回 EO-DEC-0224 段階3] 契約状態の変更（6D-1(A)）
+// ═══════════════════════════════════════════
+// 書き込みは admin_set_contract_status() RPC の1本のみ（migration_log id=106）。
+// ★動かすのは facilities.contract_status だけ。subscriptions.status は読まない・書かない（論点A）。
+// ★停止値は suspended。許可する遷移は active ⇄ suspended の2方向のみ。
+// ★billing_source='manual_invoice' 以外は RPC が NOT_MANUAL_INVOICE で弾く。
+//   画面側でもボタンを押せなくするが、これは利便のためであり防御の本丸ではない。
+// ★変更後は画面の値を手で書き換えず、施設一覧と監査ログを取り直す。
+// ═══════════════════════════════════════════
+
+// 施設一覧のキャッシュ。admin_list_facilities() の結果をそのまま持つ。
+// ★施設名を onclick の引数に埋めないためのもの（名前に引用符が入ると壊れるため）。
+let allFacilities = [];
+
+// 契約状態の日本語ラベル（2値）
+const CONTRACT_STATUS_LABELS = {
+  active: '利用中',
+  suspended: '停止中'
+};
+
+// RPCが投げる例外の日本語ラベル
+const CONTRACT_ERROR_LABELS = {
+  AUTH_REQUIRED: 'ログイン状態を確認できませんでした。開き直してください。',
+  NOT_SUPER_ADMIN: '超管理者の権限がありません。',
+  INVALID_STATUS: '指定した契約状態は使えません。',
+  FACILITY_NOT_FOUND: '対象の施設が見つかりません。',
+  INVALID_TRANSITION: 'この施設の現在の契約状態からは変更できません。',
+  NOT_MANUAL_INVOICE: '紙請求書（manual_invoice）の施設だけを操作できます。'
+};
+
+// 確認ダイアログで保留中の操作。実行後・キャンセル後は必ず null へ戻す。
+let contractPending = null;
+
+// 施設カードの操作行を作る。
+// ★DBの値を加工・補正しない（第189回 追認）。操作できない理由はそのまま文言で出す。
+function _contractActionsHtml(f) {
+  const cur = f.contract_status;
+
+  if (cur !== 'active' && cur !== 'suspended') {
+    return `
+        <div class="facility-actions">
+          <span class="fac-note">契約状態が「${escHtmlAdmin(_dashAdmin(cur))}」のため操作できません</span>
+        </div>`;
+  }
+
+  const isManual = (f.billing_source === 'manual_invoice');
+  const next = (cur === 'active') ? 'suspended' : 'active';
+  const label = (next === 'suspended') ? '契約を停止' : '契約を再開';
+  const cls = (next === 'suspended') ? 'fac-btn-stop' : 'fac-btn-resume';
+  const note = isManual ? '' : '<span class="fac-note">紙請求書の施設のみ操作できます</span>';
+
+  return `
+        <div class="facility-actions">
+          <button type="button" class="fac-btn ${cls}"${isManual ? '' : ' disabled'}
+                  onclick="openContractConfirm('${escHtmlAdmin(f.facility_id)}','${next}')">${label}</button>
+          ${note}
+        </div>`;
+}
+
+function openContractConfirm(facilityId, newStatus) {
+  const f = (allFacilities || []).find(x => String(x.facility_id) === String(facilityId));
+  if (!f) return;
+
+  contractPending = { facilityId: facilityId, newStatus: newStatus };
+
+  const name = f.facility_name || f.facility_code || '（名称不明）';
+  const curLabel = CONTRACT_STATUS_LABELS[f.contract_status] || f.contract_status;
+  const nextLabel = CONTRACT_STATUS_LABELS[newStatus] || newStatus;
+  const verb = (newStatus === 'suspended') ? '【停止】' : '【再開】';
+
+  document.getElementById('contract-confirm-title').textContent =
+    (newStatus === 'suspended') ? '契約を停止します' : '契約を再開します';
+
+  document.getElementById('contract-confirm-text').innerHTML =
+    escHtmlAdmin(name) + ' を <strong>' + escHtmlAdmin(verb) + '</strong> します。よろしいですか？<br>'
+    + '現在: ' + escHtmlAdmin(curLabel) + ' → 変更後: ' + escHtmlAdmin(nextLabel);
+
+  const reasonEl = document.getElementById('contract-confirm-reason');
+  reasonEl.value = '';
+
+  const errEl = document.getElementById('contract-confirm-error');
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  const execEl = document.getElementById('contract-confirm-exec');
+  execEl.disabled = false;
+  execEl.textContent = '実行する';
+  execEl.classList.toggle('resume', newStatus === 'active');
+
+  document.getElementById('contract-confirm-cancel').disabled = false;
+  document.getElementById('contract-confirm').classList.add('open');
+}
+
+function closeContractConfirm() {
+  contractPending = null;
+  document.getElementById('contract-confirm').classList.remove('open');
+}
+
+async function execContractStatusChange() {
+  // 「変更なし」を出したあとの2度押しはダイアログを閉じるだけにする
+  if (!contractPending) { closeContractConfirm(); return; }
+
+  const execEl = document.getElementById('contract-confirm-exec');
+  const cancelEl = document.getElementById('contract-confirm-cancel');
+  const errEl = document.getElementById('contract-confirm-error');
+
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+  execEl.disabled = true;
+  cancelEl.disabled = true;
+  execEl.textContent = '実行中...';
+
+  const reason = (document.getElementById('contract-confirm-reason').value || '').trim();
+
+  const { data, error } = await sb.rpc('admin_set_contract_status', {
+    p_facility_id: contractPending.facilityId,
+    p_new_status: contractPending.newStatus,
+    p_reason: reason ? reason : null
+  });
+
+  if (error) {
+    const msg = String(error.message || '');
+    const key = Object.keys(CONTRACT_ERROR_LABELS).find(k => msg.indexOf(k) >= 0);
+    errEl.textContent = key
+      ? CONTRACT_ERROR_LABELS[key]
+      : '変更できませんでした。時間をおいてから、もう一度お試しください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] admin_set_contract_status error:', error);
+    execEl.disabled = false;
+    cancelEl.disabled = false;
+    execEl.textContent = '実行する';
+    return;
+  }
+
+  const result = (data && data.result) ? data.result : '';
+
+  if (result === 'unchanged') {
+    const label = CONTRACT_STATUS_LABELS[contractPending.newStatus] || contractPending.newStatus;
+    errEl.textContent = 'この施設は既に「' + label + '」です。変更はありません。';
+    errEl.classList.add('open');
+    execEl.textContent = '閉じる';
+    execEl.disabled = false;
+    cancelEl.disabled = false;
+    contractPending = null;
+    return;
+  }
+
+  closeContractConfirm();
+  cancelEl.disabled = false;
+
+  // ★取り直す。画面の値を手で書き換えない（第189回 追認）。
+  await Promise.all([loadFacilities(), loadAuditLogs()]);
+}
+
 
 // ═══════════════════════════════════════════
 // [第223回 EO-DEC-0223] EdgeOpsへ戻る導線
