@@ -942,6 +942,20 @@
       <br><span style="font-size:11px;" data-i18n="label_copyright">© 2026 江の島エッジ合同会社</span>
     </div>
   </div>
+  <!-- ══ グループ切替ボトムシート ══ -->
+  <div class="group-switcher-overlay" id="group-switcher-overlay" onclick="closeBottomSheet()"></div>
+  <div class="group-switcher-sheet" id="group-switcher-sheet">
+    <div class="group-switcher-handle"></div>
+    <div class="group-switcher-title" data-i18n="heading_switch_group">グループを切り替える</div>
+    <div class="group-switcher-list" id="group-switcher-list">
+      <div class="spinner" style="margin:20px auto;"></div>
+    </div>
+    <!-- ★ 案C-改: 他のグループに参加するための導線(参加申請のみ・新規作成は含まない) -->
+    <div style="padding:12px 16px 20px; border-top:1px solid var(--border);">
+      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ <span data-i18n="btn_join_other_group">他のグループに参加</span></button>
+    </div>
+  </div>
+</div>
 <!-- ══ [EO-DEC-0230] 施設管理者の招待コード入力 ══ -->
 <div class="screen" id="screen-invite">
   <div class="header">
@@ -981,22 +995,9 @@
     </div>
   </div>
 </div>
-  <!-- ══ グループ切替ボトムシート ══ -->
-  <div class="group-switcher-overlay" id="group-switcher-overlay" onclick="closeBottomSheet()"></div>
-  <div class="group-switcher-sheet" id="group-switcher-sheet">
-    <div class="group-switcher-handle"></div>
-    <div class="group-switcher-title" data-i18n="heading_switch_group">グループを切り替える</div>
-    <div class="group-switcher-list" id="group-switcher-list">
-      <div class="spinner" style="margin:20px auto;"></div>
-    </div>
-    <!-- ★ 案C-改: 他のグループに参加するための導線(参加申請のみ・新規作成は含まない) -->
-    <div style="padding:12px 16px 20px; border-top:1px solid var(--border);">
-      <button class="join-new-group-btn" onclick="goToJoinNewGroup()">+ <span data-i18n="btn_join_other_group">他のグループに参加</span></button>
-    </div>
-  </div>
-</div>
 
-<script src="js/i18n.js?v=20260811-1"></script>   <!-- ← 追加。必ず最初 -->
+
+<script src="js/i18n.js?v=20260813-1"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260809-1"></script>
 <script src="js/image.js?v=20260728-1"></script>
 <script src="js/templates.js?v=20260704-3"></script>
