@@ -2368,8 +2368,6 @@ function openBulkConfirm(newStatus) {
   const execEl = document.getElementById('bulk-confirm-exec');
   execEl.disabled = false;
   execEl.textContent = '実行する';
-  execEl.onclick = null;
-  execEl.setAttribute('onclick', 'execBulkContractChange()');
   document.getElementById('bulk-confirm-cancel').disabled = false;
 
   document.getElementById('bulk-confirm').classList.add('open');
@@ -2430,7 +2428,7 @@ async function execBulkContractChange() {
     const { data, error } = await sb.rpc('admin_set_contract_status', {
       p_facility_id: t.id,
       p_new_status: newStatus,
-      p_reason: reason ? reason : null
+      p_reason: reason || null
     });
 
     if (error) {
@@ -2469,19 +2467,14 @@ async function execBulkContractChange() {
   document.getElementById('bulk-confirm-reason').style.display = 'none';
 
   // ★再読込は全件終了後に1回だけ（判定の条件）
-  await Promise.all([loadFacilities(), loadAuditLogs()]);
-
-  _setBulkLocked(false);
-  bulkPending = null;
-
-  execEl.disabled = false;
-  execEl.textContent = '閉じる';
-  execEl.onclick = function () {
-    document.getElementById('bulk-confirm').classList.remove('open');
-    execEl.onclick = null;
-    execEl.setAttribute('onclick', 'execBulkContractChange()');
-    onBulkCheckChanged();
-  };
+  try {
+    await Promise.all([loadFacilities(), loadAuditLogs()]);
+  } finally {
+    _setBulkLocked(false);
+    bulkPending = null;
+    execEl.disabled = false;
+    execEl.textContent = '閉じる';
+  }
 }
 
 
