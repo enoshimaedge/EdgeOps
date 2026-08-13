@@ -693,6 +693,7 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
 
     <div id="tab-facilities" class="tab-panel">
       <div class="facility-create-bar">
+        <button type="button" class="fac-create-btn" onclick="openOrganizationCreate()">＋ 組織を作成</button>
         <button type="button" class="fac-create-btn" onclick="openFacilityCreate()">＋ 施設を作成</button>
       </div>
       <div id="facility-list">
@@ -760,6 +761,23 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   </div>
 </div>
 
+<div id="organization-create" class="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">組織を作成</div>
+    <div class="confirm-text">新しい顧客法人の組織名を入力してください。</div>
+    <input class="confirm-reason" type="text" id="oc-name" placeholder="組織名（必須）" maxlength="100">
+    <div class="fc-note">
+      組織コードは自動採番されます。<br>
+      作成後は施設作成ダイアログへ進みます。
+    </div>
+    <div class="confirm-error" id="oc-error"></div>
+    <div class="confirm-actions">
+      <button type="button" class="confirm-btn confirm-btn-cancel" id="oc-cancel" onclick="closeOrganizationCreate()">キャンセル</button>
+      <button type="button" class="confirm-btn confirm-btn-exec resume" id="oc-exec" onclick="execOrganizationCreate()">作成する</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://eomsdvwklntrtiiksnro.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvbXNkdndrbG50cnRpaWtzbnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNTYyNjksImV4cCI6MjA5MjkzMjI2OX0.86F6pycMm9i6LNXv3q7uaq6hA_ePQ7BdJVQbHJM4ZOA';
@@ -786,6 +804,12 @@ const FACILITY_CREATE_ERROR_LABELS = {
   INVALID_FACILITY_NAME: '施設名を入力してください。',
   ORGANIZATION_NOT_FOUND: '選択した組織が見つかりません。開き直してください。',
   FACILITY_CODE_GENERATION_FAILED: '施設IDを採番できませんでした。もう一度お試しください。'
+};
+const ORGANIZATION_CREATE_ERROR_LABELS = {
+  AUTH_REQUIRED: 'ログイン状態を確認できませんでした。開き直してください。',
+  NOT_SUPER_ADMIN: '超管理者の権限がありません。',
+  INVALID_ORGANIZATION_NAME: '組織名を入力してください。',
+  ORGANIZATION_CODE_GENERATION_FAILED: '組織コードを採番できませんでした。もう一度お試しください。'
 };
 
 // ── 初期化 ──
@@ -1178,7 +1202,8 @@ const AUDIT_ACTION_LABELS = {
   gid_mask_set: 'グループIDの伏字を切替',
   facility_create: '施設を作成',
   contract_status_change: '契約状態を変更',
-  invite_issue: '招待コードを発行'
+  invite_issue: '招待コードを発行',
+  admin_create_organization: '組織を作成'
 };
 
 // actor_role の日本語ラベル（6値）
@@ -1300,6 +1325,7 @@ const CONTRACT_ERROR_LABELS = {
 // 確認ダイアログで保留中の操作。実行後・キャンセル後は必ず null へ戻す。
 let contractPending = null;
 let facilityCreatePending = true;
+let organizationCreatePending = true;
 
 // 施設カードの操作行を作る。
 // ★DBの値を加工・補正しない（第189回 追認）。操作できない理由はそのまま文言で出す。
@@ -1573,6 +1599,93 @@ async function execFacilityCreate() {
   cancelEl.disabled = false;
   facilityCreatePending = false;
   await Promise.all([loadFacilities(), loadAuditLogs()]);
+}
+
+function openOrganizationCreate() {
+  const nameEl = document.getElementById('oc-name');
+  const errEl = document.getElementById('oc-error');
+  const execEl = document.getElementById('oc-exec');
+  const cancelEl = document.getElementById('oc-cancel');
+
+  nameEl.value = '';
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+  execEl.disabled = false;
+  execEl.textContent = '作成する';
+  cancelEl.disabled = false;
+  organizationCreatePending = true;
+  document.getElementById('organization-create').classList.add('open');
+}
+
+function closeOrganizationCreate() {
+  organizationCreatePending = true;
+  document.getElementById('organization-create').classList.remove('open');
+}
+
+async function execOrganizationCreate() {
+  if (!organizationCreatePending) { closeOrganizationCreate(); return; }
+
+  const nameEl = document.getElementById('oc-name');
+  const errEl = document.getElementById('oc-error');
+  const execEl = document.getElementById('oc-exec');
+  const cancelEl = document.getElementById('oc-cancel');
+
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  const organizationName = (nameEl.value || '').trim();
+  if (!organizationName) {
+    errEl.textContent = '組織名を入力してください。';
+    errEl.classList.add('open');
+    return;
+  }
+
+  execEl.disabled = true;
+  cancelEl.disabled = true;
+  execEl.textContent = '作成中...';
+
+  const { data, error } = await sb.rpc('admin_create_organization', {
+    p_organization_name: organizationName
+  });
+
+  if (error) {
+    const msg = String(error.message || '');
+    const key = Object.keys(ORGANIZATION_CREATE_ERROR_LABELS).find(function(k) { return msg.indexOf(k) >= 0; });
+    errEl.textContent = key
+      ? ORGANIZATION_CREATE_ERROR_LABELS[key]
+      : '作成できませんでした。時間をおいてから、もう一度お試しください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] admin_create_organization error:', error);
+    execEl.disabled = false;
+    cancelEl.disabled = false;
+    execEl.textContent = '作成する';
+    return;
+  }
+
+  let organizationId = '';
+  let organizationCode = '';
+  if (Array.isArray(data) && data[0]) {
+    organizationId = String(data[0].organization_id || data[0].out_organization_id || '');
+    organizationCode = String(data[0].organization_code || data[0].out_organization_code || '');
+  } else if (data && typeof data === 'object') {
+    organizationId = String(data.organization_id || data.out_organization_id || '');
+    organizationCode = String(data.organization_code || data.out_organization_code || '');
+  }
+
+  organizationCreatePending = false;
+  closeOrganizationCreate();
+  await Promise.all([loadFacilities(), loadAuditLogs()]);
+  await openFacilityCreate();
+
+  if (organizationId) {
+    document.getElementById('fc-organization').value = organizationId;
+  }
+  nameEl.value = '';
+  const facilityErrEl = document.getElementById('fc-error');
+  facilityErrEl.textContent = organizationCode
+    ? '組織を作成しました。続けて施設を作成してください。組織コード: ' + organizationCode
+    : '組織を作成しました。続けて施設を作成してください。';
+  facilityErrEl.classList.add('open');
 }
 
 
