@@ -607,6 +607,61 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   line-height: 1.6;
   margin-bottom: 10px;
 }
+.ops-guide { margin-bottom: 12px; }
+.ops-guide-toggle {
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ops-guide-toggle::before { content: "▶ "; font-size: 11px; color: var(--text-light); }
+.ops-guide-toggle.open::before { content: "▼ "; }
+.ops-guide-body {
+  display: none;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 9px 9px;
+  padding: 14px;
+  background: var(--white);
+}
+.ops-guide-body.open { display: block; }
+.ops-guide-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #7c4a00;
+  background: #fff3e0;
+  border-left: 4px solid #f57c00;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.ops-guide-h {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 14px 0 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.ops-guide-h:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.ops-guide-body ol { margin: 0 0 6px 0; padding-left: 20px; }
+.ops-guide-body li { font-size: 12px; line-height: 1.8; color: var(--text-mid); margin-bottom: 3px; }
+.ops-actor { font-weight: 700; color: var(--text); }
+.ops-soon { color: var(--text-light); }
+.ops-boundary {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  margin: 6px 0 6px 20px;
+}
+.ops-caution { font-size: 11px; line-height: 1.7; color: var(--text-light); margin-left: 20px; }
 .fc-note { font-size: 11px; color: var(--text-light); line-height: 1.7; margin-bottom: 10px; }
 </style>
 </head>
@@ -727,6 +782,78 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
       </div>
     </div>
     <div id="tab-facilities" class="tab-panel">
+      <div class="ops-guide">
+        <button type="button" class="ops-guide-toggle" id="ops-guide-toggle"
+                onclick="toggleOpsGuide()">契約・施設登録の運用手順</button>
+        <div class="ops-guide-body" id="ops-guide-body">
+
+          <div class="ops-guide-note">
+            現在、最後まで実行できるのは「紙請求書」の契約手順です。
+            クレジットカード決済など、まだ利用できない操作には「（予定）」と表示しています。
+          </div>
+
+          <div class="ops-guide-h">① 新規のお客様・クレジットカード払い</div>
+          <ol>
+            <li><span class="ops-actor">お客様</span>：申込画面でカード決済をする<span class="ops-soon">（予定）</span></li>
+            <li>決済が通ると、施設・契約・施設管理者までが自動でできあがる<span class="ops-soon">（予定）</span></li>
+          </ol>
+          <div class="ops-caution">超管理者の操作はありません。<span class="ops-soon">（予定）</span></div>
+
+          <div class="ops-guide-h">② 新規のお客様・紙請求書</div>
+          <ol>
+            <li><span class="ops-actor">超管理者</span>：「＋ 施設を作成」を押す。初めての法人なら「＋ 組織を作成」で法人を先に作る</li>
+            <li><span class="ops-actor">超管理者</span>：施設名・業種・地域を入れて作成する（契約状態は「停止中」で作られる）</li>
+            <li><span class="ops-actor">超管理者</span>：請求書を送る</li>
+            <li><span class="ops-actor">超管理者</span>：入金を確認したら、その施設の「契約を再開」を押す</li>
+            <li><span class="ops-actor">超管理者</span>：「招待コードを発行」を押し、結果画面の「案内文をコピー」でメール文面を取り、お客様へ送る</li>
+          </ol>
+          <div class="ops-boundary">ここまでが超管理者の操作です。</div>
+          <ol start="6">
+            <li><span class="ops-actor">お客様</span>：EdgeOps を開き、「施設管理者の方はこちら」から招待コードを入力する</li>
+            <li><span class="ops-actor">お客様</span>：「施設管理へ」を押して施設管理画面を開く</li>
+            <li><span class="ops-actor">お客様</span>：グループを作り、できたグループIDを現場の方へ伝える</li>
+          </ol>
+          <div class="ops-caution">招待コードは1回だけ使えます。失くした場合は、もう一度発行してください。</div>
+
+          <div class="ops-guide-h">③ すでにST版をお使いのお客様・クレジットカード払い</div>
+          <ol>
+            <li><span class="ops-actor">お客様</span>：決済画面で、施設に移したいグループを選んで決済する<span class="ops-soon">（予定）</span></li>
+            <li>決済が通ると、選んだグループが施設の下に入る<span class="ops-soon">（予定）</span></li>
+          </ol>
+          <div class="ops-caution">超管理者の操作はありません。<span class="ops-soon">（予定）</span></div>
+
+          <div class="ops-guide-h">④ すでにST版をお使いのお客様・紙請求書（すべてのグループを有料にする）</div>
+          <ol>
+            <li><span class="ops-actor">超管理者</span>：②の1〜5と同じ手順で、施設を作り、入金を確認し、招待コードの案内文を送る</li>
+          </ol>
+          <div class="ops-boundary">ここまでが超管理者の操作です。</div>
+          <ol start="2">
+            <li><span class="ops-actor">お客様</span>：招待コードを入力して施設管理者になる</li>
+            <li><span class="ops-actor">お客様</span>：いま使っているグループを、1つずつ施設の下へ移す<span class="ops-soon">（予定）</span></li>
+            <li>移したグループは有効期限が無くなり、Plus版の機能が使えるようになる<span class="ops-soon">（予定）</span></li>
+          </ol>
+          <div class="ops-caution">
+            グループを施設へ移せるのは、そのグループの管理者本人だけです。
+            別の方が施設管理者になる場合は、先にグループ管理者を交代しておいてください。
+          </div>
+
+          <div class="ops-guide-h">⑤ すでにST版をお使いのお客様・紙請求書（一部のグループは無料のまま残す）</div>
+          <ol>
+            <li><span class="ops-actor">超管理者</span>：④の1と同じ手順で、施設を作り、招待コードの案内文を送る</li>
+          </ol>
+          <div class="ops-boundary">ここまでが超管理者の操作です。</div>
+          <ol start="2">
+            <li><span class="ops-actor">お客様</span>：招待コードを入力して施設管理者になる</li>
+            <li><span class="ops-actor">お客様</span>：有料にするグループだけを施設の下へ移す<span class="ops-soon">（予定）</span></li>
+            <li>移さなかったグループはST版のまま残る</li>
+          </ol>
+          <div class="ops-caution">
+            移さなかったグループは無料ですが、有効期限があり、切れると使えなくなります。
+            あとから移すこともできるため、急いですべてを移す必要はありません。
+          </div>
+
+        </div>
+      </div>
       <div class="facility-create-bar">
         <button type="button" class="fac-create-btn" onclick="openFacilityCreate()">＋ 施設を作成</button>
       </div>
@@ -848,8 +975,9 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
     </div>
     <div class="fc-note" id="ir-note"></div>
     <div class="confirm-error" id="ir-error"></div>
-    <div class="confirm-actions">
+    <div class="confirm-actions" style="flex-wrap:wrap;">
       <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy" onclick="copyInviteCode()">コードをコピー</button>
+      <button type="button" class="confirm-btn confirm-btn-cancel" id="ir-copy-msg" onclick="copyInviteMessage()">案内文をコピー</button>
       <button type="button" class="confirm-btn confirm-btn-exec" id="ir-close" onclick="closeInviteResult()">閉じる</button>
     </div>
   </div>
@@ -1888,6 +2016,7 @@ const INVITE_ERROR_LABELS = {
 
 let invitePending = null;
 let inviteIssuedCode = '';
+let inviteIssuedMessage = '';
 
 function openInviteIssue(facilityId) {
   const f = (allFacilities || []).find(x => String(x.facility_id) === String(facilityId));
@@ -1969,6 +2098,7 @@ async function execInviteIssue() {
   document.getElementById('ir-code').textContent = code;
 
   const expires = _formatDateAdmin(row.expires_at);
+  inviteIssuedMessage = buildFacilityInviteMessage(code, expires);
   document.getElementById('ir-note').innerHTML =
     '有効期限: ' + escHtmlAdmin(expires) + '<br>'
     + (revoked > 0
@@ -2004,8 +2134,71 @@ async function copyInviteCode() {
 function closeInviteResult() {
   if (!confirm('コードを控えましたか？ この画面を閉じると二度と表示できません。')) return;
   inviteIssuedCode = '';
+  inviteIssuedMessage = '';
   document.getElementById('ir-code').textContent = '';
   document.getElementById('invite-result').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════
+// [2026/8/13 EO-DEC-0231] 運用手順の折りたたみと招待の案内文
+// ═══════════════════════════════════════════
+
+function toggleOpsGuide() {
+  const body = document.getElementById('ops-guide-body');
+  const btn = document.getElementById('ops-guide-toggle');
+  const open = body.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+// ★お客様へ送る案内文の唯一の定義元（判定 論点E）。
+//   固定文言をここ以外に書かないこと。手順書側へ全文を複製しない。
+//   ★施設名は入れない（論点F）。誤送信時に施設名が第三者へ渡らないようにする。
+//   ★登録手順は第230回で実装した実画面の導線と一致させること。
+function buildFacilityInviteMessage(inviteCode, expiresAtLabel) {
+  return [
+    'EdgeOps 施設管理者の登録手順',
+    '',
+    '招待コード：' + inviteCode,
+    '有効期限：' + expiresAtLabel,
+    '',
+    '1. LINEで EdgeOps を開いてください。',
+    '2. 画面の下のほうにある「施設管理者の方はこちら」を押してください。',
+    '   すでにグループをお使いの方は、画面右上の人型のアイコンから',
+    '   「プロフィール・設定」を開くと、下のほうに同じ項目があります。',
+    '3. 上の招待コード12桁をそのまま入力してください。',
+    '   英字は大文字で、記号は入りません。',
+    '4. 「施設管理者になりました」と表示されれば完了です。',
+    '',
+    '登録が終わると、同じ画面に「施設管理」ボタンが増えます。',
+    'そこから次のことができます。',
+    '・グループを作る（1施設20グループまで・1グループ50人まで）',
+    '・グループ名の変更、グループ管理者の交代',
+    '・施設全体への一斉メッセージ',
+    '',
+    '現場の方の参加方法は、これまでと同じです。',
+    'グループを作るとグループID（SL- で始まる文字列）ができますので、',
+    'それを現場の方へお伝えください。',
+    '各自が EdgeOps でグループIDを入力して参加申請します。',
+    '',
+    '※招待コードは1回だけ使えます。',
+    '　期限が切れた場合や使えなくなった場合は、再発行しますのでご連絡ください。'
+  ].join('\n');
+}
+
+async function copyInviteMessage() {
+  const errEl = document.getElementById('ir-error');
+  errEl.textContent = '';
+  errEl.classList.remove('open');
+
+  try {
+    await navigator.clipboard.writeText(inviteIssuedMessage);
+    errEl.textContent = '案内文をコピーしました。';
+    errEl.classList.add('open');
+  } catch (e) {
+    errEl.textContent = '案内文をコピーできませんでした。コードを控えてから、手順を手でお送りください。';
+    errEl.classList.add('open');
+    console.error('[admin.html] clipboard error:', e);
+  }
 }
 
 
