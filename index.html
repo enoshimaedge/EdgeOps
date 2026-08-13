@@ -315,6 +315,11 @@
          <span data-i18n="btn_join">グループに参加する</span>
       </button>
     </div>
+    <div style="text-align:center; padding: 14px 0 0;">
+      <a href="javascript:void(0)" onclick="openInviteScreen('screen-start')"
+         style="color:var(--text-light); font-size:12px; text-decoration:underline;"
+         data-i18n="link_facility_invite">施設管理者の方はこちら</a>
+    </div>
     <div style="text-align:center; padding: 16px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       本サービスを利用することで、以下に同意したものとみなします。<br>
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
@@ -923,6 +928,11 @@
     <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;" data-i18n="btn_leave_group">グループを退出する</button>
     <div id="facility-manager-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openManagerPanel()" style="background:var(--eo-accent);color:white;width:100%;"><span data-i18n="btn_facility_manager">施設管理</span></button></div>
     <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;"><span data-i18n="btn_super_admin">超管理者ダッシュボード</span></button></div>
+    <div style="text-align:center; padding: 14px 0 0;">
+      <a href="javascript:void(0)" onclick="openInviteScreen('screen-profile')"
+         style="color:var(--text-light); font-size:12px; text-decoration:underline;"
+         data-i18n="link_facility_invite">施設管理者の方はこちら</a>
+    </div>
     <div style="text-align:center; padding: 20px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
          style="color:var(--green); text-decoration:none;" data-i18n="label_terms">利用規約</a>
@@ -932,6 +942,45 @@
       <br><span style="font-size:11px;" data-i18n="label_copyright">© 2026 江の島エッジ合同会社</span>
     </div>
   </div>
+<!-- ══ [EO-DEC-0230] 施設管理者の招待コード入力 ══ -->
+<div class="screen" id="screen-invite">
+  <div class="header">
+    <div class="back-btn" onclick="closeInviteScreen()">‹</div>
+    <div><div class="header-title" data-i18n="header_invite">施設管理者の登録</div></div>
+  </div>
+  <div class="content">
+    <div style="text-align:center; padding: 24px 0 16px;">
+      <div style="font-size:14px; color:var(--text-mid); line-height:1.7;"
+           data-i18n="desc_invite">発行元からお伝えした12桁の招待コードを入力してください。</div>
+    </div>
+
+    <div class="card" style="padding:16px;" id="invite-form-card">
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label" data-i18n="form_invite_code">招待コード</label>
+        <input class="form-input" id="input-invite-code" type="text"
+               maxlength="12" placeholder="例：ABCD1234EFGH" data-i18n-ph="ph_invite_code"
+               style="text-transform:uppercase; letter-spacing:2px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"
+               oninput="onInviteCodeInput()">
+        <div style="font-size:11px; color:var(--text-light); margin-top:6px;"
+             data-i18n="note_invite_code">英字は大文字・記号は入りません。</div>
+      </div>
+      <div id="invite-error" style="display:none; font-size:13px; color:var(--red); line-height:1.6; margin-bottom:10px;"></div>
+      <button class="btn btn-secondary" id="invite-submit-btn" disabled
+              onclick="submitInviteCode()">
+        <span data-i18n="btn_invite_redeem">施設管理者として登録する</span>
+      </button>
+    </div>
+
+    <div class="card" id="invite-success-card" style="display:none; padding:20px; text-align:center;">
+      <div id="invite-success-msg" style="font-size:15px; font-weight:700; color:var(--text); line-height:1.7; margin-bottom:6px;"></div>
+      <div id="invite-success-main" style="font-size:13px; color:var(--text-mid); margin-bottom:16px;"></div>
+      <button class="btn" onclick="openManagerPanel()"
+              style="background:var(--eo-accent); color:white; width:100%;">
+        <span data-i18n="btn_invite_to_manager">施設管理へ</span>
+      </button>
+    </div>
+  </div>
+</div>
   <!-- ══ グループ切替ボトムシート ══ -->
   <div class="group-switcher-overlay" id="group-switcher-overlay" onclick="closeBottomSheet()"></div>
   <div class="group-switcher-sheet" id="group-switcher-sheet">
@@ -4814,6 +4863,105 @@ async function checkFacilityManager() {
     }
   } catch (e) {
     console.warn("[EO-DEC-0208] checkFacilityManager failed:", e);
+  }
+}
+
+// ═══════════════════════════════════════════
+// [2026/8/13 EO-DEC-0230] 施設管理者の招待コード入力
+// ═══════════════════════════════════════════
+// ★正規化はフロントで行わない（論点B）。入力値をそのまま RPC へ渡す。
+//   facility_invite_redeem の upper(trim()) が唯一の正規化実装である。
+//   trim・toUpperCase・ハイフン除去のいずれも行ってはならない。
+// ★facility_invite_redeem は不可触。checkFacilityManager() も呼ぶだけ。
+
+// 呼出元の画面ID。戻るときに使う（論点F）。
+let inviteReturnScreen = 'screen-start';
+
+const INVITE_REDEEM_ERROR_KEYS = {
+  AUTH_REQUIRED:       'err_invite_auth_required',
+  USER_NOT_FOUND:      'err_invite_user_not_found',
+  INVALID_INPUT:       'err_invite_invalid_input',
+  INVITE_NOT_FOUND:    'err_invite_not_found',
+  INVITE_ALREADY_USED: 'err_invite_already_used',
+  INVITE_EXPIRED:      'err_invite_expired',
+  FACILITY_NOT_FOUND:  'err_invite_facility_gone',
+  ALREADY_MANAGER:     'err_invite_already_manager'
+};
+
+function openInviteScreen(fromScreen) {
+  inviteReturnScreen = fromScreen || 'screen-start';
+
+  document.getElementById('input-invite-code').value = '';
+  document.getElementById('invite-form-card').style.display = 'block';
+  document.getElementById('invite-success-card').style.display = 'none';
+
+  const errEl = document.getElementById('invite-error');
+  errEl.textContent = '';
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('invite-submit-btn');
+  btn.disabled = true;
+  btn.querySelector('span').textContent = t('btn_invite_redeem');
+
+  showScreen('screen-invite');
+}
+
+function closeInviteScreen() {
+  showScreen(inviteReturnScreen);
+}
+
+// 空文字のときだけボタンを押せなくする（論点B）。値は加工しない。
+function onInviteCodeInput() {
+  const v = document.getElementById('input-invite-code').value;
+  document.getElementById('invite-submit-btn').disabled = (v.length === 0);
+}
+
+async function submitInviteCode() {
+  const inputEl = document.getElementById('input-invite-code');
+  const btn = document.getElementById('invite-submit-btn');
+  const errEl = document.getElementById('invite-error');
+
+  errEl.textContent = '';
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  inputEl.disabled = true;
+  btn.querySelector('span').textContent = t('btn_invite_redeeming');
+
+  // ★加工せずそのまま渡す（論点B）
+  const { data, error } = await supabase.rpc('facility_invite_redeem', {
+    p_invite_code: inputEl.value
+  });
+
+  if (error) {
+    const msg = String(error.message || '');
+    const hit = Object.keys(INVITE_REDEEM_ERROR_KEYS).find(k => msg.indexOf(k) >= 0);
+    // ★未知のエラー文字列は画面に出さず、共通文言へ倒す（判定の追加条件）
+    errEl.textContent = t(hit ? INVITE_REDEEM_ERROR_KEYS[hit] : 'err_invite_unknown');
+    errEl.style.display = 'block';
+    console.error('[EO-DEC-0230] facility_invite_redeem error:', error);
+    btn.disabled = false;
+    inputEl.disabled = false;
+    btn.querySelector('span').textContent = t('btn_invite_redeem');
+    return;
+  }
+
+  const row = Array.isArray(data) ? (data[0] || {}) : (data || {});
+  const facilityName = String(row.facility_name || '');
+  const isMain = (row.is_main === true);
+
+  document.getElementById('invite-success-msg').textContent =
+    t('msg_invite_success', { facility: facilityName });
+  document.getElementById('invite-success-main').textContent =
+    isMain ? t('msg_invite_is_main') : '';
+
+  document.getElementById('invite-form-card').style.display = 'none';
+  document.getElementById('invite-success-card').style.display = 'block';
+
+  inputEl.disabled = false;
+
+  // 施設管理ボタンの表示を取り直す（判定ロジックは変更しない）
+  try { await checkFacilityManager(); } catch (e) {
+    console.warn('[EO-DEC-0230] checkFacilityManager failed:', e);
   }
 }
 
