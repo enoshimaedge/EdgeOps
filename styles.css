@@ -853,10 +853,15 @@ html {
   background-position: center 62%;
   z-index: 0;
 }
+/* [EO-DEC-0240] 白ベールの基本値を82%から65%へ。施設写真を装飾ではなく
+   「いまどの施設にいるか」を示す情報として、特徴が判別できる程度まで見せる。
+   ★135degのグラデーション幅（4ポイント）は EO-DEC-0236 のまま維持する。
+   ★受入調整の範囲は65〜70%（再判定不要）。70%を超えて戻す場合は再判定が要る。
+   ★施設側による解除・濃度変更は引き続き不可（第22-3の防衛線）。 */
 .eo-idcard .eo-idcard__veil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,.86) 0%, rgba(255,255,255,.82) 100%);
+  background: linear-gradient(135deg, rgba(255,255,255,.69) 0%, rgba(255,255,255,.65) 100%);
   z-index: 1;
 }
 .eo-idcard .eo-idcard__watermark {
@@ -882,8 +887,12 @@ html {
    施設写真を敷いたことで顕在化したため、カード内の補助文字を --text-mid へ引き上げる。
    ★写真の有無・ST/Plusを問わず .eo-idcard 全体に適用する（論点C）。
    ★色の指定は本ファイルへ一本化する。index.html 側のインライン color は削除済み（論点D）。 */
+/* [EO-DEC-0240] 補助文字を --text-mid から --text へ正式変更（EO-DEC-0239 を上書き）。
+   実施設写真での実測は 82%＋--text-mid で最悪4.23、65%＋--text で5.68（基準4.5）。
+   ★表示名との情報階層は文字サイズ・font-weight・EOIDチップで維持する。色では作らない。
+   ★受入調整はこの1行で行う。ベールを70%まで戻しても --text のままでよい。 */
 .eo-idcard {
-  --eo-idcard-sub: var(--text-mid);
+  --eo-idcard-sub: var(--text);
 }
 .eo-idcard #profile-line-name,
 .eo-idcard #profile-eo-uid {
