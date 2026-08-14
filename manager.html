@@ -703,7 +703,31 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dd id="facility-sub-status" class="mg-detail-value"></dd>
           </div>
         </dl>
-        <div class="mg-actions-reserved" aria-hidden="true"></div>
+        <div class="mg-actions-reserved" aria-hidden="true">
+          <!-- [EO-DEC-0235〜0238] 施設写真登録UI -->
+          <section id="facility-photo-section" style="margin-top:16px;">
+            <div style="font-size:11px; font-weight:700; color:#666; margin-bottom:8px; letter-spacing:0.5px;">施設写真</div>
+            <label for="facility-photo-input" style="display:inline-block; padding:8px 16px; background:var(--mg-accent,#0f1e35); color:#fff; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">
+              写真を選択
+            </label>
+            <input id="facility-photo-input" type="file" accept="image/jpeg" capture="environment" style="display:none;">
+            <!-- 登録前プレビュー（実際のEOIDカードと同じ見た目） -->
+            <div id="facility-photo-preview-wrap" style="display:none; margin-top:12px; position:relative; overflow:hidden; border-radius:6px; border:1px solid #ddd; padding:20px; text-align:center; min-height:80px; background:#fff;">
+              <div id="facility-photo-preview-bg" style="position:absolute; inset:0; background-size:cover; background-position:center 62%;"></div>
+              <div style="position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.86) 0%,rgba(255,255,255,.82) 100%);"></div>
+              <div style="position:relative; z-index:2; font-size:12px; color:#666;">このような見た目で登録されます</div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+              <button id="facility-photo-upload-btn" type="button"
+                style="padding:8px 16px; background:var(--mg-accent,#0f1e35); color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:none;"
+                onclick="facilityPhotoUpload()">登録する</button>
+              <button id="facility-photo-delete-btn" type="button"
+                style="padding:8px 16px; background:#fff; color:#c0392b; border:1.5px solid #c0392b; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;"
+                onclick="facilityPhotoDelete()">削除する</button>
+            </div>
+            <div id="facility-photo-msg" style="font-size:12px; margin-top:6px; min-height:16px;"></div>
+          </section>
+        </div>
       </section>
       <div class="mg-stat-grid">
         <div class="mg-stat-card">
@@ -1993,6 +2017,151 @@ init().catch((error) => {
   console.error('[manager.html] init failed unexpectedly:', error);
   showScreen('screen-denied');
 });
+
+// [EO-DEC-0235〜0238] 施設写真登録・削除
+(function () {
+  const MAX_BYTES = 5 * 1024 * 1024;
+  let _pendingFile = null;
+
+  const _msgEl = () => document.getElementById('facility-photo-msg');
+  const _uploadBtn = () => document.getElementById('facility-photo-upload-btn');
+  const _deleteBtn = () => document.getElementById('facility-photo-delete-btn');
+  const _previewWrap = () => document.getElementById('facility-photo-preview-wrap');
+  const _previewBg = () => document.getElementById('facility-photo-preview-bg');
+  const _input = () => document.getElementById('facility-photo-input');
+
+  function _setMsg(msg, color) {
+    const el = _msgEl();
+    if (!el) return;
+    el.textContent = msg;
+    el.style.color = color || '#333';
+  }
+  function _setBusy(busy) {
+    const ub = _uploadBtn();
+    const db = _deleteBtn();
+    if (ub) ub.disabled = busy;
+    if (db) db.disabled = busy;
+  }
+  function _errorCode(code) {
+    const map = {
+      AUTH_REQUIRED: 'ログインし直しが必要です',
+      NOT_FACILITY_MANAGER: 'この施設の管理者ではありません',
+      FORBIDDEN: '権限がありません',
+      INVALID_MIME: 'JPEG以外は登録できません',
+      FILE_TOO_LARGE: '5MBを超えています',
+      VALIDATION_ERROR: '入力が不正です',
+      STORAGE_FAILED: '時間をおいて再度お試しください',
+      DB_FAILED: '時間をおいて再度お試しください',
+      INTERNAL_ERROR: '時間をおいて再度お試しください'
+    };
+    return map[code] || '時間をおいて再度お試しください';
+  }
+
+  const inputEl = document.getElementById('facility-photo-input');
+  if (inputEl) {
+    inputEl.addEventListener('change', function () {
+      const file = this.files && this.files[0];
+      if (!file) return;
+      if (file.type !== 'image/jpeg') {
+        _setMsg('JPEG形式のファイルを選択してください', '#c0392b');
+        this.value = '';
+        return;
+      }
+      if (file.size > MAX_BYTES) {
+        _setMsg('5MBを超えています。より小さいファイルを選択してください', '#c0392b');
+        this.value = '';
+        return;
+      }
+      _pendingFile = file;
+      _setMsg('');
+      // プレビュー表示
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const bg = _previewBg();
+        if (bg) bg.style.backgroundImage = `url(${JSON.stringify(e.target.result)})`;
+        const pw = _previewWrap();
+        if (pw) pw.style.display = '';
+        const ub = _uploadBtn();
+        if (ub) ub.style.display = '';
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  window.facilityPhotoUpload = async function () {
+    if (!_pendingFile) return;
+    if (!selectedFacilityId) { _setMsg('施設が選択されていません', '#c0392b'); return; }
+    if (typeof window.callImageFunction !== 'function') { _setMsg('認証ヘルパーが読み込まれていません', '#c0392b'); return; }
+    _setBusy(true);
+    _setMsg('登録中...');
+    try {
+      const fd = new FormData();
+      fd.append('facility_id', String(selectedFacilityId));
+      fd.append('action', 'set');
+      fd.append('file', _pendingFile, 'facility_photo.jpg');
+      const url = `${SUPABASE_URL}/functions/v1/facility-photo-upload`;
+      const res = await window.callImageFunction(url, { method: 'POST', body: fd });
+      let body = null;
+      try { body = await res.json(); } catch (_) { /* noop */ }
+      if (!res.ok) {
+        const code = body && body.code;
+        const rid = body && body.rid;
+        if (rid) console.error('[EO-DEC-0235] facility-photo-upload error rid:', rid);
+        _setMsg(_errorCode(code), '#c0392b');
+        return;
+      }
+      _setMsg('登録しました', '#27ae60');
+      _pendingFile = null;
+      const inp = _input();
+      if (inp) inp.value = '';
+      const ub = _uploadBtn();
+      if (ub) ub.style.display = 'none';
+    } catch (e) {
+      console.error('[EO-DEC-0235] facilityPhotoUpload exception:', e);
+      _setMsg('時間をおいて再度お試しください', '#c0392b');
+    } finally {
+      _setBusy(false);
+    }
+  };
+
+  window.facilityPhotoDelete = async function () {
+    if (!selectedFacilityId) { _setMsg('施設が選択されていません', '#c0392b'); return; }
+    if (!window.confirm('施設写真を削除しますか？')) return;
+    if (typeof window.callImageFunction !== 'function') { _setMsg('認証ヘルパーが読み込まれていません', '#c0392b'); return; }
+    _setBusy(true);
+    _setMsg('削除中...');
+    try {
+      const fd = new FormData();
+      fd.append('facility_id', String(selectedFacilityId));
+      fd.append('action', 'delete');
+      const url = `${SUPABASE_URL}/functions/v1/facility-photo-upload`;
+      const res = await window.callImageFunction(url, { method: 'POST', body: fd });
+      let body = null;
+      try { body = await res.json(); } catch (_) { /* noop */ }
+      if (!res.ok) {
+        const code = body && body.code;
+        const rid = body && body.rid;
+        if (rid) console.error('[EO-DEC-0235] facility-photo-delete error rid:', rid);
+        _setMsg(_errorCode(code), '#c0392b');
+        return;
+      }
+      _setMsg('削除しました', '#27ae60');
+      _pendingFile = null;
+      const inp = _input();
+      if (inp) inp.value = '';
+      const ub = _uploadBtn();
+      if (ub) ub.style.display = 'none';
+      const pw = _previewWrap();
+      if (pw) pw.style.display = 'none';
+    } catch (e) {
+      console.error('[EO-DEC-0235] facilityPhotoDelete exception:', e);
+      _setMsg('時間をおいて再度お試しください', '#c0392b');
+    } finally {
+      _setBusy(false);
+    }
+  };
+}());
+
 </script>
 </body>
 </html>

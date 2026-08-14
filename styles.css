@@ -839,3 +839,45 @@ html {
   color: #fff;
   border-color: var(--eo-header-bg);
 }
+
+/* ── EOIDカード 施設写真レイヤー（EO-DEC-0235〜0238） ── */
+.eo-idcard {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--eo-radius);
+}
+.eo-idcard__photo {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 62%;
+}
+.eo-idcard__veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.86) 0%, rgba(255,255,255,.82) 100%);
+}
+.eo-idcard__watermark {
+  position: absolute;
+  color: rgba(15,30,53,.05);
+  font-size: 150px;
+  font-weight: 700;
+  right: -4%;
+  bottom: -24%;
+  letter-spacing: -.04em;
+  user-select: none;
+  pointer-events: none;
+  line-height: 1;
+}
+.eo-idcard__facility {
+  font-size: 11px;
+  color: var(--text-light);
+  margin-top: 6px;
+}
+.eo-idcard > * {
+  position: relative;
+  z-index: 2;
+}
+.eo-idcard--has-photo .eo-idcard__watermark {
+  display: none;
+}
