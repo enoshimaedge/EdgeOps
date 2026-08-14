@@ -320,6 +320,11 @@
          style="color:var(--text-light); font-size:12px; text-decoration:underline;"
          data-i18n="link_facility_invite">施設管理者の方はこちら</a>
     </div>
+    <div style="text-align:center; padding: 10px 0 0;">
+      <a href="javascript:void(0)" onclick="openSignupScreen('screen-start')"
+         style="color:var(--text-light); font-size:12px; text-decoration:underline;"
+         data-i18n="link_signup">施設として契約する（Plus版）</a>
+    </div>
     <div style="text-align:center; padding: 16px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
       本サービスを利用することで、以下に同意したものとみなします。<br>
       <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
@@ -1001,7 +1006,152 @@
 </div>
 
 
-<script src="js/i18n.js?v=20260813-1"></script>   <!-- ← 追加。必ず最初 -->
+<div class="screen" id="screen-signup">
+  <div class="header">
+    <div class="back-btn" onclick="closeSignupScreen()">‹</div>
+    <div><div class="header-title" data-i18n="header_signup">Plus版のお申し込み</div></div>
+  </div>
+  <div class="content">
+    <div class="card" id="signup-form-card" style="padding:16px;">
+      <div style="font-size:14px; color:var(--text-mid); line-height:1.7; margin-bottom:8px;"
+           data-i18n="desc_signup">施設ごとのPlus版お申し込みに進みます。必要事項を入力してください。</div>
+      <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:14px;"
+           data-i18n="note_signup_price">月額1,980円（税込）／1施設あたり</div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" data-i18n="form_signup_facility_name">施設名（必須）</label>
+        <input class="form-input" id="input-signup-facility-name" type="text" maxlength="100"
+               placeholder="例：藤沢オフィス" oninput="onSignupInput()">
+        <div style="font-size:11px; color:var(--text-light); margin-top:6px;"
+             data-i18n="note_signup_facility_name">建物や事業所の名前を入れてください（例：藤沢オフィス／スマイルホテル湘南藤沢）。法人名は入力不要です</div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" data-i18n="form_signup_industry">業種（任意）</label>
+        <select class="form-input" id="input-signup-industry">
+          <option value="">-- 業種を選んでください --</option>
+          <option value="hotel">ホテル・旅館</option>
+          <option value="commercial">商業施設</option>
+          <option value="clinic">病院・クリニック</option>
+          <option value="care">介護施設</option>
+          <option value="attraction">集客施設</option>
+          <option value="fitness">フィットネス施設</option>
+          <option value="club">部活・クラブ</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" data-i18n="form_region">地域を選択（任意）</label>
+        <select class="form-input" id="input-signup-region">
+          <option value="">-- 地域を選んでください --</option>
+          <optgroup label="── 北海道・東北 ──">
+            <option value="hokkaido">北海道</option>
+            <option value="aomori">青森県</option>
+            <option value="iwate">岩手県</option>
+            <option value="miyagi">宮城県</option>
+            <option value="akita">秋田県</option>
+            <option value="yamagata">山形県</option>
+            <option value="fukushima">福島県</option>
+          </optgroup>
+          <optgroup label="── 関東 ──">
+            <option value="ibaraki">茨城県</option>
+            <option value="tochigi">栃木県</option>
+            <option value="gunma">群馬県</option>
+            <option value="saitama">埼玉県</option>
+            <option value="chiba">千葉県</option>
+            <option value="tokyo">東京都</option>
+            <option value="kanagawa">神奈川県</option>
+            <option value="yokohama">神奈川県（横浜）</option>
+            <option value="fujisawa">神奈川県（藤沢・湘南）</option>
+            <option value="kamakura">神奈川県（鎌倉）</option>
+            <option value="hakone">神奈川県（箱根）</option>
+          </optgroup>
+          <optgroup label="── 中部 ──">
+            <option value="niigata">新潟県</option>
+            <option value="toyama">富山県</option>
+            <option value="ishikawa">石川県</option>
+            <option value="fukui">福井県</option>
+            <option value="yamanashi">山梨県</option>
+            <option value="nagano">長野県</option>
+            <option value="gifu">岐阜県</option>
+            <option value="shizuoka">静岡県</option>
+            <option value="aichi">愛知県</option>
+          </optgroup>
+          <optgroup label="── 近畿 ──">
+            <option value="mie">三重県</option>
+            <option value="shiga">滋賀県</option>
+            <option value="kyoto">京都府</option>
+            <option value="osaka">大阪府</option>
+            <option value="hyogo">兵庫県</option>
+            <option value="nara">奈良県</option>
+            <option value="wakayama">和歌山県</option>
+          </optgroup>
+          <optgroup label="── 中国 ──">
+            <option value="tottori">鳥取県</option>
+            <option value="shimane">島根県</option>
+            <option value="okayama">岡山県</option>
+            <option value="hiroshima">広島県</option>
+            <option value="yamaguchi">山口県</option>
+          </optgroup>
+          <optgroup label="── 四国 ──">
+            <option value="tokushima">徳島県</option>
+            <option value="kagawa">香川県</option>
+            <option value="ehime">愛媛県</option>
+            <option value="kochi">高知県</option>
+          </optgroup>
+          <optgroup label="── 九州・沖縄 ──">
+            <option value="fukuoka">福岡県</option>
+            <option value="saga">佐賀県</option>
+            <option value="nagasaki">長崎県</option>
+            <option value="kumamoto">熊本県</option>
+            <option value="oita">大分県</option>
+            <option value="miyazaki">宮崎県</option>
+            <option value="kagoshima">鹿児島県</option>
+            <option value="okinawa">沖縄県</option>
+          </optgroup>
+        </select>
+      </div>
+      <div id="signup-error" style="display:none; font-size:13px; color:var(--red); line-height:1.6; margin-bottom:10px;"></div>
+      <button class="btn btn-secondary" id="signup-submit-btn" disabled onclick="submitSignup()">
+        <span data-i18n="btn_signup_proceed">お支払いへ進む</span>
+      </button>
+      <div style="text-align:center; padding: 16px 0 8px; font-size:12px; color:var(--text-light); line-height:1.8;">
+        <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank"
+           style="color:var(--green); text-decoration:none; font-weight:600;" data-i18n="link_terms">利用規約</a>
+        &nbsp;／&nbsp;
+        <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank"
+           style="color:var(--green); text-decoration:none; font-weight:600;" data-i18n="link_privacy">プライバシーポリシー</a>
+        &nbsp;／&nbsp;
+        <a href="https://enoshimaedge.jp/edgeops-tokushoho/" target="_blank"
+           style="color:var(--green); text-decoration:none; font-weight:600;" data-i18n="link_tokushoho">特定商取引法に基づく表記</a>
+      </div>
+      <div style="font-size:12px; color:var(--text-light); line-height:1.7;"
+           data-i18n="note_signup_external">お支払い手続きは決済会社（Stripe）の画面へ移動します</div>
+    </div>
+
+    <div class="card" id="signup-pending-card" style="display:none; padding:20px; text-align:center;">
+      <div style="font-size:16px; font-weight:700; color:var(--text); margin-bottom:10px;"
+           data-i18n="heading_signup_pending">お手続きを確認しています</div>
+      <div style="font-size:13px; color:var(--text-mid); line-height:1.7; margin-bottom:16px;"
+           data-i18n="desc_signup_pending">決済が完了すると、施設の登録が自動で行われます。数分かかることがあります。</div>
+      <button class="btn" onclick="openManagerPanel()"
+              style="background:var(--eo-accent); color:white; width:100%; margin-bottom:10px;">
+        <span data-i18n="btn_signup_open_manager">施設管理を開く</span>
+      </button>
+      <button class="btn btn-secondary" onclick="closeSignupScreen()">
+        <span data-i18n="btn_close">閉じる</span>
+      </button>
+    </div>
+
+    <div class="card" id="signup-cancel-card" style="display:none; padding:20px; text-align:center;">
+      <div style="font-size:13px; color:var(--text-mid); line-height:1.7; margin-bottom:16px;"
+           data-i18n="desc_signup_cancel">お手続きは完了していません。もう一度お申し込みいただけます。</div>
+      <button class="btn btn-secondary" onclick="openSignupScreen(signupReturnScreen)">
+        <span data-i18n="btn_signup_back_to_form">入力に戻る</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<script src="js/i18n.js?v=20260814-1"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260809-1"></script>
 <script src="js/image.js?v=20260728-1"></script>
 <script src="js/templates.js?v=20260704-3"></script>
@@ -4966,6 +5116,7 @@ async function checkFacilityManager() {
 
 // 呼出元の画面ID。戻るときに使う（論点F）。
 let inviteReturnScreen = 'screen-start';
+let signupReturnScreen = 'screen-start';
 
 const INVITE_REDEEM_ERROR_KEYS = {
   AUTH_REQUIRED:       'err_invite_auth_required',
@@ -5052,6 +5203,145 @@ async function submitInviteCode() {
   // 施設管理ボタンの表示を取り直す（判定ロジックは変更しない）
   try { await checkFacilityManager(); } catch (e) {
     console.warn('[EO-DEC-0230] checkFacilityManager failed:', e);
+  }
+}
+
+const SIGNUP_ERROR_KEYS = {
+  AUTH_REQUIRED:         'err_signup_auth_required',
+  AUTH_INVALID:          'err_signup_auth_invalid',
+  EOID_NOT_FOUND:        'err_signup_eoid_not_found',
+  INVALID_BODY:          'err_signup_invalid_body',
+  INVALID_FACILITY_NAME: 'err_signup_invalid_facility_name',
+  FACILITY_NAME_TOO_LONG:'err_signup_facility_name_too_long',
+  INTENT_CREATE_FAILED:  'err_signup_intent_create_failed',
+  SESSION_CREATE_FAILED: 'err_signup_session_create_failed',
+  SERVER_MISCONFIGURED:  'err_signup_server_misconfigured',
+  METHOD_NOT_ALLOWED:    'err_signup_method_not_allowed'
+};
+
+function openSignupScreen(fromScreen) {
+  signupReturnScreen = fromScreen || 'screen-start';
+
+  const facilityEl = document.getElementById('input-signup-facility-name');
+  const industryEl = document.getElementById('input-signup-industry');
+  const regionEl = document.getElementById('input-signup-region');
+  const btn = document.getElementById('signup-submit-btn');
+  const errEl = document.getElementById('signup-error');
+
+  facilityEl.value = '';
+  industryEl.value = '';
+  regionEl.value = '';
+  facilityEl.disabled = false;
+  industryEl.disabled = false;
+  regionEl.disabled = false;
+
+  document.getElementById('signup-form-card').style.display = 'block';
+  document.getElementById('signup-pending-card').style.display = 'none';
+  document.getElementById('signup-cancel-card').style.display = 'none';
+
+  errEl.textContent = '';
+  errEl.style.display = 'none';
+
+  btn.disabled = true;
+  btn.querySelector('span').textContent = t('btn_signup_proceed');
+
+  showScreen('screen-signup');
+}
+
+function closeSignupScreen() {
+  showScreen(signupReturnScreen);
+}
+
+function onSignupInput() {
+  const v = document.getElementById('input-signup-facility-name').value;
+  document.getElementById('signup-submit-btn').disabled = (v.length === 0);
+}
+
+async function submitSignup() {
+  const facilityEl = document.getElementById('input-signup-facility-name');
+  const industryEl = document.getElementById('input-signup-industry');
+  const regionEl = document.getElementById('input-signup-region');
+  const btn = document.getElementById('signup-submit-btn');
+  const errEl = document.getElementById('signup-error');
+
+  errEl.textContent = '';
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  facilityEl.disabled = true;
+  industryEl.disabled = true;
+  regionEl.disabled = true;
+  btn.querySelector('span').textContent = t('btn_signup_submitting');
+
+  const facility_name = facilityEl.value;
+  const region = regionEl.value;
+  const industry = industryEl.value;
+
+  try {
+    const url = `${SUPABASE_URL}/functions/v1/stripe-checkout`;
+    if (typeof window.callImageFunction !== 'function') {
+      throw new Error('AUTH_HELPER_MISSING');
+    }
+
+    const res = await window.callImageFunction(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ facility_name, region, industry })
+    });
+
+    let body = {};
+    try {
+      body = await res.json();
+    } catch (e) {
+      body = {};
+    }
+
+    if (res && res.ok && typeof body.checkout_url === 'string' && body.checkout_url.length > 0) {
+      window.location.href = body.checkout_url;
+      return;
+    }
+
+    const errorKey = SIGNUP_ERROR_KEYS[body.error_code] || 'err_signup_unknown';
+    errEl.textContent = t(errorKey);
+    errEl.style.display = 'block';
+    console.error('[EO-DEC-0233] stripe-checkout error:', body);
+  } catch (e) {
+    errEl.textContent = t('err_signup_unknown');
+    errEl.style.display = 'block';
+    console.error('[EO-DEC-0233] submitSignup failed:', e);
+  }
+
+  btn.disabled = false;
+  facilityEl.disabled = false;
+  industryEl.disabled = false;
+  regionEl.disabled = false;
+  btn.querySelector('span').textContent = t('btn_signup_proceed');
+}
+
+async function handleCheckoutReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const checkout = params.get('checkout');
+  const intent = params.get('intent');
+  if (!checkout) return;
+  if (!currentUser?.eo_uid) return;
+
+  if (checkout === 'success') {
+    signupReturnScreen = 'screen-start';
+    document.getElementById('signup-form-card').style.display = 'none';
+    document.getElementById('signup-pending-card').style.display = 'block';
+    document.getElementById('signup-cancel-card').style.display = 'none';
+    showScreen('screen-signup');
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
+
+  if (checkout === 'cancel') {
+    signupReturnScreen = 'screen-start';
+    document.getElementById('signup-form-card').style.display = 'none';
+    document.getElementById('signup-pending-card').style.display = 'none';
+    document.getElementById('signup-cancel-card').style.display = 'block';
+    showScreen('screen-signup');
+    history.replaceState(null, '', window.location.pathname);
+    return;
   }
 }
 
@@ -5516,7 +5806,7 @@ async function submitJoinOnly() {
   await joinGroup();
 }
 
-window.addEventListener('load', init);
+window.addEventListener('load', async () => { await init(); await handleCheckoutReturn(); });
 </script>
 </body>
 </html>
