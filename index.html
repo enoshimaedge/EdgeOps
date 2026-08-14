@@ -2640,7 +2640,21 @@ async function loadMessages() {
     //   ★空配列で上書きしないため、messages への代入より前に置くこと。
     //   ★Supabase は error を throw しないので、明示的に throw する必要がある。
     if (messagesError) throw messagesError;
-    messages = data || [];
+    // [EO-DEC-0249] ポーリングでは全置換しない。取得できた範囲だけ差し替え、
+    //   それより古い既読込行は引き継ぐ（読込済みが1000件を超えても欠けないため）。
+    //   ★境界の判定は created_at 単独で行わず、第119回の複合カーソル（created_at + id）に合わせる。
+    const fetched = data || [];
+    if (isFirstLoad) {
+      messages = fetched;
+    } else {
+      const oldestFetched = fetched.length ? fetched[fetched.length - 1] : null;
+      const carried = oldestFetched
+        ? messages.filter(m =>
+            m.created_at < oldestFetched.created_at ||
+            (m.created_at === oldestFetched.created_at && m.id < oldestFetched.id))
+        : messages;
+      messages = fetched.concat(carried);
+    }
     members = memberData || [];
     // [EO-DEC-0216] 今回取得した approved members から、この描画サイクル用の creator を確定させる。
     //   順序は必ず「members 取得 → 判定 → 描画専用状態へ設定 → 表示判定」とすること。
