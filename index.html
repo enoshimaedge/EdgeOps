@@ -5277,11 +5277,11 @@ async function submitSignup() {
   const industry = industryEl.value;
 
   try {
-    const url = `${SUPABASE_URL}/functions/v1/stripe-checkout`;
     if (typeof window.callImageFunction !== 'function') {
       throw new Error('AUTH_HELPER_MISSING');
     }
 
+    const url = `${SUPABASE_URL}/functions/v1/stripe-checkout`;
     const res = await window.callImageFunction(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5295,17 +5295,31 @@ async function submitSignup() {
       body = {};
     }
 
-    if (res && res.ok && typeof body.checkout_url === 'string' && body.checkout_url.length > 0) {
-      window.location.href = body.checkout_url;
+    let checkoutUrl = null;
+    try {
+      checkoutUrl = new URL(body.checkout_url);
+    } catch (e) {
+      checkoutUrl = null;
+    }
+
+    if (res && res.ok && checkoutUrl && checkoutUrl.protocol === 'https:' && /(^|\.)stripe\.com$/i.test(checkoutUrl.hostname)) {
+      btn.disabled = false;
+      facilityEl.disabled = false;
+      industryEl.disabled = false;
+      regionEl.disabled = false;
+      btn.querySelector('span').textContent = t('btn_signup_proceed');
+      window.location.href = checkoutUrl.toString();
       return;
     }
 
-    const errorKey = SIGNUP_ERROR_KEYS[body.error_code] || 'err_signup_unknown';
+    const errorKey = res && res.ok
+      ? 'err_signup_session_create_failed'
+      : (SIGNUP_ERROR_KEYS[body.error_code] || 'err_signup_unknown');
     errEl.textContent = t(errorKey);
     errEl.style.display = 'block';
     console.error('[EO-DEC-0233] stripe-checkout error:', body);
   } catch (e) {
-    errEl.textContent = t('err_signup_unknown');
+    errEl.textContent = t(e?.message === 'AUTH_HELPER_MISSING' ? 'err_signup_auth_required' : 'err_signup_unknown');
     errEl.style.display = 'block';
     console.error('[EO-DEC-0233] submitSignup failed:', e);
   }
@@ -5320,29 +5334,20 @@ async function submitSignup() {
 async function handleCheckoutReturn() {
   const params = new URLSearchParams(window.location.search);
   const checkout = params.get('checkout');
-  const intent = params.get('intent');
+  params.get('intent');
   if (!checkout) return;
   if (!currentUser?.eo_uid) return;
 
-  if (checkout === 'success') {
-    signupReturnScreen = 'screen-start';
-    document.getElementById('signup-form-card').style.display = 'none';
-    document.getElementById('signup-pending-card').style.display = 'block';
-    document.getElementById('signup-cancel-card').style.display = 'none';
-    showScreen('screen-signup');
-    history.replaceState(null, '', window.location.pathname);
-    return;
-  }
+  const isSuccess = (checkout === 'success');
+  const isCancel = (checkout === 'cancel');
+  if (!isSuccess && !isCancel) return;
 
-  if (checkout === 'cancel') {
-    signupReturnScreen = 'screen-start';
-    document.getElementById('signup-form-card').style.display = 'none';
-    document.getElementById('signup-pending-card').style.display = 'none';
-    document.getElementById('signup-cancel-card').style.display = 'block';
-    showScreen('screen-signup');
-    history.replaceState(null, '', window.location.pathname);
-    return;
-  }
+  signupReturnScreen = 'screen-start';
+  document.getElementById('signup-form-card').style.display = 'none';
+  document.getElementById('signup-pending-card').style.display = isSuccess ? 'block' : 'none';
+  document.getElementById('signup-cancel-card').style.display = isCancel ? 'block' : 'none';
+  showScreen('screen-signup');
+  history.replaceState(null, '', window.location.pathname);
 }
 
 async function checkSuperAdmin() {
