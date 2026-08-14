@@ -874,8 +874,20 @@ html {
 }
 .eo-idcard__facility {
   font-size: 11px;
-  color: var(--text-light);
+  color: var(--eo-idcard-sub);
   margin-top: 6px;
+}
+/* [EO-DEC-0239] EOIDカード内の補助文字色。
+   --text-light は白背景でもコントラスト2.40でありWCAG AA(4.5)を下回る。
+   施設写真を敷いたことで顕在化したため、カード内の補助文字を --text-mid へ引き上げる。
+   ★写真の有無・ST/Plusを問わず .eo-idcard 全体に適用する（論点C）。
+   ★色の指定は本ファイルへ一本化する。index.html 側のインライン color は削除済み（論点D）。 */
+.eo-idcard {
+  --eo-idcard-sub: var(--text-mid);
+}
+.eo-idcard #profile-line-name,
+.eo-idcard #profile-eo-uid {
+  color: var(--eo-idcard-sub);
 }
 .eo-idcard > * {
   position: relative;
