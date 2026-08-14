@@ -763,11 +763,15 @@
     <div><div class="header-title" data-i18n="header_sub_profile">プロフィール・設定</div></div>
   </div>
   <div class="content">
-    <div class="card" style="padding:20px; text-align:center; margin-bottom:16px;">
+    <div class="card eo-idcard" style="padding:20px; text-align:center; margin-bottom:16px;">
+      <div id="eo-idcard-photo" class="eo-idcard__photo" style="display:none;"></div>
+      <div id="eo-idcard-veil" class="eo-idcard__veil" style="display:none;"></div>
+      <div id="eo-idcard-watermark" class="eo-idcard__watermark" style="display:none;" aria-hidden="true">EO</div>
       <div id="profile-avatar" style="width:72px;height:72px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;overflow:hidden;border:3px solid var(--green);"></div>
       <div style="font-size:18px; font-weight:700;" id="profile-name">---</div>
       <div style="font-size:12px; color:var(--text-light); margin-top:4px;" id="profile-line-name"></div>
       <div style="font-size:11px; color:var(--text-light); margin-top:6px; font-family:monospace; padding:4px 8px; background:var(--bg); border-radius:4px; display:inline-block;" id="profile-eo-uid" title="EdgeOps Universal ID">---</div>
+      <div id="profile-facility-name" class="eo-idcard__facility" style="display:none;"></div>
     </div>
     <div class="group-id-box">
       <div class="group-id-label" data-i18n="label_your_group_id">あなたのグループID</div>
@@ -4817,7 +4821,92 @@ function showProfile() {
   checkSuperAdmin();
   // [EO-DEC-0208] 施設管理ボタン表示チェック（起動時ではなくプロフィール表示時に判定する）
   checkFacilityManager();
+  // [EO-DEC-0235〜0238] 施設ブランドの読み込み（失敗しても画面は開く）
+  loadFacilityBrand();
   showScreen('screen-profile');
+}
+
+// [EO-DEC-0235〜0238] 施設ブランド（施設名・施設写真）をEOIDカードに反映する
+// ★失敗しても画面は開く。3状態の描き分けはsection4-2の仕様に従う。
+const _facilityPhotoCache = new Map();
+const _FACILITY_PHOTO_TTL_MS = 55 * 60 * 1000;
+
+async function loadFacilityBrand() {
+  const card = document.querySelector('.eo-idcard');
+  const photoEl = document.getElementById('eo-idcard-photo');
+  const veilEl = document.getElementById('eo-idcard-veil');
+  const wmEl = document.getElementById('eo-idcard-watermark');
+  const facilityNameEl = document.getElementById('profile-facility-name');
+  if (!card || !photoEl || !veilEl || !wmEl || !facilityNameEl) return;
+
+  // まず従来の白いカードの状態にリセット
+  card.classList.remove('eo-idcard--has-photo');
+  photoEl.style.display = 'none';
+  photoEl.style.backgroundImage = '';
+  veilEl.style.display = 'none';
+  wmEl.style.display = 'none';
+  facilityNameEl.style.display = 'none';
+  facilityNameEl.textContent = '';
+
+  if (typeof window.callImageFunction !== 'function') return;
+  const groupId = currentGroup?.id;
+  if (!groupId) return;
+
+  try {
+    const url = `${SUPABASE_URL}/functions/v1/facility-photo-url`;
+    const res = await window.callImageFunction(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_session_id: groupId })
+    });
+    if (!res || !res.ok) {
+      console.warn('[EO-DEC-0235] facility-photo-url failed:', res?.status);
+      return;
+    }
+    const json = await res.json().catch(() => null);
+    if (!json) return;
+
+    const { facility_name, photo_object_path, signed_url } = json;
+
+    // ST版：facility_name が null → 従来の白いカードのまま
+    if (!facility_name) return;
+
+    // 施設名を表示
+    facilityNameEl.textContent = facility_name;
+    facilityNameEl.style.display = '';
+
+    if (!photo_object_path) {
+      // 写真未設定：白カード＋施設名＋EOウォーターマーク
+      wmEl.style.display = '';
+      return;
+    }
+
+    // 写真あり：署名URLをキャッシュして適用
+    let photoUrl = signed_url;
+    const cacheKey = `facilityPhoto:${photo_object_path}`;
+    const now = Date.now();
+    const cached = _facilityPhotoCache.get(cacheKey);
+    if (cached && now < cached.expiresAt) {
+      photoUrl = cached.url;
+    } else if (signed_url) {
+      _facilityPhotoCache.set(cacheKey, { url: signed_url, expiresAt: now + _FACILITY_PHOTO_TTL_MS });
+    } else if (cached) {
+      // signed_urlが返らなかった場合は期限切れキャッシュをフォールバックとして使う
+      photoUrl = cached.url;
+    }
+
+    if (!photoUrl) {
+      wmEl.style.display = '';
+      return;
+    }
+
+    card.classList.add('eo-idcard--has-photo');
+    photoEl.style.backgroundImage = `url(${JSON.stringify(photoUrl)})`;
+    photoEl.style.display = '';
+    veilEl.style.display = '';
+  } catch (e) {
+    console.warn('[EO-DEC-0235] loadFacilityBrand error:', e);
+  }
 }
 
 async function updateGroupSwitcherBtn() {
