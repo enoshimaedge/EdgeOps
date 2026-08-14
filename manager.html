@@ -710,11 +710,11 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <label for="facility-photo-input" style="display:inline-block; padding:8px 16px; background:var(--mg-accent,#0f1e35); color:#fff; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600;">
               写真を選択
             </label>
-            <input id="facility-photo-input" type="file" accept="image/jpeg" capture="environment" style="display:none;">
+            <input id="facility-photo-input" type="file" accept="image/jpeg" style="display:none;">
             <!-- 登録前プレビュー（実際のEOIDカードと同じ見た目） -->
-            <div id="facility-photo-preview-wrap" style="display:none; margin-top:12px; position:relative; overflow:hidden; border-radius:6px; border:1px solid #ddd; padding:20px; text-align:center; min-height:80px; background:#fff;">
-              <div id="facility-photo-preview-bg" style="position:absolute; inset:0; background-size:cover; background-position:center 62%;"></div>
-              <div style="position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,255,255,.86) 0%,rgba(255,255,255,.82) 100%);"></div>
+            <div id="facility-photo-preview-wrap" class="eo-idcard" style="display:none; margin-top:12px; position:relative; overflow:hidden; border-radius:6px; border:1px solid #ddd; padding:20px; text-align:center; min-height:80px; background:#fff;">
+              <div id="facility-photo-preview-bg" class="eo-idcard__photo"></div>
+              <div class="eo-idcard__veil"></div>
               <div style="position:relative; z-index:2; font-size:12px; color:#666;">このような見た目で登録されます</div>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
@@ -2104,7 +2104,7 @@ init().catch((error) => {
       let body = null;
       try { body = await res.json(); } catch (_) { /* noop */ }
       if (!res.ok) {
-        const code = body && body.code;
+        const code = body && body.error;
         const rid = body && body.rid;
         if (rid) console.error('[EO-DEC-0235] facility-photo-upload error rid:', rid);
         _setMsg(_errorCode(code), '#c0392b');
@@ -2139,7 +2139,7 @@ init().catch((error) => {
       let body = null;
       try { body = await res.json(); } catch (_) { /* noop */ }
       if (!res.ok) {
-        const code = body && body.code;
+        const code = body && body.error;
         const rid = body && body.rid;
         if (rid) console.error('[EO-DEC-0235] facility-photo-delete error rid:', rid);
         _setMsg(_errorCode(code), '#c0392b');

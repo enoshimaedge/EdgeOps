@@ -846,18 +846,20 @@ html {
   overflow: hidden;
   border-radius: var(--eo-radius);
 }
-.eo-idcard__photo {
+.eo-idcard .eo-idcard__photo {
   position: absolute;
   inset: 0;
   background-size: cover;
   background-position: center 62%;
+  z-index: 0;
 }
-.eo-idcard__veil {
+.eo-idcard .eo-idcard__veil {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg, rgba(255,255,255,.86) 0%, rgba(255,255,255,.82) 100%);
+  z-index: 1;
 }
-.eo-idcard__watermark {
+.eo-idcard .eo-idcard__watermark {
   position: absolute;
   color: rgba(15,30,53,.05);
   font-size: 150px;
@@ -868,6 +870,7 @@ html {
   user-select: none;
   pointer-events: none;
   line-height: 1;
+  z-index: 1;
 }
 .eo-idcard__facility {
   font-size: 11px;
