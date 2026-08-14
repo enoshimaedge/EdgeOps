@@ -36,6 +36,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
 </script>
 <!-- auth.js (認証フロー独立化) [Phase 0 5-2] -->
 <script src="auth.js"></script>
+<script src="js/image.js?v=20260728-1"></script>
 <link rel="stylesheet" href="styles.css">
 <style>
   .mg-shell {
@@ -2052,7 +2053,10 @@ init().catch((error) => {
       VALIDATION_ERROR: '入力が不正です',
       STORAGE_FAILED: '時間をおいて再度お試しください',
       DB_FAILED: '時間をおいて再度お試しください',
-      INTERNAL_ERROR: '時間をおいて再度お試しください'
+      INTERNAL_ERROR: '時間をおいて再度お試しください',
+      HEIC_UNSUPPORTED: 'HEIC形式の写真は登録できません。JPEG形式の写真を選ぶか、スクリーンショットを撮って登録してください。',
+      CLIENT_INVALID_MIME: '対応していない形式です',
+      CLIENT_SIZE_OVER_5MB: '圧縮しても5MBを超えています'
     };
     return map[code] || '時間をおいて再度お試しください';
   }
@@ -2065,11 +2069,21 @@ init().catch((error) => {
       if (file.type !== 'image/jpeg') {
         _setMsg('JPEG形式のファイルを選択してください', '#c0392b');
         this.value = '';
+        _pendingFile = null;
+        const _ub = _uploadBtn();
+        if (_ub) _ub.style.display = 'none';
+        const _pw = _previewWrap();
+        if (_pw) _pw.style.display = 'none';
         return;
       }
       if (file.size > MAX_BYTES) {
         _setMsg('5MBを超えています。より小さいファイルを選択してください', '#c0392b');
         this.value = '';
+        _pendingFile = null;
+        const _ub = _uploadBtn();
+        if (_ub) _ub.style.display = 'none';
+        const _pw = _previewWrap();
+        if (_pw) _pw.style.display = 'none';
         return;
       }
       _pendingFile = file;
@@ -2092,15 +2106,40 @@ init().catch((error) => {
     if (!_pendingFile) return;
     if (!selectedFacilityId) { _setMsg('施設が選択されていません', '#c0392b'); return; }
     if (typeof window.callImageFunction !== 'function') { _setMsg('認証ヘルパーが読み込まれていません', '#c0392b'); return; }
+    if (typeof window.compressImageForUpload !== 'function') { _setMsg('画像処理を準備できませんでした', '#c0392b'); return; }
     _setBusy(true);
+    _setMsg('画像を準備中...');
+    let compressed;
+    try {
+      // [EO-DEC-0235 論点I] 既存のクライアント圧縮方式を流用する。
+      //   ★2240px以下へ縮小し品質0.88のJPEGにする。5MBの写真が1MB前後になる。
+      //   ★compressImageForUpload は fullBlob と thumbBlob を返すが、施設写真に
+      //     サムネは要らないので fullBlob だけ使う。
+      compressed = await window.compressImageForUpload(_pendingFile);
+    } catch (ce) {
+      const code = ce && ce.message;
+      if (code === 'HEIC_UNSUPPORTED') {
+        _setMsg(_errorCode('HEIC_UNSUPPORTED'), '#c0392b');
+      } else if (code === 'INVALID_MIME') {
+        _setMsg(_errorCode('CLIENT_INVALID_MIME'), '#c0392b');
+      } else if (code === 'SIZE_OVER_5MB') {
+        _setMsg(_errorCode('CLIENT_SIZE_OVER_5MB'), '#c0392b');
+      } else {
+        _setMsg('画像の処理に失敗しました', '#c0392b');
+      }
+      _setBusy(false);
+      return;
+    }
     _setMsg('登録中...');
+    let _gotResponse = false;
     try {
       const fd = new FormData();
       fd.append('facility_id', String(selectedFacilityId));
       fd.append('action', 'set');
-      fd.append('file', _pendingFile, 'facility_photo.jpg');
+      fd.append('file', compressed.fullBlob, 'facility_photo.jpg');
       const url = `${SUPABASE_URL}/functions/v1/facility-photo-upload`;
       const res = await window.callImageFunction(url, { method: 'POST', body: fd });
+      _gotResponse = true;
       let body = null;
       try { body = await res.json(); } catch (_) { /* noop */ }
       if (!res.ok) {
@@ -2118,7 +2157,11 @@ init().catch((error) => {
       if (ub) ub.style.display = 'none';
     } catch (e) {
       console.error('[EO-DEC-0235] facilityPhotoUpload exception:', e);
-      _setMsg('時間をおいて再度お試しください', '#c0392b');
+      if (!_gotResponse) {
+        _setMsg('通信に失敗した可能性があります。プロフィール画面を開いて、写真が変わっているかご確認ください', '#c0392b');
+      } else {
+        _setMsg('時間をおいて再度お試しください', '#c0392b');
+      }
     } finally {
       _setBusy(false);
     }
@@ -2130,12 +2173,14 @@ init().catch((error) => {
     if (typeof window.callImageFunction !== 'function') { _setMsg('認証ヘルパーが読み込まれていません', '#c0392b'); return; }
     _setBusy(true);
     _setMsg('削除中...');
+    let _gotResponse = false;
     try {
       const fd = new FormData();
       fd.append('facility_id', String(selectedFacilityId));
       fd.append('action', 'delete');
       const url = `${SUPABASE_URL}/functions/v1/facility-photo-upload`;
       const res = await window.callImageFunction(url, { method: 'POST', body: fd });
+      _gotResponse = true;
       let body = null;
       try { body = await res.json(); } catch (_) { /* noop */ }
       if (!res.ok) {
@@ -2155,7 +2200,11 @@ init().catch((error) => {
       if (pw) pw.style.display = 'none';
     } catch (e) {
       console.error('[EO-DEC-0235] facilityPhotoDelete exception:', e);
-      _setMsg('時間をおいて再度お試しください', '#c0392b');
+      if (!_gotResponse) {
+        _setMsg('通信に失敗した可能性があります。プロフィール画面を開いて、写真が削除されているかご確認ください', '#c0392b');
+      } else {
+        _setMsg('時間をおいて再度お試しください', '#c0392b');
+      }
     } finally {
       _setBusy(false);
     }
