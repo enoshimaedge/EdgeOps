@@ -283,6 +283,7 @@ window.EdgeOpsI18n = {
     err_signup_session_create_failed: 'お申し込み画面を開けませんでした。時間をおいてもう一度お試しください。',
     err_signup_server_misconfigured: '現在お申し込みを受け付けられません。時間をおいてもう一度お試しください。',
     err_signup_method_not_allowed: 'この操作は許可されていません。',
+    err_signup_not_yet:         'ただいま準備中です。お申し込みの受付開始まで、いましばらくお待ちください。',
     err_invite_unknown:         '処理に失敗しました。時間をおいてもう一度お試しください。',
     err_signup_unknown:         '処理に失敗しました。時間をおいてもう一度お試しください。',
   },
@@ -568,6 +569,7 @@ window.EdgeOpsI18n = {
     err_signup_session_create_failed: 'Could not open the checkout page. Please try again later.',
     err_signup_server_misconfigured: 'Subscriptions are temporarily unavailable. Please try again later.',
     err_signup_method_not_allowed: 'This action is not allowed.',
+    err_signup_not_yet:         'Applications are not open yet. Please check back soon.',
     err_invite_unknown:         'Something went wrong. Please try again later.',
     err_signup_unknown:         'Something went wrong. Please try again later.',
   }
