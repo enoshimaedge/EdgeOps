@@ -1152,7 +1152,7 @@
 
 
 <script src="js/i18n.js?v=20260814-2"></script>   <!-- ← 追加。必ず最初 -->
-<script src="js/ui-helpers.js?v=20260809-1"></script>
+<script src="js/ui-helpers.js?v=20260814-1"></script>
 <script src="js/image.js?v=20260728-1"></script>
 <script src="js/templates.js?v=20260704-3"></script>
 <script src="js/survey.js?v=20260728-1"></script>
@@ -2612,7 +2612,8 @@ async function loadMessages() {
   try {
     // messages・members・handover_notesを並列取得（起動速度改善）
     const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    // [EO-DEC-0247] 連絡の表示範囲。ST版60日／Plus版（施設配下）180日。
+    const cutoffRange = new Date(Date.now() - getMessageRetentionDays(currentGroup) * 24 * 60 * 60 * 1000).toISOString();
     let hwConfsForBadge = [];   // [EO-DEC-0214 論点D] updateHandoverBadge へ渡す
     const [
       { data, error: messagesError },
@@ -2622,8 +2623,8 @@ async function loadMessages() {
     ] = await Promise.all([
       supabase.from('messages').select('*')
         .eq('group_session_id', currentGroup.id)
-        .gte('created_at', cutoff60d)                    // 【条件7】60日は維持
-        .gte('created_at', oldestLoadedAt || cutoff60d)  // 【条件1・3】案α：読込済み範囲だけ取り直す
+        .gte('created_at', cutoffRange)                    // 【条件7】表示範囲は維持（ST版60日／Plus版180日）
+        .gte('created_at', oldestLoadedAt || cutoffRange)  // 【条件1・3】案α：読込済み範囲だけ取り直す
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })               // 【条件2】複合カーソルの安定ソート
         .limit(oldestLoadedAt ? 1000 : PAGE_SIZE),       // 初回=100件／ポーリング=読込済み範囲
@@ -2883,14 +2884,15 @@ async function loadMoreMessages() {
   if (btn) { btn.disabled = true; btn.textContent = t('loading'); }
 
   try {
-    const cutoff60d = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    // [EO-DEC-0247] 追加取得も同じ表示範囲を使う。
+    const cutoffRange = new Date(Date.now() - getMessageRetentionDays(currentGroup) * 24 * 60 * 60 * 1000).toISOString();
 
     // 【条件2】複合カーソル：
     //   created_at < oldestLoadedAt
     //   OR (created_at = oldestLoadedAt AND id < oldestLoadedId)
     const { data, error } = await supabase.from('messages').select('*')
       .eq('group_session_id', currentGroup.id)
-      .gte('created_at', cutoff60d)                     // 【条件7】追加取得も60日以内
+      .gte('created_at', cutoffRange)                     // 【条件7】追加取得も同じ表示範囲
       .or(`created_at.lt.${oldestLoadedAt},and(created_at.eq.${oldestLoadedAt},id.lt.${oldestLoadedId})`)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })

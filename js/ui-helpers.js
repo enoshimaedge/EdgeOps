@@ -120,6 +120,18 @@ function isExpiryManaged(group) {
   return group.facility_id === null && group.archived_at === null;
 }
 
+// [EO-DEC-0247] 連絡一覧の表示範囲（日数）を返す。ST版60日／Plus版（施設配下）180日。
+//   ★これは契約プランの判定ではない。表示と保持の振り分けだけに使う（Plus版設計書 43-3）。
+//     契約・ST版期限の判定は従来どおり plan 列と isExpiryManaged() を使うこと。
+function getMessageRetentionDays(group) {
+  if (!group) return 60;
+  if (!('facility_id' in group)) {
+    console.warn('[EO-DEC-0247] getMessageRetentionDays: facility_id が未取得です。取得経路の修正対象です。', group.group_id);
+    return 60;
+  }
+  return group.facility_id === null ? 60 : 180;
+}
+
 // [EO-DEC-0201] GID表示用共通関数。gid_masked=true のグループは伏字を返す。
 function formatGroupIdForDisplay(groupId, gidMasked) {
   if (gidMasked === undefined) {
