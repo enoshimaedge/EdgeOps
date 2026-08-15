@@ -237,7 +237,7 @@ window.EdgeOpsI18n = {
     toast_withdrawal_on:         '参加取りやめにしました',
     toast_withdrawal_off:        '参加取りやめを解除しました',
     // ── 施設管理者の招待コード入力（EO-DEC-0230）────────────────────
-    link_facility_invite:       '施設管理者の方はこちら',
+    link_facility_invite:       '施設管理者として登録する方はこちら',
     link_signup:                '施設として契約する（Plus版）',
     link_tokushoho:             '特定商取引法に基づく表記',
     header_signup:              'Plus版のお申し込み',
@@ -526,7 +526,7 @@ window.EdgeOpsI18n = {
     toast_withdrawal_on:         'Marked as withdrawn',
     toast_withdrawal_off:        'Withdrawal released',
     // ── 施設管理者の招待コード入力（EO-DEC-0230）────────────────────
-    link_facility_invite:       'Facility managers: start here',
+    link_facility_invite:       'Register as a facility manager',
     link_signup:                'Subscribe as a facility (Plus)',
     link_tokushoho:             'Legal notice under the Specified Commercial Transactions Act',
     header_signup:              'Subscribe to Plus',
