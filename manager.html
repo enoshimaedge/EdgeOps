@@ -663,7 +663,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
   <div class="mg-state">
     <div class="mg-state-title">権限がありません</div>
     <p class="mg-state-text">施設管理者として登録されているアカウントでご利用ください。</p>
-    <button type="button" class="mg-state-action" onclick="managerLogout()">別のアカウントでログイン</button>
+    <button type="button" id="manager-logout-denied-btn" class="mg-state-action" onclick="managerLogout()">別のアカウントでログイン</button>
     <button type="button" id="back-to-edgeops-denied" class="mg-state-back" onclick="backToEdgeOps()" hidden>EdgeOpsへ戻る</button>
   </div>
 </div>
@@ -674,7 +674,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
       <h1 class="mg-title">EdgeOps 施設管理</h1>
       <div class="mg-header-actions">
         <button type="button" id="back-to-edgeops" class="mg-back" onclick="backToEdgeOps()" hidden>EdgeOpsへ戻る</button>
-        <button type="button" class="mg-logout" onclick="managerLogout()">ログアウト</button>
+        <button type="button" id="manager-logout-btn" class="mg-logout" onclick="managerLogout()">ログアウト</button>
       </div>
     </header>
     <main class="mg-content">
@@ -1954,6 +1954,14 @@ function applyBackToEdgeOpsVisibility() {
   ['back-to-edgeops', 'back-to-edgeops-denied'].forEach(function (id) {
     const el = document.getElementById(id);
     if (el) el.hidden = !inClient;
+  });
+
+  // [EO-DEC-0255] EdgeOpsへ戻る／ログアウトの排他表示も、ここで制御する。
+  //   LINEアプリ内では「ログアウト」が成立しない（同じLINEアカウントで入り直すため）。
+  //   ★isInClient() の判定を2か所に増やさない。判定は1回、表示対象だけ複数にする。
+  ['manager-logout-btn', 'manager-logout-denied-btn'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = inClient;
   });
 }
 
