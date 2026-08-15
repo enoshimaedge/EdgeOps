@@ -1025,6 +1025,13 @@
              data-i18n="note_signup_facility_name">建物や事業所の名前を入れてください（例：藤沢オフィス／スマイルホテル湘南藤沢）。法人名は入力不要です</div>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" data-i18n="form_signup_organization_name">法人・団体名（任意）</label>
+        <input class="form-input" id="input-signup-organization-name" type="text" maxlength="100"
+               placeholder="例：株式会社ホスピタリティオペレーションズ">
+        <div style="font-size:11px; color:var(--text-light); margin-top:6px;"
+             data-i18n="note_signup_organization_name">法人・団体に所属している場合のみ入力してください。施設名・店舗名ではなく、運営する法人・団体の名称を入力してください</div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label" data-i18n="form_signup_industry">業種（任意）</label>
         <select class="form-input" id="input-signup-industry">
           <option value="">-- 業種を選んでください --</option>
@@ -1151,7 +1158,7 @@
 </div>
 
 
-<script src="js/i18n.js?v=20260814-2"></script>   <!-- ← 追加。必ず最初 -->
+<script src="js/i18n.js?v=20260815-1"></script>   <!-- ← 追加。必ず最初 -->
 <script src="js/ui-helpers.js?v=20260814-1"></script>
 <script src="js/image.js?v=20260728-1"></script>
 <script src="js/templates.js?v=20260704-3"></script>
@@ -5229,6 +5236,7 @@ const SIGNUP_ERROR_KEYS = {
   INVALID_BODY:          'err_signup_invalid_body',
   INVALID_FACILITY_NAME: 'err_signup_invalid_facility_name',
   FACILITY_NAME_TOO_LONG:'err_signup_facility_name_too_long',
+  ORGANIZATION_NAME_TOO_LONG:'err_signup_organization_name_too_long',
   INTENT_CREATE_FAILED:  'err_signup_intent_create_failed',
   SESSION_CREATE_FAILED: 'err_signup_session_create_failed',
   SERVER_MISCONFIGURED:  'err_signup_server_misconfigured',
@@ -5242,15 +5250,18 @@ function openSignupScreen(fromScreen) {
   const facilityEl = document.getElementById('input-signup-facility-name');
   const industryEl = document.getElementById('input-signup-industry');
   const regionEl = document.getElementById('input-signup-region');
+  const orgEl = document.getElementById('input-signup-organization-name');
   const btn = document.getElementById('signup-submit-btn');
   const errEl = document.getElementById('signup-error');
 
   facilityEl.value = '';
   industryEl.value = '';
   regionEl.value = '';
+  orgEl.value = '';
   facilityEl.disabled = false;
   industryEl.disabled = false;
   regionEl.disabled = false;
+  orgEl.disabled = false;
 
   document.getElementById('signup-form-card').style.display = 'block';
   document.getElementById('signup-pending-card').style.display = 'none';
@@ -5278,6 +5289,7 @@ async function submitSignup() {
   const facilityEl = document.getElementById('input-signup-facility-name');
   const industryEl = document.getElementById('input-signup-industry');
   const regionEl = document.getElementById('input-signup-region');
+  const orgEl = document.getElementById('input-signup-organization-name');
   const btn = document.getElementById('signup-submit-btn');
   const errEl = document.getElementById('signup-error');
 
@@ -5287,11 +5299,13 @@ async function submitSignup() {
   facilityEl.disabled = true;
   industryEl.disabled = true;
   regionEl.disabled = true;
+  orgEl.disabled = true;
   btn.querySelector('span').textContent = t('btn_signup_submitting');
 
   const facility_name = facilityEl.value;
   const region = regionEl.value;
   const industry = industryEl.value;
+  const organization_name = orgEl.value;
 
   try {
     if (typeof window.callImageFunction !== 'function') {
@@ -5302,7 +5316,7 @@ async function submitSignup() {
     const res = await window.callImageFunction(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ facility_name, region, industry })
+      body: JSON.stringify({ facility_name, organization_name, region, industry })
     });
 
     let body = {};
@@ -5324,6 +5338,7 @@ async function submitSignup() {
       facilityEl.disabled = false;
       industryEl.disabled = false;
       regionEl.disabled = false;
+      orgEl.disabled = false;
       btn.querySelector('span').textContent = t('btn_signup_proceed');
       window.location.href = checkoutUrl.toString();
       return;
@@ -5345,6 +5360,7 @@ async function submitSignup() {
   facilityEl.disabled = false;
   industryEl.disabled = false;
   regionEl.disabled = false;
+  orgEl.disabled = false;
   btn.querySelector('span').textContent = t('btn_signup_proceed');
 }
 
