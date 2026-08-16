@@ -795,16 +795,46 @@ function getSelectedFacility() {
   return managerFacilities.find((facility) => String(facility.facility_id) === String(selectedFacilityId)) || null;
 }
 
+// ── [EO-DEC-0256] 契約状態のガード（課題83）─────────────────────────
+// ★通す値を列挙する。弾く値を列挙しない。
+//   contract_status は NULL可・DEFAULT active・CHECK制約なしのため、
+//   「!== 'suspended'」と書くと NULL と将来の未知の値（cancel_scheduled・ended）が素通りする。
+// ★第253回で cancel_scheduled を実装したら、この配列にだけ足す。
+//   DB側（manager_create_group の ARRAY['active']）と対で直すこと。
+const FACILITY_ACTIVE_CONTRACT_STATUSES = ['active'];
+
+// ★画面に出す理由の文言。帯とボタンの両方がこの1つを見る（同じ文を2箇所に書き写さない）。
+const FACILITY_INACTIVE_MESSAGE = 'この施設は現在利用開始前または利用停止中です。グループを作成できません。';
+
+// ★契約状態の判定はこの関数1つだけ。帯の出し分けとグループ作成ボタンの無効化が両方これを見る。
+// ★契約状態を取得できていないとき（RPC失敗・facility 未取得）は「制限しない」を既定とする。
+//   制御されない経路でボタンが永久に押せなくなることを避けるため（原則77）。
+function isFacilityContractActive(facility) {
+  const status = facility && facility.contract_status;
+  if (status == null || String(status) === '') return true;
+  return FACILITY_ACTIVE_CONTRACT_STATUSES.indexOf(String(status)) !== -1;
+}
+
+// ★グループ作成の導線だけを無効化する。他の管理操作のボタンには触れない。
+//   DB側で止めているのは manager_create_group だけであり、
+//   画面の制御範囲は常にDB側に合わせる。
+function applyGroupCreateGuard() {
+  const button = document.getElementById('group-create-entry-btn');
+  if (!button) return;
+  const blocked = !isFacilityContractActive(getSelectedFacility());
+  button.disabled = blocked;
+  button.title = blocked ? FACILITY_INACTIVE_MESSAGE : '';
+}
+
 function renderFacilityBanner(facility) {
   const banner = document.getElementById('facility-banner');
   if (!banner) return;
-  const status = facility && facility.contract_status;
-  if (status && status !== 'active') {
-    banner.textContent = 'この施設の契約状態は「' + status + '」です。管理操作が制限される場合があります。';
-    banner.hidden = false;
-  } else {
+  if (isFacilityContractActive(facility)) {
     banner.textContent = '';
     banner.hidden = true;
+  } else {
+    banner.textContent = FACILITY_INACTIVE_MESSAGE;
+    banner.hidden = false;
   }
 }
 
@@ -852,6 +882,9 @@ function setGroupSectionButtonsDisabled(disabled) {
   section.querySelectorAll('button').forEach((button) => {
     button.disabled = disabled;
   });
+  // [EO-DEC-0256] 通信中の一括無効化から戻すときも、
+  // グループ作成の導線だけは契約状態の判定を優先する。
+  if (!disabled) applyGroupCreateGuard();
 }
 
 function getGroupOwnerCandidates(group) {
@@ -1411,6 +1444,8 @@ function renderGroupList() {
 
   const createBtn = document.createElement('button');
   createBtn.type = 'button';
+  // [EO-DEC-0256] 無効化の対象を確実に指定するため専用のIDを持たせる（クラスは見た目・共通用途のもの）
+  createBtn.id = 'group-create-entry-btn';
   createBtn.className = 'mg-group-btn mg-group-btn-primary';
   createBtn.textContent = groupCreateDraft ? '入力を閉じる' : 'グループを作成';
   createBtn.addEventListener('click', () => {
@@ -1430,6 +1465,9 @@ function renderGroupList() {
   header.appendChild(createBtn);
 
   container.appendChild(header);
+
+  // [EO-DEC-0256] 契約状態が許可リストに無いときは、グループ作成の導線だけを無効化する
+  applyGroupCreateGuard();
 
   if (groupSectionErrorMessage) {
     const errorEl = document.createElement('div');
