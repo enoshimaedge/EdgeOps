@@ -1104,7 +1104,7 @@ async function init() {
     await liff.init({ liffId: LIFF_ID });
     applyBackToEdgeOpsVisibility();
     if (!liff.isLoggedIn()) {
-      liff.login();
+      liff.login({ redirectUri: window.location.href });
       return;
     }
     // [Phase 0 5-4] auth.js の resolveEoUid を使用してeo_uidを解決
@@ -1124,7 +1124,7 @@ async function init() {
     try {
       liff.logout();
     } catch (_) {}
-    liff.login();
+    liff.login({ redirectUri: window.location.href });
     return;
   }
 
