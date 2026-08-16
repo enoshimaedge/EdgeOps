@@ -1121,13 +1121,15 @@ function renderMigrateSection() {
     const detail = document.createElement('div');
     detail.style.fontSize = '12px';
     detail.style.color = '#333';
-    detail.style.lineHeight = '1.7';
+    detail.style.lineHeight = '1.8';
     detail.style.margin = '0 0 10px';
+    // ★安全のための説明なので、1行ずつ改行して読ませる
+    detail.style.whiteSpace = 'pre-line';
     detail.textContent =
-        '「' + expected + '」をこの施設へ移します。'
-      + '・連絡と画像の保存期間が 60日／30日 から 180日 に変わります'
-      + '・グループの1年の有効期限が無くなります'
-      + '・地域の表示が この施設の地域 に変わります'
+        '「' + expected + '」をこの施設へ移します。\n'
+      + '・連絡と画像の保存期間が 60日／30日 から 180日 に変わります\n'
+      + '・グループの1年の有効期限が無くなります\n'
+      + '・地域の表示が この施設の地域 に変わります（施設に地域が設定されていない場合は空欄になります）\n'
       + '・メンバー・過去の連絡・引き継ぎは そのまま残ります';
     container.appendChild(detail);
 
