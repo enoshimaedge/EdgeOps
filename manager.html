@@ -971,6 +971,10 @@ let migratableGroups = [];
 let migrateRunning = false;
 // [EO-DEC-0258 追補] 確認中のグループ。★不可逆な操作のため、グループ名の入力が一致するまで実行できない
 let migrateDraftId = null;
+// ★[EO-DEC-0258 追補4] 確認を開始したときに選ばれていた施設を控える。
+//   施設管理者が複数施設を持つ場合、確認中に上のプルダウンを切り替えると
+//   「画面に出ている施設名」と「実際に送る施設」がずれうるため、実行の直前に照合する。
+let migrateDraftFacilityId = null;
 
 const MIGRATE_ERROR_MESSAGES = {
   ALREADY_MIGRATED:     'このグループはすでに施設へ移されています',
@@ -1038,6 +1042,17 @@ async function migrateGroup(group) {
     return;
   }
 
+  // ★[EO-DEC-0258 追補4] 確認を始めたときの施設と、いま選ばれている施設が同じであることを確かめる。
+  //   ずれていたら送らない。移す先を取り違えると取り消せないためである。
+  if (migrateDraftFacilityId != null
+      && String(migrateDraftFacilityId) !== String(facility.facility_id)) {
+    migrateDraftId = null;
+    migrateDraftFacilityId = null;
+    renderMigrateSection();
+    setMigrateMessage('移す先の施設が切り替わりました。安全のため中止しました。もう一度やり直してください。', true);
+    return;
+  }
+
   migrateRunning = true;
   setMigrateMessage('移しています。しばらくお待ちください…', false);
   try {
@@ -1047,14 +1062,28 @@ async function migrateGroup(group) {
     });
     if (error) { setMigrateMessage(migrateErrorMessage(error), true); return; }
     migrateDraftId = null;
+    migrateDraftFacilityId = null;
+    const movedTo = String(facility.facility_name == null ? '' : facility.facility_name).trim();
     await reloadManagerDataStrict();
     renderFacilityDetails();
-    setMigrateMessage('「' + (group.group_name || group.group_id || '') + '」をこの施設へ移しました。', false);
+    // ★[EO-DEC-0258 追補4] 完了の知らせにも施設名を出す。どこへ移したかを後から見て分かるようにする。
+    setMigrateMessage('「' + (group.group_name || group.group_id || '') + '」を「'
+      + (movedTo || 'この施設') + '」へ移しました。', false);
   } catch (e) {
     setMigrateMessage(migrateErrorMessage(e), true);
   } finally {
     migrateRunning = false;
   }
+}
+
+// ★[EO-DEC-0258 追補4] 移行の確認文で、取り違えると困る語（グループ名・施設名）を赤の太字にする。
+//   textContent では色を分けられないため、この関数で span を作って差し込む。
+function migrateEmphasis(text) {
+  const span = document.createElement('span');
+  span.style.color = '#c0392b';
+  span.style.fontWeight = '700';
+  span.textContent = text;
+  return span;
 }
 
 function renderMigrateSection() {
@@ -1064,6 +1093,9 @@ function renderMigrateSection() {
 
   const facility = getSelectedFacility();
   if (!facility) return;
+  // ★[EO-DEC-0258 追補4] 確認文に出す施設名。空のときだけ「この施設」に戻す。
+  const facilityLabel = String(facility.facility_name == null ? '' : facility.facility_name).trim()
+                        || 'この施設';
   // ★契約状態が許可リストに無い施設では、このカードごと出さない（判定は1箇所を使い回す）
   if (!isFacilityContractActive(facility)) return;
 
@@ -1138,6 +1170,8 @@ function renderMigrateSection() {
       btn.textContent = 'この施設へ移す';
       btn.addEventListener('click', () => {
         migrateDraftId = g.id;
+        // ★[EO-DEC-0258 追補4] 確認を始めた時点の施設を控える
+        migrateDraftFacilityId = facility.facility_id;
         setMigrateMessage('', false);
         renderMigrateSection();
       });
@@ -1162,12 +1196,20 @@ function renderMigrateSection() {
     detail.style.margin = '0 0 10px';
     // ★安全のための説明なので、1行ずつ改行して読ませる
     detail.style.whiteSpace = 'pre-line';
-    detail.textContent =
-        '「' + expected + '」をこの施設へ移します。\n'
+    // ★[EO-DEC-0258 追補4] 施設管理者が複数の施設を持つ場合、「この施設」では
+    //   どこへ移すのかが分からず、移す先を取り違えうる（移行は取り消せない）。
+    //   そこで施設名を出し、グループ名と施設名を赤の太字で強調する。
+    //   ★施設名が空のときだけ「この施設」に戻す（原則77・既定は安全側の文言）。
+    detail.appendChild(document.createTextNode('「'));
+    detail.appendChild(migrateEmphasis(expected));
+    detail.appendChild(document.createTextNode('」を「'));
+    detail.appendChild(migrateEmphasis(facilityLabel));
+    detail.appendChild(document.createTextNode(
+        '」へ移します。\n'
       + '・連絡と画像の保存期間が 60日／30日 から 180日 に変わります\n'
       + '・グループの1年の有効期限が無くなります\n'
-      + '・地域の表示が この施設の地域 に変わります（施設に地域が設定されていない場合は空欄になります）\n'
-      + '・メンバー・過去の連絡・引き継ぎは そのまま残ります';
+      + '・地域の表示が 「' + facilityLabel + '」の地域 に変わります（施設に地域が設定されていない場合は空欄になります）\n'
+      + '・メンバー・過去の連絡・引き継ぎは そのまま残ります'));
     container.appendChild(detail);
 
     const caution = document.createElement('div');
@@ -1180,7 +1222,10 @@ function renderMigrateSection() {
 
     const label = document.createElement('label');
     label.className = 'mg-group-form-label';
-    label.textContent = '確認のため、グループ名「' + expected + '」を入力してください';
+    // ★[EO-DEC-0258 追補4] 入力を求めるグループ名も赤の太字にして、見比べやすくする
+    label.appendChild(document.createTextNode('確認のため、グループ名「'));
+    label.appendChild(migrateEmphasis(expected));
+    label.appendChild(document.createTextNode('」を入力してください'));
     container.appendChild(label);
 
     const input = document.createElement('input');
@@ -1206,6 +1251,7 @@ function renderMigrateSection() {
     cancelBtn.textContent = 'やめる';
     cancelBtn.addEventListener('click', () => {
       migrateDraftId = null;
+      migrateDraftFacilityId = null;
       setMigrateMessage('', false);
       renderMigrateSection();
     });
@@ -2385,6 +2431,10 @@ const facilitySelectElement = document.getElementById('facility-select');
 if (facilitySelectElement) {
   facilitySelectElement.addEventListener('change', (event) => {
     selectedFacilityId = event.target.value;
+    // ★[EO-DEC-0258 追補4] 施設を切り替えたら、開いていた移行の確認は必ず閉じる。
+    //   確認文の施設名と、実際に送る施設がずれた状態を残さないためである。
+    migrateDraftId = null;
+    migrateDraftFacilityId = null;
     renderFacilityDetails();
   });
 }
