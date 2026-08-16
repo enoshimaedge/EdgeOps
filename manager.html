@@ -7,6 +7,8 @@
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<!-- [EO-DEC-0246] CSV出力のZIP化に使う。crypto-js と同じ cdnjs から読み込む -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const ENV_CONFIG = {
   prod: {
@@ -37,6 +39,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
 <!-- auth.js (認証フロー独立化) [Phase 0 5-2] -->
 <script src="auth.js"></script>
 <script src="js/image.js?v=20260728-1"></script>
+<script src="js/export.js?v=20260816-1"></script>
 <link rel="stylesheet" href="styles.css">
 <style>
   .mg-shell {
@@ -748,6 +751,8 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
       </div>
       <div id="group-list-container" class="mg-group-card"></div>
       <div id="manager-section-container"></div>
+      <!-- [EO-DEC-0246] データ出力（CSV）。中身の描画は js/export.js が行う -->
+      <div id="export-container" class="mg-group-card"></div>
     </main>
   </div>
 </div>
@@ -861,6 +866,8 @@ function renderFacilityDetails() {
   renderFacilityBanner(facility);
   renderGroupList();
   renderManagerSection();
+  // [EO-DEC-0246] データ出力（CSV）の画面。判定も整形も js/export.js 側に持たせる
+  if (typeof renderExportSection === 'function') renderExportSection();
 }
 
 const INDUSTRY_LABELS = {
