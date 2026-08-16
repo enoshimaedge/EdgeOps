@@ -924,12 +924,31 @@ async function reloadManagerDataStrict() {
 
   // [EO-DEC-0258] 移行候補の取得。★ここは失敗しても画面全体を止めない（本体の認可はRPC側が持つ）
   await loadMigratableGroups();
+  // [EO-DEC-0259] 施設管理者の一覧
+  await loadFacilityManagers();
 }
 
 // ── [EO-DEC-0258] ST版グループのPlus版移行 ──────────────────────
 // ★移行の本体は既存の migrate_group_to_facility である。1行も変えていない。
 //   認証・作成者確認・施設管理者確認・20件上限・二重移行防止はすべてRPC側が持つ。
 //   ここで行うのは「弾かれるものを最初から見せない」ことだけである。
+// [EO-DEC-0259] 施設管理者の一覧（facility_managers を正とする専用RPCから取る）
+let facilityManagers = [];
+
+async function loadFacilityManagers() {
+  facilityManagers = [];
+  try {
+    const { data, error } = await sb.rpc('manager_list_facility_managers');
+    if (error) {
+      console.warn('[manager.html] manager_list_facility_managers failed (continue):', error);
+      return;
+    }
+    facilityManagers = Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('[manager.html] manager_list_facility_managers threw (continue):', e);
+  }
+}
+
 let migratableGroups = [];
 let migrateRunning = false;
 // [EO-DEC-0258 追補] 確認中のグループ。★不可逆な操作のため、グループ名の入力が一致するまで実行できない
@@ -1931,8 +1950,11 @@ function renderManagerSection() {
   currentErrorEl.hidden = true;
   currentCard.appendChild(currentErrorEl);
 
-  const managers = memberCandidates.filter(
-    (c) => String(c.out_facility_id) === String(selectedFacilityId) && c.out_is_manager
+  // ★[EO-DEC-0259] 施設管理者の一覧は facility_managers を正とする。
+  //   従来は manager_list_member_candidates（グループ参加者）から作っていたため、
+  //   施設にグループが0件だと1行も返らず「管理者情報がありません」と出ていた。
+  const managers = facilityManagers.filter(
+    (m) => String(m.out_facility_id) === String(selectedFacilityId)
   );
 
   if (managers.length === 0) {
@@ -1952,9 +1974,16 @@ function renderManagerSection() {
 
       const nameEl = document.createElement('span');
       nameEl.className = 'mg-manager-name';
-      const displayNames = Array.isArray(mgr.out_display_names) ? mgr.out_display_names : [];
-      nameEl.textContent = displayNames.join(' / ') || '（名前なし）';
+      const managerName = String(mgr.out_display_name || '').trim() || '（名前なし）';
+      nameEl.textContent = managerName;
       info.appendChild(nameEl);
+
+      if (mgr.out_is_main) {
+        const mainBadge = document.createElement('span');
+        mainBadge.className = 'mg-manager-self-badge';
+        mainBadge.textContent = '（主）';
+        nameEl.appendChild(mainBadge);
+      }
 
       if (currentEoUid && mgr.out_eo_uid === currentEoUid) {
         const selfBadge = document.createElement('span');
@@ -1970,14 +1999,14 @@ function renderManagerSection() {
       removeBtn.className = 'mg-manager-btn';
       removeBtn.textContent = '削除';
       removeBtn.dataset.eoUid = mgr.out_eo_uid;
-      removeBtn.dataset.displayName = displayNames.join(' / ') || '';
+      removeBtn.dataset.displayName = managerName;
       removeBtn.addEventListener('click', () => {
         removeFacilityManager(
           removeBtn,
           currentErrorEl,
           String(facility.facility_id),
           mgr.out_eo_uid,
-          displayNames.join(' / ') || ''
+          managerName
         );
       });
       row.appendChild(removeBtn);
@@ -2083,6 +2112,8 @@ async function reloadManagerData() {
   }
   // [EO-DEC-0258] 施設写真などの更新後にも移行候補を読み直す
   await loadMigratableGroups();
+  // [EO-DEC-0259] 施設管理者の一覧
+  await loadFacilityManagers();
 }
 
 function setManagerSectionButtonsDisabled(disabled) {
@@ -2243,6 +2274,8 @@ async function init() {
 
   // [EO-DEC-0258] 初回表示のときも移行候補を読む（失敗しても画面は止めない）
   await loadMigratableGroups();
+  // [EO-DEC-0259] 初回表示のときも施設管理者の一覧を読む
+  await loadFacilityManagers();
 
   renderFacilitySelect();
   showScreen('screen-main');
