@@ -750,6 +750,8 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
         </div>
       </div>
       <div id="group-list-container" class="mg-group-card"></div>
+      <!-- [EO-DEC-0258] ST版グループをこの施設へ移す -->
+      <div id="migrate-container" class="mg-group-card"></div>
       <div id="manager-section-container"></div>
       <!-- [EO-DEC-0246] データ出力（CSV）。中身の描画は js/export.js が行う -->
       <div id="export-container" class="mg-group-card"></div>
@@ -865,6 +867,8 @@ function renderFacilityDetails() {
   setFacilityValue('facility-manager-count', (facility.manager_count != null ? facility.manager_count : 0) + '人');
   renderFacilityBanner(facility);
   renderGroupList();
+  // [EO-DEC-0258] ST版グループの移行。契約状態の判定は isFacilityContractActive() を使い回す
+  renderMigrateSection();
   renderManagerSection();
   // [EO-DEC-0246] データ出力（CSV）の画面。判定も整形も js/export.js 側に持たせる
   if (typeof renderExportSection === 'function') renderExportSection();
@@ -917,6 +921,173 @@ async function reloadManagerDataStrict() {
   const { data: candidateData, error: candidateError } = await sb.rpc('manager_list_member_candidates');
   if (candidateError) throw candidateError;
   memberCandidates = Array.isArray(candidateData) ? candidateData : [];
+
+  // [EO-DEC-0258] 移行候補の取得。★ここは失敗しても画面全体を止めない（本体の認可はRPC側が持つ）
+  await loadMigratableGroups();
+}
+
+// ── [EO-DEC-0258] ST版グループのPlus版移行 ──────────────────────
+// ★移行の本体は既存の migrate_group_to_facility である。1行も変えていない。
+//   認証・作成者確認・施設管理者確認・20件上限・二重移行防止はすべてRPC側が持つ。
+//   ここで行うのは「弾かれるものを最初から見せない」ことだけである。
+let migratableGroups = [];
+let migrateRunning = false;
+
+const MIGRATE_ERROR_MESSAGES = {
+  ALREADY_MIGRATED:     'このグループはすでに施設へ移されています',
+  NOT_OWNER:            'このグループを作成した方だけが移せます',
+  NOT_FACILITY_MANAGER: '権限がありません',
+  FACILITY_GROUP_LIMIT: 'この施設のグループ数が上限（20）に達しています',
+  GROUP_NOT_FOUND:      'グループが見つかりません',
+  FACILITY_NOT_FOUND:   '施設が見つかりません',
+  AUTH_REQUIRED:        'ログインの有効期限が切れています。画面を開き直してください',
+};
+
+function migrateErrorMessage(error) {
+  if (!error) return '移せませんでした。時間をおいて再度お試しください';
+  const code = (error.message || error.code || '') + '';
+  for (const key of Object.keys(MIGRATE_ERROR_MESSAGES)) {
+    if (code.includes(key)) return MIGRATE_ERROR_MESSAGES[key];
+  }
+  return '移せませんでした。時間をおいて再度お試しください';
+}
+
+// 自分が作成者で、まだどの施設にも属していないグループだけを集める。
+// ★index.html の restoreSession() と同じ形のクエリにする（新しい書き方を持ち込まない）。
+async function loadMigratableGroups() {
+  migratableGroups = [];
+  if (!currentEoUid) return;
+  try {
+    const { data, error } = await sb
+      .from('group_members')
+      .select('group_session_id, group_sessions(id, group_id, group_name, industry, region, expires_at, archived_at, facility_id, created_at)')
+      .eq('eo_uid', currentEoUid)
+      .eq('status', 'approved')
+      .eq('is_creator', true);
+    if (error) {
+      console.warn('[manager.html] loadMigratableGroups failed (continue):', error);
+      return;
+    }
+    migratableGroups = (data || [])
+      .map((row) => row.group_sessions)
+      .filter((g) => g && g.facility_id == null && g.archived_at == null)
+      .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
+  } catch (e) {
+    console.warn('[manager.html] loadMigratableGroups threw (continue):', e);
+  }
+}
+
+function setMigrateMessage(text, isError) {
+  const el = document.getElementById('migrate-message');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = isError ? '#c0392b' : '#555';
+}
+
+async function migrateGroup(group) {
+  if (migrateRunning) return;
+  const facility = getSelectedFacility();
+  if (!facility || !group) return;
+
+  // ★不可逆であることと、変わるもの・残るものを具体的に出す（EO-DEC-0258 論点D）
+  const confirmed = window.confirm(
+    '「' + (group.group_name || group.group_id || '') + '」をこの施設へ移します。\n\n'
+    + '・連絡と画像の保存期間が 60日／30日 から 180日 に変わります\n'
+    + '・グループの1年の有効期限が無くなります\n'
+    + '・地域の表示が この施設の地域 に変わります\n'
+    + '・メンバー・過去の連絡・引き継ぎは そのまま残ります\n\n'
+    + '★この操作は取り消せません。施設から外して元に戻す機能はありません。'
+  );
+  if (!confirmed) return;
+
+  migrateRunning = true;
+  setMigrateMessage('移しています。しばらくお待ちください…', false);
+  try {
+    const { error } = await sb.rpc('migrate_group_to_facility', {
+      p_group_session_id: group.id,
+      p_facility_id: facility.facility_id,
+    });
+    if (error) { setMigrateMessage(migrateErrorMessage(error), true); return; }
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+    setMigrateMessage('「' + (group.group_name || group.group_id || '') + '」をこの施設へ移しました。', false);
+  } catch (e) {
+    setMigrateMessage(migrateErrorMessage(e), true);
+  } finally {
+    migrateRunning = false;
+  }
+}
+
+function renderMigrateSection() {
+  const container = document.getElementById('migrate-container');
+  if (!container) return;
+  container.replaceChildren();
+
+  const facility = getSelectedFacility();
+  if (!facility) return;
+  // ★契約状態が許可リストに無い施設では、このカードごと出さない（判定は1箇所を使い回す）
+  if (!isFacilityContractActive(facility)) return;
+
+  const header = document.createElement('div');
+  header.className = 'mg-group-card-header';
+  const title = document.createElement('div');
+  title.className = 'mg-group-card-title';
+  title.textContent = 'ST版グループをこの施設へ移す';
+  header.appendChild(title);
+  container.appendChild(header);
+
+  const note = document.createElement('div');
+  note.style.fontSize = '12px';
+  note.style.color = '#666';
+  note.style.margin = '4px 0 12px';
+  note.textContent = 'あなたが作成した、まだどの施設にも属していないグループを、この施設の所属にします。'
+                   + 'グループを作り直すのではなく、同じグループのまま施設に付け替えます。'
+                   + 'メンバー・過去の連絡・引き継ぎはそのまま残ります。';
+  container.appendChild(note);
+
+  const msg = document.createElement('div');
+  msg.id = 'migrate-message';
+  msg.style.fontSize = '12px';
+  msg.style.margin = '0 0 8px';
+  msg.style.minHeight = '16px';
+  msg.style.color = '#555';
+  container.appendChild(msg);
+
+  if (!migratableGroups.length) {
+    const empty = document.createElement('div');
+    empty.className = 'mg-group-empty';
+    empty.textContent = '移せるグループはありません';
+    container.appendChild(empty);
+    return;
+  }
+
+  migratableGroups.forEach((g) => {
+    const row = document.createElement('div');
+    row.className = 'mg-group-row';
+
+    const name = document.createElement('div');
+    name.className = 'mg-group-row-name';
+    name.textContent = g.group_name || g.group_id || '';
+    row.appendChild(name);
+
+    const sub = document.createElement('div');
+    sub.className = 'mg-group-row-sub';
+    sub.textContent = (g.group_id || '')
+      + (INDUSTRY_LABELS[g.industry] ? '　' + INDUSTRY_LABELS[g.industry] : '');
+    row.appendChild(sub);
+
+    const actions = document.createElement('div');
+    actions.className = 'mg-group-row-actions';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mg-group-btn mg-group-btn-primary';
+    btn.textContent = 'この施設へ移す';
+    btn.addEventListener('click', () => migrateGroup(g));
+    actions.appendChild(btn);
+    row.appendChild(actions);
+
+    container.appendChild(row);
+  });
 }
 
 async function createGroup() {
