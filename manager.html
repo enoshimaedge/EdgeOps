@@ -1186,9 +1186,10 @@ function renderMigrateSection() {
     row.appendChild(actions);
     container.appendChild(row);
 
-    const box = document.createElement('div');
-    box.className = 'mg-group-form';
-
+    // ★[2026/8/16] ここに const box = document.createElement('div') があったが、
+    //   どこにも appendChild されておらず（detail 以降はすべて container へ直接付けている）
+    //   .mg-group-form のCSSが1つも効かない死んだコードだったため削除した。
+    //   ★見た目は1ピクセルも変わらない（案ア）。枠で囲う案イは採らない。
     const detail = document.createElement('div');
     detail.style.fontSize = '12px';
     detail.style.color = '#333';
