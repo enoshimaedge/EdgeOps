@@ -1989,6 +1989,8 @@ async function reloadManagerData() {
   if (!candidateError && Array.isArray(candidateData)) {
     memberCandidates = candidateData;
   }
+  // [EO-DEC-0258] 施設写真などの更新後にも移行候補を読み直す
+  await loadMigratableGroups();
 }
 
 function setManagerSectionButtonsDisabled(disabled) {
@@ -2146,6 +2148,9 @@ async function init() {
   } else if (Array.isArray(candidateData)) {
     memberCandidates = candidateData;
   }
+
+  // [EO-DEC-0258] 初回表示のときも移行候補を読む（失敗しても画面は止めない）
+  await loadMigratableGroups();
 
   renderFacilitySelect();
   showScreen('screen-main');
