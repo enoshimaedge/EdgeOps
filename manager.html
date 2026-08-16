@@ -935,6 +935,24 @@ async function reloadManagerDataStrict() {
 // [EO-DEC-0259] 施設管理者の一覧（facility_managers を正とする専用RPCから取る）
 let facilityManagers = [];
 
+// ★[EO-DEC-0259] 施設管理者の表示名を決める。
+//   ①facility_managers.display_name ②この施設のグループでの表示名 ③他のグループでの表示名
+//   のうち、最初に見つかったものを使う。どれも無ければ「（名前なし）」。
+function managerDisplayName(mgr) {
+  if (!mgr) return '（名前なし）';
+  const own = String(mgr.out_display_name || '').trim();
+  if (own) return own;
+  const sameFacility = memberCandidates.find(
+    (c) => String(c.out_facility_id) === String(mgr.out_facility_id)
+        && c.out_eo_uid === mgr.out_eo_uid
+  );
+  const anyFacility = sameFacility || memberCandidates.find((c) => c.out_eo_uid === mgr.out_eo_uid);
+  const names = anyFacility && Array.isArray(anyFacility.out_display_names)
+    ? anyFacility.out_display_names.filter((n) => String(n || '').trim())
+    : [];
+  return names.join(' / ') || '（名前なし）';
+}
+
 async function loadFacilityManagers() {
   facilityManagers = [];
   try {
@@ -1974,7 +1992,10 @@ function renderManagerSection() {
 
       const nameEl = document.createElement('span');
       nameEl.className = 'mg-manager-name';
-      const managerName = String(mgr.out_display_name || '').trim() || '（名前なし）';
+      // ★[EO-DEC-0259] facility_managers.display_name は経路によって空のことがある
+      //   （セルフ契約で自動的に施設管理者になる経路は設定していない）。
+      //   その場合は、この施設のグループでの表示名をフォールバックに使う。
+      const managerName = managerDisplayName(mgr);
       nameEl.textContent = managerName;
       info.appendChild(nameEl);
 
