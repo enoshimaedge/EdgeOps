@@ -856,7 +856,11 @@ function getSelectedFacility() {
 //   「!== 'suspended'」と書くと NULL と将来の未知の値（cancel_scheduled・ended）が素通りする。
 // ★第253回で cancel_scheduled を実装したら、この配列にだけ足す。
 //   DB側（manager_create_group の ARRAY['active']）と対で直すこと。
-const FACILITY_ACTIVE_CONTRACT_STATUSES = ['active'];
+// ★★2026/8/17 実施＝DB側（migration_log id=133）と対で cancel_scheduled を足した。
+//   理由＝解約予約中は契約終了日まで通常どおり利用できる（Plus版設計書 44-4）。
+//   ★解約予約は撤回できる（EO-DEC-0253 論点D）ため、「終わる施設」と決めつけて止めてはならない。
+//   ★ended と suspended は足さない。DB側の ARRAY と1対1で対応させる。
+const FACILITY_ACTIVE_CONTRACT_STATUSES = ['active', 'cancel_scheduled'];
 
 // ★画面に出す理由の文言。帯とボタンの両方がこの1つを見る（同じ文を2箇所に書き写さない）。
 const FACILITY_INACTIVE_MESSAGE = 'この施設は現在利用開始前または利用停止中です。グループを作成できません。';
