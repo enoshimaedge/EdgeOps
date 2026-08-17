@@ -936,7 +936,17 @@
       <button class="btn btn-secondary" onclick="updateDisplayName()" data-i18n="btn_update_name">表示名を更新</button>
     </div>
     <button class="btn btn-danger" onclick="leaveGroup()" style="margin-top:8px;" data-i18n="btn_leave_group">グループを退出する</button>
-    <div id="facility-manager-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openManagerPanel()" style="background:var(--eo-accent);color:white;width:100%;"><span data-i18n="btn_facility_manager">施設管理</span></button></div>
+    <!-- ★★2026/8/17 追加＝ご契約についての窓口への案内（EO-DEC-0253 論点A 案ウ の導線）
+         ★このリンクは #facility-manager-btn の中に置く。この div は既定で display:none で、
+           施設管理者のときだけ表示される。したがって ST版の利用者・一般の利用者には出ない。
+           JSの出し分けを新しく足していない（既にある仕組みに載せただけ）。
+         ★解約の窓口そのものは manager.html の下部「ご契約について」であり、ここは案内だけ。
+           完成形は案ア（manager.html の解約申請画面・課題80）。 -->
+    <div id="facility-manager-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openManagerPanel()" style="background:var(--eo-accent);color:white;width:100%;"><span data-i18n="btn_facility_manager">施設管理</span></button>
+      <div style="text-align:center; padding:8px 0 0; font-size:12px; line-height:1.7;">
+        <a href="javascript:void(0)" onclick="openManagerPanel()"
+           style="color:var(--text-light); text-decoration:underline;">ご契約・解約のお問い合わせは「施設管理」の最下部へ</a>
+      </div></div>
     <div id="super-admin-btn" style="display:none; margin-top:12px;"><button class="btn" onclick="openAdminPanel()" style="background:#0f1e35;color:white;width:100%;"><span data-i18n="btn_super_admin">超管理者ダッシュボード</span></button></div>
     <div style="text-align:center; padding: 14px 0 0;">
       <a href="javascript:void(0)" onclick="openInviteScreen('screen-profile')"
