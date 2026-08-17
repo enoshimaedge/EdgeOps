@@ -1430,7 +1430,7 @@ async function loadFacilities() {
         </div>
         <div class="group-item-info">
           <span>🏷️ ${escHtmlAdmin(f.facility_code || '')}</span>
-          <span>📄 契約: ${escHtmlAdmin(f.contract_status || '-')}</span>
+          <span>📄 契約: ${escHtmlAdmin(CONTRACT_STATUS_LABELS[f.contract_status] || f.contract_status || '-')}</span>
         </div>
         <div class="group-item-info">
           <span>👥 管理者: ${escHtmlAdmin(`${f.manager_count}`)}人</span>
@@ -1599,10 +1599,14 @@ function buildAuditFacilityFilter(facilities) {
 // ★施設名を onclick の引数に埋めないためのもの（名前に引用符が入ると壊れるため）。
 let allFacilities = [];
 
-// 契約状態の日本語ラベル（2値）
+// 契約状態の日本語ラベル
+// ★第253回 EO-DEC-0253 論点B 案ア＝段階1で4値になった（migration_log id=131）。
+//   cancel_scheduled と ended は Stripe 側の操作で入る値であり、admin からは動かさない。
 const CONTRACT_STATUS_LABELS = {
   active: '利用中',
-  suspended: '停止中'
+  suspended: '停止中',
+  cancel_scheduled: '解約予約中',
+  ended: '契約終了'
 };
 
 // RPCが投げる例外の日本語ラベル
@@ -1627,6 +1631,17 @@ let organizationCreateOverrideName = '';
 function _contractActionsHtml(f) {
   const cur = f.contract_status;
 
+  // ★第253回 EO-DEC-0253 段階3＝cancel_scheduled と ended は admin から動かさない。
+  // ★操作ボタンは1つも出さず、Stripe 側の操作が正であることを文言で伝えるだけにする。
+  //   admin_set_contract_status も入口・出口とも2値固定であり、渡しても INVALID_TRANSITION で
+  //   弾かれる（2026/8/16 第0段 0-4 の実測）。画面側の非表示は利便であり防御の本丸ではない。
+  if (cur === 'cancel_scheduled' || cur === 'ended') {
+    return `
+        <div class="facility-actions">
+          <span class="fac-note">契約状態は「${escHtmlAdmin(CONTRACT_STATUS_LABELS[cur])}」です。この状態の変更は Stripe 側の操作が正です。EdgeOps の管理画面からは操作できません。</span>
+        </div>`;
+  }
+
   if (cur !== 'active' && cur !== 'suspended') {
     return `
         <div class="facility-actions">
@@ -1639,7 +1654,9 @@ function _contractActionsHtml(f) {
   const label = (next === 'suspended') ? '契約を停止' : '契約を再開';
   const cls = (next === 'suspended') ? 'fac-btn-stop' : 'fac-btn-resume';
   const canInvite = (cur === 'active');
-  const note = isManual ? '' : '<span class="fac-note">紙請求書の施設のみ操作できます</span>';
+  // ★第253回 EO-DEC-0253 論点I の明示＝Stripe契約の施設へ EEE代行の窓は開かない。
+  //   RPC が billing_source='manual_invoice' 以外を NOT_MANUAL_INVOICE で弾く（0-4 の実測）。
+  const note = isManual ? '' : '<span class="fac-note">紙請求書の施設のみ操作できます。Stripe契約の施設は Stripe 側の操作が正です。</span>';
   const inviteBtn = `
           <button type="button" class="fac-btn fac-btn-invite"${canInvite ? '' : ' disabled'}
                   onclick="openInviteIssue('${escHtmlAdmin(f.facility_id)}')">招待コードを発行</button>`;

@@ -755,6 +755,54 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
       <div id="manager-section-container"></div>
       <!-- [EO-DEC-0246] データ出力（CSV）。中身の描画は js/export.js が行う -->
       <div id="export-container" class="mg-group-card"></div>
+
+      <!-- ════════════════════════════════════════════════════════════════
+           [EO-DEC-0253 段階4] 論点A 案ウ（暫定の出口）＋ 論点J
+           ★案ウ＝解約したい人の行き先を「文言とリンクだけ」で置く。
+             RPC も操作ボタンも作らない。完成形は案ア（manager.html の解約申請画面）であり、
+             本実装では作らない（指示書 6-1・第10節）。
+           ★manager.html は js/i18n.js を読み込んでいないため、文言は日本語で直書きする（第45章 45-4）。
+           ★論点J＝契約後の画面から規約・特商法・問い合わせ先へ辿れるようにする。
+             これまで manager.html には規約類のリンクが1つも無かった（0件）。
+           ★契約経路で出し分けない（静的に全員へ出す）。紙請求書の施設にとっても内容は正しく、
+             出し分けるとJSの判定が増えて「文言とリンクだけ」から外れるためである。
+           ════════════════════════════════════════════════════════════════ -->
+      <section class="mg-group-card" style="margin-top:12px;">
+        <div class="mg-group-card-title">ご契約について</div>
+        <p style="font-size:13px; line-height:1.8; color:var(--eo-text); margin:0 0 10px;">
+          ご契約の解約をご希望の場合は、下記までご連絡ください。
+        </p>
+        <dl style="margin:0 0 10px;">
+          <div style="display:flex; gap:10px; font-size:13px; line-height:1.9;">
+            <dt style="color:var(--eo-text-muted); min-width:4.5em;">メール</dt>
+            <dd style="margin:0;"><a href="mailto:support-edgeops@enoshimaedge.jp"
+              style="color:var(--green); text-decoration:none; word-break:break-all;">support-edgeops@enoshimaedge.jp</a></dd>
+          </div>
+          <div style="display:flex; gap:10px; font-size:13px; line-height:1.9;">
+            <dt style="color:var(--eo-text-muted); min-width:4.5em;">LINE</dt>
+            <dd style="margin:0;">EdgeOpsサポート　<a href="https://line.me/R/ti/p/%40918uwtlk"
+              target="_blank" rel="noopener" style="color:var(--green); text-decoration:none;">@918uwtlk</a></dd>
+          </div>
+        </dl>
+        <p style="font-size:12px; line-height:1.8; color:var(--eo-text-muted); margin:0;">
+          ※解約は契約期間の末日をもって成立します。期間中は通常どおりご利用いただけます。
+        </p>
+      </section>
+
+      <div style="text-align:center; padding:16px 0 8px; font-size:12px; color:var(--eo-text-muted); line-height:1.9;">
+        <a href="https://enoshimaedge.jp/edgeops/terms" target="_blank" rel="noopener"
+           style="color:var(--green); text-decoration:none;">利用規約</a>
+        &nbsp;／&nbsp;
+        <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank" rel="noopener"
+           style="color:var(--green); text-decoration:none;">プライバシーポリシー</a>
+        <br>
+        <a href="https://enoshimaedge.jp/edgeops/tokushoho/" target="_blank" rel="noopener"
+           style="color:var(--green); text-decoration:none;">特定商取引法に基づく表記</a>
+        &nbsp;／&nbsp;
+        <a href="mailto:support-edgeops@enoshimaedge.jp"
+           style="color:var(--green); text-decoration:none;">お問い合わせ</a>
+        <br><span style="font-size:11px;">© 2026 江の島エッジ合同会社</span>
+      </div>
     </main>
   </div>
 </div>

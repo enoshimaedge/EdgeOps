@@ -949,6 +949,12 @@
       &nbsp;／&nbsp;
       <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank"
          style="color:var(--green); text-decoration:none;" data-i18n="label_privacy">プライバシーポリシー</a>
+      <!-- ★第253回 EO-DEC-0253 論点J 案イ＝契約後の画面から特定商取引法に基づく表記へ辿れるようにする。
+           ★これまでリンクがあったのは screen-signup（新規登録画面）だけで、契約後は1つも辿れなかった。
+           ★data-i18n のキーは screen-signup と同じ link_tokushoho を再利用する（js/i18n.js の変更・版番号の更新は不要）。 -->
+      <br>
+      <a href="https://enoshimaedge.jp/edgeops/tokushoho/" target="_blank"
+         style="color:var(--green); text-decoration:none;" data-i18n="link_tokushoho">特定商取引法に基づく表記</a>
       <br><span style="font-size:11px;" data-i18n="label_copyright">© 2026 江の島エッジ合同会社</span>
     </div>
   </div>
@@ -1127,7 +1133,9 @@
         <a href="https://enoshimaedge.jp/edgeops/privacy" target="_blank"
            style="color:var(--green); text-decoration:none; font-weight:600;" data-i18n="link_privacy">プライバシーポリシー</a>
         &nbsp;／&nbsp;
-        <a href="https://enoshimaedge.jp/edgeops-tokushoho/" target="_blank"
+        <!-- ★2026/8/17 是正＝宛先を edgeops-tokushoho/ から edgeops/tokushoho/ へ直した。
+             ★第253回 段階4 で screen-profile へ同じリンクを足すため、宛先を1つに揃える必要があった。 -->
+        <a href="https://enoshimaedge.jp/edgeops/tokushoho/" target="_blank"
            style="color:var(--green); text-decoration:none; font-weight:600;" data-i18n="link_tokushoho">特定商取引法に基づく表記</a>
       </div>
       <div style="font-size:12px; color:var(--text-light); line-height:1.7;"
