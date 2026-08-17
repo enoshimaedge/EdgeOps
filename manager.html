@@ -769,8 +769,11 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
            ════════════════════════════════════════════════════════════════ -->
       <section class="mg-group-card" style="margin-top:12px;">
         <div class="mg-group-card-title">ご契約について</div>
+        <!-- ★★2026/8/17 追加＝EO-DEC-0253 論点A 案ア（セルフ解約の申請と撤回）。
+             中身の描画は renderContractSection() が行う。主担当のときだけボタンが出る。 -->
+        <div id="contract-action-area" style="margin:0 0 12px;"></div>
         <p style="font-size:13px; line-height:1.8; color:var(--eo-text); margin:0 0 10px;">
-          ご契約の解約をご希望の場合は、下記までご連絡ください。
+          ご不明な点やお困りのことがございましたら、下記までご連絡ください。
         </p>
         <dl style="margin:0 0 10px;">
           <div style="display:flex; gap:10px; font-size:13px; line-height:1.9;">
@@ -897,6 +900,204 @@ function renderFacilityBanner(facility) {
   }
 }
 
+// ── ★★[EO-DEC-0253 論点A 案ア] セルフ解約の申請と撤回（2026/8/17）──────────
+// ★操作できるのは「その施設の主担当（is_main）」だけである。判定の本丸は Edge Function
+//   manager-cancel-subscription 側にあり、ここでの出し分けは利便のためである（第189回の考え方）。
+// ★この画面は EdgeOps のDBを直接書かない。Edge Function が Stripe を更新し、
+//   その結果は stripe-webhook が同期する（原則90）。だから実行後は数秒待って読み直す。
+// ★契約終了予定日は manager_get_my_facilities が返さないため、日付は出さない（案ア・DB作業0件）。
+//   日付を出すなら同RPCへ列を足す必要があり、8/22 の第260回で同関数を作り直すときに合わせる。
+let contractActionRunning = false;
+let contractConfirmMode = null;   // 'cancel' | 'resume' | null
+
+function setContractMessage(msg, isError) {
+  const el = document.getElementById('contract-action-msg');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? '#c0392b' : 'var(--eo-text-muted)';
+}
+
+function contractErrorMessage(code) {
+  const map = {
+    AUTH_REQUIRED:  'ログイン状態を確認できませんでした。アプリを開き直してください。',
+    AUTH_INVALID:   'ログイン状態を確認できませんでした。アプリを開き直してください。',
+    EOID_NOT_FOUND: 'ご利用者の情報を確認できませんでした。開き直してもう一度お試しください。',
+    NOT_FACILITY_MANAGER: 'この施設の管理者として確認できませんでした。',
+    NOT_MAIN_MANAGER:     'お手続きは、この施設の主担当の方が行えます。',
+    NOT_STRIPE_CONTRACT:  'この施設は紙請求書のご契約です。解約は下記の連絡先までご連絡ください。',
+    STRIPE_SUBSCRIPTION_MISSING: 'ご契約の情報を確認できませんでした。下記までご連絡ください。',
+    ALREADY_SCHEDULED: 'すでに解約のお申し込みを受け付けています。',
+    NOT_CANCELABLE:    '現在の契約状態ではお手続きできません。下記までご連絡ください。',
+    NOT_SCHEDULED:     '解約のお申し込みは受け付けられていません。',
+    STRIPE_UPDATE_FAILED: 'お手続きができませんでした。時間をおいてもう一度お試しください。',
+  };
+  return map[code] || 'お手続きができませんでした。時間をおいてもう一度お試しください。';
+}
+
+function renderContractSection() {
+  const container = document.getElementById('contract-action-area');
+  if (!container) return;
+  container.replaceChildren();
+
+  const facility = getSelectedFacility();
+  if (!facility) return;
+
+  const status = String(facility.contract_status == null ? '' : facility.contract_status);
+  const isMain = (facility.is_main === true);
+
+  const lead = document.createElement('p');
+  lead.style.cssText = 'font-size:13px; line-height:1.8; color:var(--eo-text); margin:0 0 10px;';
+
+  // ★主担当でない管理者には、誰が手続きできるかだけを伝える（ボタンは出さない）
+  if (!isMain) {
+    lead.textContent = '解約のお手続きは、この施設の主担当の方が行えます。';
+    container.appendChild(lead);
+    return;
+  }
+
+  if (status === 'active') {
+    lead.textContent = 'ご契約の解約をご希望の場合は、下のボタンからお申し込みいただけます。'
+      + '解約は契約期間の末日をもって成立し、期間中は通常どおりご利用いただけます。'
+      + '末日までは取り消すこともできます。';
+    container.appendChild(lead);
+    container.appendChild(_contractButton('解約を申し込む', 'cancel'));
+  } else if (status === 'cancel_scheduled') {
+    lead.innerHTML = '';
+    const strong = document.createElement('strong');
+    strong.style.color = '#c0392b';
+    strong.textContent = '解約のお申し込みを受け付けています。';
+    lead.appendChild(strong);
+    lead.appendChild(document.createTextNode(
+      'ご契約は契約期間の末日をもって終了します。末日までは通常どおりご利用いただけます。'
+      + '取り消したい場合は下のボタンからお手続きください。'));
+    container.appendChild(lead);
+    container.appendChild(_contractButton('解約を取り消す', 'resume'));
+  } else {
+    lead.textContent = '解約をご希望の場合は、下記の連絡先までご連絡ください。';
+    container.appendChild(lead);
+    return;
+  }
+
+  // 確認欄（★2段にする。押した瞬間には実行しない）
+  if (contractConfirmMode) {
+    container.appendChild(_contractConfirmBox(contractConfirmMode));
+  }
+
+  const msg = document.createElement('div');
+  msg.id = 'contract-action-msg';
+  msg.style.cssText = 'font-size:12px; line-height:1.7; margin-top:8px; min-height:16px; color:var(--eo-text-muted);';
+  container.appendChild(msg);
+}
+
+function _contractButton(label, mode) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = label;
+  btn.disabled = contractActionRunning;
+  btn.style.cssText = (mode === 'cancel')
+    ? 'padding:10px 16px; background:#fff; color:#c0392b; border:1.5px solid #c0392b; border-radius:var(--eo-radius); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer;'
+    : 'padding:10px 16px; background:var(--eo-accent,#0F6B63); color:#fff; border:none; border-radius:var(--eo-radius); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer;';
+  btn.addEventListener('click', () => {
+    if (contractActionRunning) return;
+    contractConfirmMode = mode;
+    renderContractSection();
+  });
+  return btn;
+}
+
+function _contractConfirmBox(mode) {
+  const box = document.createElement('div');
+  box.style.cssText = 'margin-top:12px; padding:12px; border:1px solid var(--eo-border); border-radius:var(--eo-radius); background:var(--eo-surface-sunken);';
+
+  const text = document.createElement('p');
+  text.style.cssText = 'font-size:13px; line-height:1.8; margin:0 0 10px; color:var(--eo-text);';
+  text.textContent = (mode === 'cancel')
+    ? '解約を申し込みます。よろしいですか？　契約期間の末日まで通常どおりご利用いただけます。末日までは取り消せます。'
+    : '解約のお申し込みを取り消します。よろしいですか？　ご契約はそのまま継続します。';
+  box.appendChild(text);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap;';
+
+  const ok = document.createElement('button');
+  ok.type = 'button';
+  ok.textContent = (mode === 'cancel') ? 'はい、解約を申し込む' : 'はい、取り消す';
+  ok.disabled = contractActionRunning;
+  ok.style.cssText = 'padding:10px 16px; background:#c0392b; color:#fff; border:none; border-radius:var(--eo-radius); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer;';
+  ok.addEventListener('click', () => { runContractAction(mode); });
+
+  const no = document.createElement('button');
+  no.type = 'button';
+  no.textContent = 'やめる';
+  no.disabled = contractActionRunning;
+  no.style.cssText = 'padding:10px 16px; background:#fff; color:var(--eo-text); border:1px solid var(--eo-border); border-radius:var(--eo-radius); font-size:13px; font-weight:600; font-family:inherit; cursor:pointer;';
+  no.addEventListener('click', () => {
+    if (contractActionRunning) return;
+    contractConfirmMode = null;
+    renderContractSection();
+  });
+
+  row.appendChild(ok);
+  row.appendChild(no);
+  box.appendChild(row);
+  return box;
+}
+
+async function runContractAction(action) {
+  if (contractActionRunning) return;
+  const facility = getSelectedFacility();
+  if (!facility) return;
+
+  contractActionRunning = true;
+  renderContractSection();
+  setContractMessage('お手続きしています。しばらくお待ちください…', false);
+
+  try {
+    // ★セッションのトークンを付けて呼ぶ（sb.rpc と同じセッションを使う）
+    const { data: sessionData } = await sb.auth.getSession();
+    const token = sessionData && sessionData.session && sessionData.session.access_token;
+    if (!token) {
+      setContractMessage('ログイン状態を確認できませんでした。アプリを開き直してください。', true);
+      return;
+    }
+
+    const res = await fetch(SUPABASE_URL + '/functions/v1/manager-cancel-subscription', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ facility_id: facility.facility_id, action: action }),
+    });
+
+    let body = null;
+    try { body = await res.json(); } catch (_) { /* noop */ }
+
+    if (!res.ok || !body || body.ok !== true) {
+      const code = body && body.error_code;
+      if (body && body.rid) console.error('[EO-DEC-0253] manager-cancel-subscription rid:', body.rid, code);
+      setContractMessage(contractErrorMessage(code), true);
+      return;
+    }
+
+    contractConfirmMode = null;
+    // ★ここで契約状態を手で書き換えない。Webhook の同期を待って読み直す（原則90）
+    setContractMessage(action === 'cancel'
+      ? '解約のお申し込みを受け付けました。画面に反映されるまで数秒お待ちください…'
+      : '解約のお申し込みを取り消しました。画面に反映されるまで数秒お待ちください…', false);
+
+    await new Promise((r) => setTimeout(r, 3000));
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+    setContractMessage(action === 'cancel'
+      ? '解約のお申し込みを受け付けました。'
+      : '解約のお申し込みを取り消しました。', false);
+  } catch (e) {
+    console.error('[EO-DEC-0253] contract action failed:', e);
+    setContractMessage('お手続きができませんでした。時間をおいてもう一度お試しください。', true);
+  } finally {
+    contractActionRunning = false;
+    renderContractSection();
+  }
+}
+
 function renderFacilityDetails() {
   const facility = getSelectedFacility();
   if (!facility) return;
@@ -924,6 +1125,8 @@ function renderFacilityDetails() {
   renderManagerSection();
   // [EO-DEC-0246] データ出力（CSV）の画面。判定も整形も js/export.js 側に持たせる
   if (typeof renderExportSection === 'function') renderExportSection();
+  // ★[EO-DEC-0253 論点A 案ア] セルフ解約の申請と撤回（主担当のときだけボタンが出る）
+  renderContractSection();
 }
 
 const INDUSTRY_LABELS = {
