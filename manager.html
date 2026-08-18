@@ -2315,7 +2315,11 @@ const MANAGER_ERROR_MESSAGES = {
 
 function managerErrorMessage(error) {
   if (!error) return '処理できませんでした。時間をおいて再度お試しください';
-  const code = (error.code || error.message || '');
+  // ★[EO-DEC-0260 実装時の是正] error.code を先に見ると、RPC の RAISE EXCEPTION が
+  //   PostgreSQL の汎用エラー番号 'P0001' で埋まるため、どのキーにも一致せず常に既定文へ落ちる。
+  //   （2026/8/18 実測＝code='P0001' / message='FACILITY_GROUP_LIMIT'）
+  //   ★MIGRATE_ERROR_MESSAGES 側の migrateErrorMessage() は元から message 優先であり、そちらへ揃える。
+  const code = (error.message || error.code || '') + '';
   for (const key of Object.keys(MANAGER_ERROR_MESSAGES)) {
     if (code.includes(key)) return MANAGER_ERROR_MESSAGES[key];
   }
