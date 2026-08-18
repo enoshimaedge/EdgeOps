@@ -273,6 +273,15 @@ console.log('[EdgeOps admin] Environment:', CURRENT_ENV, '| hostname:', window.l
   .industry-tag.care { background: #fff3e0; color: #e65100; }
   .industry-tag.attraction { background: #f3e5f5; color: #6a1b9a; }
   .industry-tag.event { background: #fdf1e3; color: #a05a1c; }
+  /* ★[EO-DEC-0266] 課金経路のバッジ */
+  .route-badge {
+    font-size: 10px; font-weight: 700; padding: 2px 9px; border-radius: 10px;
+    display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .route-badge.card    { background: #e3f2fd; color: #1565c0; }
+  .route-badge.paper   { background: #fff3e0; color: #e65100; }
+  .route-badge.none    { background: #fdecea; color: #c62828; box-shadow: inset 0 0 0 1.5px #e57373; }
+  .route-badge.unknown { background: #ede7f6; color: #4527a0; box-shadow: inset 0 0 0 1.5px #b39ddb; }
   .group-item-info {
     display: flex;
     gap: 16px;
@@ -1422,11 +1431,12 @@ async function loadFacilities() {
                  ${canBulk ? '' : 'disabled'}
                  onchange="onBulkCheckChanged()"
                  data-facility-id="${escHtmlAdmin(f.facility_id)}">
-          <label for="bulk-${escHtmlAdmin(f.facility_id)}">${canBulk ? 'まとめ操作の対象にする' : 'まとめ操作の対象外'}</label>
+          <label for="bulk-${escHtmlAdmin(f.facility_id)}">${canBulk ? 'まとめ操作の対象にする' : 'まとめ操作の対象外（' + escHtmlAdmin(_bulkOffReason(f)) + '）'}</label>
         </div>
         <div class="group-item-header">
           <div class="group-id">${escHtmlAdmin(f.facility_name || '')}</div>
           <div class="industry-tag">${escHtmlAdmin(f.plan || '')}</div>
+          ${_routeBadgeHtml(f.billing_source)}
         </div>
         <div class="group-item-info">
           <span>🏷️ ${escHtmlAdmin(f.facility_code || '')}</span>
@@ -1611,6 +1621,38 @@ const CONTRACT_STATUS_LABELS = {
   ended: '契約終了'
 };
 
+// ── ★[EO-DEC-0266] 課金経路の表示（2026/8/18）──────────────────────
+// ★★条件4＝評価の順序を固定する。上から順に見て、最初に一致したものだけを出す。
+//   ① NULL → 契約行なし　② stripe → カード決済　③ manual_invoice → 契約状態で判定
+//   ④ それ以外（未知値）→ 未対応
+// ★「manual_invoice 以外はカード決済」と書いてはならない。未知値まで
+//   「カード決済」と表示され、お金に関する画面で事実と違うことを述べてしまう。
+function _routeBadgeHtml(billingSource) {
+  if (billingSource == null || billingSource === '') {
+    return '<div class="route-badge none">⚠️ 契約行なし</div>';
+  }
+  if (billingSource === 'stripe') {
+    return '<div class="route-badge card">💳 カード決済</div>';
+  }
+  if (billingSource === 'manual_invoice') {
+    return '<div class="route-badge paper">📄 紙請求書</div>';
+  }
+  return '<div class="route-badge unknown">⚠️ 未対応の経路: '
+    + escHtmlAdmin(String(billingSource)) + '</div>';
+}
+
+// 「まとめ操作の対象外」の理由。★同じ優先順位で評価する。
+function _bulkOffReason(f) {
+  const bs = f.billing_source;
+  if (bs == null || bs === '')  return '契約行なし';
+  if (bs === 'stripe')          return 'カード決済のため';
+  if (bs === 'manual_invoice') {
+    const label = CONTRACT_STATUS_LABELS[f.contract_status] || f.contract_status || '不明';
+    return '契約状態が' + label + 'のため';
+  }
+  return '課金経路が未対応のため';
+}
+
 // RPCが投げる例外の日本語ラベル
 const CONTRACT_ERROR_LABELS = {
   AUTH_REQUIRED: 'ログイン状態を確認できませんでした。開き直してください。',
@@ -1658,7 +1700,18 @@ function _contractActionsHtml(f) {
   const canInvite = (cur === 'active');
   // ★第253回 EO-DEC-0253 論点I の明示＝Stripe契約の施設へ EEE代行の窓は開かない。
   //   RPC が billing_source='manual_invoice' 以外を NOT_MANUAL_INVOICE で弾く（0-4 の実測）。
-  const note = isManual ? '' : '<span class="fac-note">紙請求書の施設のみ操作できます。Stripe契約の施設は Stripe 側の操作が正です。</span>';
+  // ★[EO-DEC-0266] 注記を3分岐にする。★是正＝変更前は isManual が false のとき一律に
+  //   「Stripe契約の施設は」と出していたため、契約行が無い施設に対して事実と違うことを
+  //   述べていた。お金に関わる画面なので、実態どおりの文言に分ける（条件4と同じ順序）。
+  const bsAdm = f.billing_source;
+  let note = '';
+  if (bsAdm == null || bsAdm === '') {
+    note = '<span class="fac-note">subscriptions に行がありません。カード・紙のどちらでもないため、契約状態の操作はできません。</span>';
+  } else if (bsAdm === 'stripe') {
+    note = '<span class="fac-note">カード決済の施設です。契約状態の変更は Stripe 側の操作が正です。</span>';
+  } else if (bsAdm !== 'manual_invoice') {
+    note = '<span class="fac-note">課金経路が未対応の値です。契約状態の操作はできません。</span>';
+  }
   const inviteBtn = `
           <button type="button" class="fac-btn fac-btn-invite"${canInvite ? '' : ' disabled'}
                   onclick="openInviteIssue('${escHtmlAdmin(f.facility_id)}')">招待コードを発行</button>`;

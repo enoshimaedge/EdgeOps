@@ -698,6 +698,11 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dt class="mg-detail-term">プラン</dt>
             <dd id="facility-plan" class="mg-detail-value"></dd>
           </div>
+          <!-- ★[EO-DEC-0266] お支払い方法。既知の2値のときだけ行ごと表示する -->
+          <div class="mg-detail" id="facility-billing-row">
+            <dt class="mg-detail-term">お支払い方法</dt>
+            <dd id="facility-billing-source" class="mg-detail-value"></dd>
+          </div>
           <div class="mg-detail">
             <dt class="mg-detail-term">契約ステータス</dt>
             <dd id="facility-contract-status" class="mg-detail-value"></dd>
@@ -955,6 +960,21 @@ function renderContractSection() {
     return;
   }
 
+  // ★★[EO-DEC-0266 論点A・B] 課金経路による出し分け（2026/8/18）
+  // ★許可リスト方式＝'stripe' と一致するときだけ申込・撤回のボタンを出す。
+  //   manual_invoice・NULL・将来の未知値はすべて連絡先案内へ倒す（条件1）。
+  //   ★「manual_invoice だけ禁止」と書いてはならない。値が増えたとき穴が開く。
+  // ★これは利便のための出し分けである。防御の本丸は Edge Function
+  //   manager-cancel-subscription の NOT_STRIPE_CONTRACT であり、そちらは残っている（条件2）。
+  const billingSource = String(facility.billing_source == null ? '' : facility.billing_source);
+  if (billingSource !== 'stripe') {
+    lead.textContent = (billingSource === 'manual_invoice')
+      ? 'この施設は請求書（郵送）でのお支払いです。解約のお申し込みは、下記の連絡先までご連絡ください。'
+      : '解約をご希望の場合は、下記の連絡先までご連絡ください。';
+    container.appendChild(lead);
+    return;
+  }
+
   if (status === 'active') {
     lead.textContent = 'ご契約の解約をご希望の場合は、下のボタンからお申し込みいただけます。'
       + '解約は契約期間の末日をもって成立し、期間中は通常どおりご利用いただけます。'
@@ -1103,10 +1123,18 @@ function renderFacilityDetails() {
   if (!facility) return;
   setFacilityValue('facility-name', facility.facility_name);
   setFacilityValue('facility-code', facility.facility_code);
-  setFacilityValue('facility-plan', facility.plan);
-  setFacilityValue('facility-contract-status', facility.contract_status);
-  // sub_status は表示のみ（凍結判定には使わない）
+  // ★[EO-DEC-0266] 既知値は日本語、未知値は生値へフォールバックする（条件3）
+  setFacilityValue('facility-plan', labelOrRawMg(PLAN_LABELS_MG, facility.plan));
+  setFacilityValue('facility-contract-status',
+    labelOrRawMg(CONTRACT_STATUS_LABELS_MG, facility.contract_status));
+  // sub_status は表示のみ（凍結判定には使わない）。★[EO-DEC-0266] 変換せず生値のまま
   setFacilityValue('facility-sub-status', facility.sub_status);
+  // ★[EO-DEC-0266] お支払い方法。既知の2値のときだけ行を出す。
+  //   NULL も未知値も行ごと消す（利用者に技術的な生値を見せないため）。
+  const billingLabelMg = BILLING_SOURCE_LABELS_MG[String(facility.billing_source)] || '';
+  const billingRowMg = document.getElementById('facility-billing-row');
+  if (billingRowMg) billingRowMg.style.display = billingLabelMg ? '' : 'none';
+  setFacilityValue('facility-billing-source', billingLabelMg);
   setFacilityValue('facility-group-count', (facility.group_count != null ? facility.group_count : 0) + ' / ' + FACILITY_GROUP_LIMIT);
   setFacilityValue('facility-archived-count', 'アーカイブ ' + (facility.archived_count != null ? facility.archived_count : 0));
   const noOwnerCount = managerGroups.filter((group) => (
@@ -1127,6 +1155,34 @@ function renderFacilityDetails() {
   if (typeof renderExportSection === 'function') renderExportSection();
   // ★[EO-DEC-0253 論点A 案ア] セルフ解約の申請と撤回（主担当のときだけボタンが出る）
   renderContractSection();
+}
+
+// ── ★[EO-DEC-0266] 表示ラベル（2026/8/18）────────────────────────────
+// ★条件3＝既知値は日本語、未知値は元の生値をそのまま出す。空欄にしない。
+// ★sub_status は変換しない。Stripe の subscription.status そのものであり、
+//   サポート時に Stripe 画面と突き合わせる材料になるため、生値のまま残す。
+const PLAN_LABELS_MG = {
+  plus: 'Plus'
+};
+
+const CONTRACT_STATUS_LABELS_MG = {
+  active:           '利用中',
+  cancel_scheduled: '解約予約中',
+  suspended:        '停止中',
+  ended:            '契約終了'
+};
+
+// ★お支払い方法。★既知の2値だけを持つ。NULL・未知値は行ごと出さない（判定記録 第5節）。
+const BILLING_SOURCE_LABELS_MG = {
+  stripe:         'カード決済',
+  manual_invoice: '請求書（郵送）'
+};
+
+// 既知値なら日本語ラベル、未知値なら生値、NULL/空なら空文字を返す。
+function labelOrRawMg(map, value) {
+  if (value == null || value === '') return '';
+  const key = String(value);
+  return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : key;
 }
 
 const INDUSTRY_LABELS = {
