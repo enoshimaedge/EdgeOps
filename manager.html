@@ -1306,6 +1306,9 @@ let migrateDraftFacilityId = null;
 
 const MIGRATE_ERROR_MESSAGES = {
   ALREADY_MIGRATED:     'このグループはすでに施設へ移されています',
+  // ★[EO-DEC-0262] アーカイブ済みはRPC側で弾く（第258回 論点E をRPCでも成立させた）。
+  //   これを足さないと GROUP_ARCHIVED が既定文へ丸まる（原則38）。
+  GROUP_ARCHIVED:       'アーカイブ済みのグループは移せません',
   NOT_OWNER:            'このグループを作成した方だけが移せます',
   NOT_FACILITY_MANAGER: '権限がありません',
   // ★[EO-DEC-0260] 枠を分けたので「グループ数」ではなく「通常グループ数」と書く。
