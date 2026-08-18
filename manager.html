@@ -165,6 +165,15 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     font-weight: 700;
   }
 
+  /* ★[EO-DEC-0260] 通常枠とイベント枠を2行に分ける。
+     setFacilityValue() は textContent で入れるため <br> は使えない。
+     文字列中の \n を改行として描くために pre-line を指定する。
+     ★.mg-stat-value 全体ではなくIDだけに効かせる（メンバー数・管理者数には影響させない）。 */
+  #facility-group-count {
+    white-space: pre-line;
+    line-height: 1.25;
+  }
+
   .mg-stat-sub {
     color: var(--eo-text-muted);
     font-size: 12px;
@@ -1142,7 +1151,7 @@ function renderFacilityDetails() {
   setFacilityValue('facility-group-count',
     '通常 ' + (facility.normal_group_count != null ? facility.normal_group_count : 0)
       + ' / ' + FACILITY_GROUP_LIMIT
-    + '　イベント ' + (facility.event_group_count != null ? facility.event_group_count : 0)
+    + '\nイベント ' + (facility.event_group_count != null ? facility.event_group_count : 0)
       + ' / ' + FACILITY_EVENT_GROUP_LIMIT);
   setFacilityValue('facility-archived-count', 'アーカイブ ' + (facility.archived_count != null ? facility.archived_count : 0));
   const noOwnerCount = managerGroups.filter((group) => (
