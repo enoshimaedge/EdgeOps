@@ -823,6 +823,8 @@ const LIFF_ID = '2009827939-rZo06gWm';
 // 1施設あたりのグループ数上限（Plus版の確定仕様・設計書6-4）
 // ★将来プラン別上限が必要になればDB/RPCへ移す。その際もこの1か所を置き換えればよい。
 const FACILITY_GROUP_LIMIT = 20;
+// ★[EO-DEC-0260] イベント枠は通常枠と別勘定。値が同じでも別の定数として持つ。
+const FACILITY_EVENT_GROUP_LIMIT = 20;
 
 let sb;
 let managerFacilities = [];
@@ -1135,7 +1137,13 @@ function renderFacilityDetails() {
   const billingRowMg = document.getElementById('facility-billing-row');
   if (billingRowMg) billingRowMg.style.display = billingLabelMg ? '' : 'none';
   setFacilityValue('facility-billing-source', billingLabelMg);
-  setFacilityValue('facility-group-count', (facility.group_count != null ? facility.group_count : 0) + ' / ' + FACILITY_GROUP_LIMIT);
+  // ★[EO-DEC-0260] 通常枠とイベント枠を別々に出す。HTMLの要素は増やさない（1つの文字列にまとめる）。
+  //   ★facility.group_count はRPCが返し続ける合計値だが、この表示では使わない（論点C案イ）。
+  setFacilityValue('facility-group-count',
+    '通常 ' + (facility.normal_group_count != null ? facility.normal_group_count : 0)
+      + ' / ' + FACILITY_GROUP_LIMIT
+    + '　イベント ' + (facility.event_group_count != null ? facility.event_group_count : 0)
+      + ' / ' + FACILITY_EVENT_GROUP_LIMIT);
   setFacilityValue('facility-archived-count', 'アーカイブ ' + (facility.archived_count != null ? facility.archived_count : 0));
   const noOwnerCount = managerGroups.filter((group) => (
     String(group.facility_id) === String(facility.facility_id)
@@ -1291,7 +1299,9 @@ const MIGRATE_ERROR_MESSAGES = {
   ALREADY_MIGRATED:     'このグループはすでに施設へ移されています',
   NOT_OWNER:            'このグループを作成した方だけが移せます',
   NOT_FACILITY_MANAGER: '権限がありません',
-  FACILITY_GROUP_LIMIT: 'この施設のグループ数が上限（20）に達しています',
+  // ★[EO-DEC-0260] 枠を分けたので「グループ数」ではなく「通常グループ数」と書く。
+  FACILITY_GROUP_LIMIT:       'この施設の通常グループ数が上限（20）に達しています',
+  FACILITY_EVENT_GROUP_LIMIT: 'この施設のイベントグループ数が上限（20）に達しています',
   GROUP_NOT_FOUND:      'グループが見つかりません',
   FACILITY_NOT_FOUND:   '施設が見つかりません',
   AUTH_REQUIRED:        'ログインの有効期限が切れています。画面を開き直してください',
@@ -2279,7 +2289,9 @@ const MANAGER_ERROR_MESSAGES = {
   TARGET_NOT_APPROVED_MEMBER: 'この方は施設のグループに参加していないため追加できません',
   NOT_FACILITY_MANAGER: '権限がありません',
   DUPLICATE_GROUP_ID: 'グループIDが重複しました。もう一度お試しください',
-  FACILITY_GROUP_LIMIT: 'この施設のグループ数が上限（20）に達しています',
+  // ★[EO-DEC-0260] 枠を分けたので「グループ数」ではなく「通常グループ数」と書く。
+  FACILITY_GROUP_LIMIT: 'この施設の通常グループ数が上限（20）に達しています',
+  FACILITY_EVENT_GROUP_LIMIT: 'この施設のイベントグループ数が上限（20）に達しています',
   GROUP_NOT_FOUND: 'グループが見つかりません',
   ALREADY_ARCHIVED: 'このグループはすでにアーカイブされています',
   NOT_ARCHIVED: 'このグループはアーカイブされていません',
