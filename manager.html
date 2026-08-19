@@ -1543,7 +1543,7 @@ function renderMigrateSection() {
     detail.appendChild(document.createTextNode(
         '」へ移します。\n'
       + '・連絡と画像の保存期間が 60日／30日 から 180日 に変わります\n'
-      + (g.industry === 'event'
+      + (group.industry === 'event'
           ? '・イベントの終了日はそのまま維持されます\n'
           : '・このグループの利用期限は無期限になります\n')
       + '・地域の表示が 「' + facilityLabel + '」の地域 に変わります（施設に地域が設定されていない場合は空欄になります）\n'
