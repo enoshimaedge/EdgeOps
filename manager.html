@@ -844,6 +844,8 @@ let currentEoUid = null;
 let groupCreateDraft = null;
 let groupRenameTargetId = null;
 let groupRenameDraftName = '';
+let groupExpiryTargetId = null;
+let groupExpiryDraftLastDay = '';
 let groupOwnerPickerTargetId = null;
 let groupOwnerPickerEoUid = '';
 let groupSectionErrorMessage = '';
@@ -867,6 +869,58 @@ function setFacilityValue(id, value) {
 
 function getSelectedFacility() {
   return managerFacilities.find((facility) => String(facility.facility_id) === String(selectedFacilityId)) || null;
+}
+
+function formatDateInputValue(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  return date.getFullYear() + '-'
+    + String(date.getMonth() + 1).padStart(2, '0') + '-'
+    + String(date.getDate()).padStart(2, '0');
+}
+
+function getJstYmd(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  if (!year || !month || !day) return '';
+  return year + '-' + month + '-' + day;
+}
+
+function getGroupExpiryMaxLastDay(group) {
+  if (!group || !group.created_at) return '';
+  const created = new Date(group.created_at);
+  if (Number.isNaN(created.getTime())) return '';
+  const createdJstYmd = getJstYmd(created);
+  if (!createdJstYmd) return '';
+  const limit = new Date(createdJstYmd + 'T00:00:00');
+  if (Number.isNaN(limit.getTime())) return '';
+  limit.setFullYear(limit.getFullYear() + 1);
+  return formatDateInputValue(limit);
+}
+
+function formatYmdJa(ymd) {
+  const parts = String(ymd || '').split('-');
+  if (parts.length !== 3) return '';
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return '';
+  return year + '年' + month + '月' + day + '日';
+}
+
+function lastDayFromExpiresAt(expiresAt) {
+  if (!expiresAt) return '';
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return '';
+  date.setDate(date.getDate() - 1);
+  return formatDateInputValue(date);
 }
 
 // ── [EO-DEC-0256] 契約状態のガード（課題83）─────────────────────────
@@ -1621,6 +1675,33 @@ async function createGroup() {
   );
   if (!confirmed) return;
 
+  let expiresAtIso = null;
+  if (groupCreateDraft.industry === 'event') {
+    const lastDay = groupCreateDraft.lastDay || '';
+    if (!lastDay) {
+      groupSectionErrorMessage = '利用最終日を入力してください';
+      renderGroupList();
+      return;
+    }
+    const base = new Date(lastDay + 'T00:00:00');
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (base < today) {
+      groupSectionErrorMessage = '過去の日付は指定できません';
+      renderGroupList();
+      return;
+    }
+    const limit = new Date(); limit.setHours(0, 0, 0, 0);
+    limit.setFullYear(limit.getFullYear() + 1);
+    if (base > limit) {
+      groupSectionErrorMessage = '利用最終日は1年以内で指定してください';
+      renderGroupList();
+      return;
+    }
+    const exp = new Date(base);
+    exp.setDate(exp.getDate() + 1);
+    expiresAtIso = exp.toISOString();
+  }
+
   setGroupSectionButtonsDisabled(true);
   groupSectionErrorMessage = '';
   groupSectionInfoMessage = '';
@@ -1631,6 +1712,7 @@ async function createGroup() {
       p_group_name: groupName,
       p_industry: industry,
       p_display_name: displayName,
+      p_expires_at: expiresAtIso,
     });
     if (error) {
       groupSectionErrorMessage = managerErrorMessage(error);
@@ -1638,6 +1720,73 @@ async function createGroup() {
       return;
     }
     groupCreateDraft = null;
+    await reloadManagerDataStrict();
+    renderFacilityDetails();
+  } catch (e) {
+    groupSectionErrorMessage = managerErrorMessage(e);
+    renderGroupList();
+  } finally {
+    setGroupSectionButtonsDisabled(false);
+  }
+}
+
+async function updateGroupExpiry(group) {
+  const lastDay = (groupExpiryDraftLastDay || '').trim();
+  if (!lastDay) {
+    groupSectionErrorMessage = '利用最終日を入力してください';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const base = new Date(lastDay + 'T00:00:00');
+  if (Number.isNaN(base.getTime())) {
+    groupSectionErrorMessage = '利用最終日の形式が正しくありません';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (base < today) {
+    groupSectionErrorMessage = '過去の日付は指定できません';
+    groupSectionInfoMessage = '';
+    renderGroupList();
+    return;
+  }
+  const maxLastDay = getGroupExpiryMaxLastDay(group);
+  if (maxLastDay) {
+    const limit = new Date(maxLastDay + 'T00:00:00');
+    if (!Number.isNaN(limit.getTime()) && base > limit) {
+      groupSectionErrorMessage = '利用最終日は、グループ作成日から1年以内で指定してください';
+      groupSectionInfoMessage = '';
+      renderGroupList();
+      return;
+    }
+  }
+  const confirmed = window.confirm(
+    '「' + (group.group_name || '') + '」の終了日を ' + formatYmdJa(lastDay) + ' に変更します。\n'
+    + '終了日を変更すると、参加者が利用できる期間も変更されます。'
+  );
+  if (!confirmed) return;
+
+  const exp = new Date(base);
+  exp.setDate(exp.getDate() + 1);
+  const expiresAtIso = exp.toISOString();
+
+  setGroupSectionButtonsDisabled(true);
+  groupSectionErrorMessage = '';
+  groupSectionInfoMessage = '';
+  try {
+    const { error } = await sb.rpc('manager_update_group_expiry', {
+      p_group_session_id: group.group_session_id,
+      p_expires_at: expiresAtIso,
+    });
+    if (error) {
+      groupSectionErrorMessage = managerErrorMessage(error);
+      renderGroupList();
+      return;
+    }
+    groupExpiryTargetId = null;
+    groupExpiryDraftLastDay = '';
     await reloadManagerDataStrict();
     renderFacilityDetails();
   } catch (e) {
@@ -1956,6 +2105,8 @@ function buildGroupRow(group, options = {}) {
     renameBtn.addEventListener('click', () => {
       groupRenameTargetId = groupId;
       groupRenameDraftName = group.group_name || '';
+      groupExpiryTargetId = null;
+      groupExpiryDraftLastDay = '';
       groupOwnerPickerTargetId = null;
       groupOwnerPickerEoUid = '';
       groupSectionErrorMessage = '';
@@ -1985,6 +2136,30 @@ function buildGroupRow(group, options = {}) {
     maskBtn.addEventListener('click', () => setGidMask(group));
     actions.appendChild(maskBtn);
 
+    if (group.industry === 'event') {
+      const expiryBtn = document.createElement('button');
+      expiryBtn.type = 'button';
+      expiryBtn.className = 'mg-group-btn';
+      expiryBtn.textContent = '終了日を変更';
+      expiryBtn.addEventListener('click', () => {
+        if (groupExpiryTargetId === groupId) {
+          groupExpiryTargetId = null;
+          groupExpiryDraftLastDay = '';
+        } else {
+          groupExpiryTargetId = groupId;
+          groupExpiryDraftLastDay = lastDayFromExpiresAt(group.expires_at);
+        }
+        groupRenameTargetId = null;
+        groupRenameDraftName = '';
+        groupOwnerPickerTargetId = null;
+        groupOwnerPickerEoUid = '';
+        groupSectionErrorMessage = '';
+        groupSectionInfoMessage = '';
+        renderGroupList();
+      });
+      actions.appendChild(expiryBtn);
+    }
+
     const ownerBtn = document.createElement('button');
     ownerBtn.type = 'button';
     ownerBtn.className = 'mg-group-btn mg-group-btn-primary';
@@ -2000,6 +2175,8 @@ function buildGroupRow(group, options = {}) {
       }
       groupRenameTargetId = null;
       groupRenameDraftName = '';
+      groupExpiryTargetId = null;
+      groupExpiryDraftLastDay = '';
       groupSectionErrorMessage = '';
       groupSectionInfoMessage = '';
       renderGroupList();
@@ -2043,6 +2220,55 @@ function buildGroupRow(group, options = {}) {
       cancelBtn.addEventListener('click', () => {
         groupRenameTargetId = null;
         groupRenameDraftName = '';
+        groupSectionErrorMessage = '';
+        groupSectionInfoMessage = '';
+        renderGroupList();
+      });
+      formActions.appendChild(cancelBtn);
+
+      form.appendChild(formActions);
+      row.appendChild(form);
+    }
+
+    if (groupExpiryTargetId === groupId) {
+      const form = document.createElement('div');
+      form.className = 'mg-group-form';
+
+      const label = document.createElement('label');
+      label.className = 'mg-group-form-label';
+      label.textContent = '新しい利用最終日';
+      form.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.className = 'mg-group-input';
+      const today = new Date();
+      input.min = formatDateInputValue(today);
+      const maxLastDay = getGroupExpiryMaxLastDay(group);
+      if (maxLastDay) input.max = maxLastDay;
+      input.value = groupExpiryDraftLastDay || '';
+      input.addEventListener('input', (event) => {
+        groupExpiryDraftLastDay = event.target.value;
+      });
+      form.appendChild(input);
+
+      const formActions = document.createElement('div');
+      formActions.className = 'mg-group-form-actions';
+
+      const submitBtn = document.createElement('button');
+      submitBtn.type = 'button';
+      submitBtn.className = 'mg-group-btn mg-group-btn-primary';
+      submitBtn.textContent = '変更を保存';
+      submitBtn.addEventListener('click', () => updateGroupExpiry(group));
+      formActions.appendChild(submitBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'mg-group-btn';
+      cancelBtn.textContent = 'キャンセル';
+      cancelBtn.addEventListener('click', () => {
+        groupExpiryTargetId = null;
+        groupExpiryDraftLastDay = '';
         groupSectionErrorMessage = '';
         groupSectionInfoMessage = '';
         renderGroupList();
@@ -2153,10 +2379,12 @@ function renderGroupList() {
     if (groupCreateDraft) {
       groupCreateDraft = null;
     } else {
-      groupCreateDraft = { groupName: '', industry: '', displayName: '' };
+      groupCreateDraft = { groupName: '', industry: '', displayName: '', lastDay: '' };
     }
     groupRenameTargetId = null;
     groupRenameDraftName = '';
+    groupExpiryTargetId = null;
+    groupExpiryDraftLastDay = '';
     groupOwnerPickerTargetId = null;
     groupOwnerPickerEoUid = '';
     groupSectionErrorMessage = '';
@@ -2213,7 +2441,6 @@ function renderGroupList() {
     emptyOption.textContent = '選択してください';
     industrySelect.appendChild(emptyOption);
     Object.entries(INDUSTRY_LABELS).forEach(([industryKey, industryLabelText]) => {
-      if (industryKey === 'event') return;
       const option = document.createElement('option');
       option.value = industryKey;
       option.textContent = industryLabelText;
@@ -2222,8 +2449,40 @@ function renderGroupList() {
     industrySelect.value = groupCreateDraft.industry || '';
     industrySelect.addEventListener('change', (event) => {
       groupCreateDraft.industry = event.target.value;
+      _toggleExpiry();
     });
     form.appendChild(industrySelect);
+
+    const expiryLabel = document.createElement('label');
+    expiryLabel.className = 'mg-group-form-label';
+    expiryLabel.textContent = '利用最終日（必須）';
+    expiryLabel.style.display = 'none';
+    form.appendChild(expiryLabel);
+
+    const expiryInput = document.createElement('input');
+    expiryInput.type = 'date';
+    expiryInput.className = 'mg-group-input';
+    expiryInput.style.display = 'none';
+    const _lim = new Date(); _lim.setFullYear(_lim.getFullYear() + 1);
+    expiryInput.max = _lim.getFullYear() + '-'
+      + String(_lim.getMonth() + 1).padStart(2, '0') + '-'
+      + String(_lim.getDate()).padStart(2, '0');
+    const _tdy = new Date();
+    expiryInput.min = _tdy.getFullYear() + '-'
+      + String(_tdy.getMonth() + 1).padStart(2, '0') + '-'
+      + String(_tdy.getDate()).padStart(2, '0');
+    expiryInput.value = groupCreateDraft.lastDay || '';
+    expiryInput.addEventListener('input', (event) => {
+      groupCreateDraft.lastDay = event.target.value;
+    });
+    form.appendChild(expiryInput);
+
+    const _toggleExpiry = () => {
+      const isEvent = (groupCreateDraft.industry === 'event');
+      expiryLabel.style.display = isEvent ? '' : 'none';
+      expiryInput.style.display = isEvent ? '' : 'none';
+    };
+    _toggleExpiry();
 
     const displayLabel = document.createElement('label');
     displayLabel.className = 'mg-group-form-label';
@@ -2325,6 +2584,9 @@ const MANAGER_ERROR_MESSAGES = {
   INVALID_GID_FORMAT: 'グループIDの形式が正しくありません',
   SIGNAGE_CANNOT_BE_OWNER: 'サイネージ端末はグループ管理者にできません',
   ALREADY_OWNER: 'この方はすでにこのグループの管理者です',
+  INVALID_EXPIRES_AT: '利用最終日は、今日より後で、グループ作成日から1年以内で指定してください',
+  NOT_EVENT_GROUP: 'イベントグループだけが終了日を変更できます',
+  NOT_FACILITY_GROUP: '施設に属していないグループは操作できません',
   FACILITY_NOT_FOUND: '施設が見つかりません',
   // [EO-DEC-0222] レート制限。★具体的な件数・残り時間は表示しない（EO-DEC-0221）。
   RATE_LIMIT_EXCEEDED: '短時間に多くのグループを作成したため、現在は新しいグループを作成できません。しばらく時間をおいてから、もう一度お試しください。',
