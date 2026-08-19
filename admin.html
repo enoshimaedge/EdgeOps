@@ -1466,6 +1466,15 @@ async function loadFacilities() {
           <span>📅 作成: ${escHtmlAdmin(_formatDateAdmin(f.facility_created_at))}</span>
           <span>⏸️ 停止: ${escHtmlAdmin(_formatDateAdmin(f.suspended_at))}</span>
         </div>
+        ${(f.contract_status === 'ended' && (f.pending_downgrade_group_count || 0) > 0) ? `
+        <div class="group-item-info" style="color:#c0392b;font-weight:700;">
+          <span>⚠️ 降格処理が必要です（未降格のグループ ${escHtmlAdmin(`${f.pending_downgrade_group_count}`)}件）</span>
+        </div>
+        <div style="margin-top:8px;">
+          <button type="button" onclick="downgradeFacilityGroups('${escHtmlAdmin(f.facility_id)}')">
+            グループをST版へ降格
+          </button>
+        </div>` : ''}
         ${_contractActionsHtml(f)}
       </div>
     `;
@@ -1723,6 +1732,49 @@ function _contractActionsHtml(f) {
           ${inviteBtn}
           ${note}
         </div>`;
+}
+
+const DOWNGRADE_ERROR_MESSAGES = {
+  AUTH_REQUIRED:      'ログインの有効期限が切れています。画面を開き直してください',
+  FACILITY_NOT_FOUND: '施設が見つかりませんでした',
+  FACILITY_NOT_ENDED: '契約が終了した施設だけを降格できます',
+};
+function downgradeErrorMessage(error) {
+  // ★Supabase の RPC が RAISE EXCEPTION を返すとき、error.code は 'P0001' で埋まる。
+  //   エラー名は error.message にある（原則102）。必ず message を先に見る。
+  const key = (error && (error.message || error.code) || '') + '';
+  for (const k of Object.keys(DOWNGRADE_ERROR_MESSAGES)) {
+    if (key.includes(k)) return DOWNGRADE_ERROR_MESSAGES[k];
+  }
+  return '処理できませんでした。時間をおいて再度お試しください。';
+}
+
+async function downgradeFacilityGroups(facilityId) {
+  const f = (allFacilities || []).find(x => String(x.facility_id) === String(facilityId));
+  const name = f ? (f.facility_name || f.facility_code || '') : '';
+  const cnt  = f ? (f.pending_downgrade_group_count || 0) : 0;
+  // ★確認ダイアログ必須。グループ名の入力までは求めない（判定の指定）
+  if (!window.confirm(
+      '「' + name + '」の配下グループ ' + cnt + '件をST版へ降格します。\n'
+    + '・通常グループの有効期限は、降格した時点から1年になります\n'
+    + '・イベントグループの終了日はそのまま維持されます\n'
+    + '・グループ管理者は変更しません\n'
+    + '★この操作は取り消せません。')) return;
+  try {
+    const { data, error } = await sb.rpc('admin_downgrade_facility_groups', {
+      p_facility_id: facilityId
+    });
+    if (error) {
+      alert(downgradeErrorMessage(error));
+      return;
+    }
+    const r = Array.isArray(data) ? data[0] : data;
+    alert('降格しました（' + (r?.downgraded_count ?? 0) + '件）');
+    // ★成功後に一覧を再取得する。件数0になれば警告とボタンが自然に消える（判定の指定）
+    await loadFacilities();
+  } catch (e) {
+    alert(downgradeErrorMessage(e));
+  }
 }
 
 function openContractConfirm(facilityId, newStatus) {
