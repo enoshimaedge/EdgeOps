@@ -2281,6 +2281,12 @@ function updateExpiryWarningBar() {
     bar.classList.remove('warning', 'danger');
     return;
   }
+  const _ind = currentGroupData?.industry;
+  const _fac = currentGroupData?.facility_id;
+  if (_fac != null && _ind != null && _ind !== 'event') {
+    bar.classList.remove('warning', 'danger');
+    return;
+  }
   if (!currentGroupData?.expires_at) {
     bar.classList.remove('warning', 'danger');
     return;

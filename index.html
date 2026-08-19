@@ -2049,6 +2049,9 @@ async function resolveIsCreator(groupSessionId, myMemberId) {
       return allMembers.find(m => m.id === myMemberId)?.is_creator || false;
     }
     // 誰もTRUEでなければ最古の人間メンバーを管理者とみなす（フォールバック）
+    // ★EO-DEC-0267 論点F：施設配下（Plus版）では繰り上がりを行わない。
+    //   ★判定は currentGroup.facility_id の状態で行う。フラグで固定しない。
+    if (currentGroup && currentGroup.facility_id != null) return false;
     // [EO-DEC-0160 案イ] サイネージ端末は対象外(NULL は人間扱い)。人間がいなければ昇格させない
     const humanMembers = allMembers.filter(m => m.is_signage !== true);
     if (humanMembers.length === 0) return false;
@@ -2074,6 +2077,9 @@ function resolveIsCreatorFromMembers(memberList, myMemberId) {
     return memberList.find(m => m.id === myMemberId)?.is_creator || false;
   }
   // 誰もTRUEでなければ最古の人間メンバーを管理者とみなす（フォールバック）
+  // ★EO-DEC-0267 論点F：施設配下（Plus版）では繰り上がりを行わない。
+  //   ★判定は currentGroup.facility_id の状態で行う。フラグで固定しない。
+  if (currentGroup && currentGroup.facility_id != null) return false;
   // [EO-DEC-0160 案イ] サイネージ端末は対象外(NULL は人間扱い)。人間がいなければ昇格させない
   // ★呼び出し元の members には order 指定が無いため、ここで created_at 昇順を保証する。
   // ★元の配列を破壊しないため、コピーしてから並べ替える（EO-DEC-0216 条件）。

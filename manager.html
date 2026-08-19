@@ -1309,6 +1309,7 @@ const MIGRATE_ERROR_MESSAGES = {
   // ★[EO-DEC-0262] アーカイブ済みはRPC側で弾く（第258回 論点E をRPCでも成立させた）。
   //   これを足さないと GROUP_ARCHIVED が既定文へ丸まる（原則38）。
   GROUP_ARCHIVED:       'アーカイブ済みのグループは移せません',
+  GROUP_EXPIRED:        '有効期限が切れたグループは移せません',
   NOT_OWNER:            'このグループを作成した方だけが移せます',
   NOT_FACILITY_MANAGER: '権限がありません',
   // ★[EO-DEC-0260] 枠を分けたので「グループ数」ではなく「通常グループ数」と書く。
@@ -1346,7 +1347,8 @@ async function loadMigratableGroups() {
     }
     migratableGroups = (data || [])
       .map((row) => row.group_sessions)
-      .filter((g) => g && g.facility_id == null && g.archived_at == null)
+      .filter((g) => g && g.facility_id == null && g.archived_at == null
+                  && !(g.expires_at && new Date(g.expires_at) <= new Date()))
       .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')));
   } catch (e) {
     console.warn('[manager.html] loadMigratableGroups threw (continue):', e);
@@ -1541,7 +1543,9 @@ function renderMigrateSection() {
     detail.appendChild(document.createTextNode(
         '」へ移します。\n'
       + '・連絡と画像の保存期間が 60日／30日 から 180日 に変わります\n'
-      + '・グループの1年の有効期限が無くなります\n'
+      + (g.industry === 'event'
+          ? '・イベントの終了日はそのまま維持されます\n'
+          : '・このグループの利用期限は無期限になります\n')
       + '・地域の表示が 「' + facilityLabel + '」の地域 に変わります（施設に地域が設定されていない場合は空欄になります）\n'
       + '・メンバー・過去の連絡・引き継ぎは そのまま残ります'));
     container.appendChild(detail);
@@ -1905,6 +1909,16 @@ function buildGroupRow(group, options = {}) {
   let metaText = '👥 ' + (group.member_count != null ? group.member_count : 0) + '人';
   if (group.signage_count) {
     metaText += '  📺 ' + group.signage_count + '台';
+  }
+  if (group.industry === 'event') {
+    if (group.expires_at) {
+      const _d = new Date(group.expires_at);
+      // ★イベントの expires_at は利用最終日の翌日0時を指すため、表示上は1日引く。
+      _d.setDate(_d.getDate() - 1);
+      metaText += '   終了日: ' + _d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' });
+    }
+  } else if (group.facility_id != null) {
+    metaText += '   期限: 無期限';
   }
   const hasCreators = Array.isArray(group.creator_names) && group.creator_names.length > 0;
   if (hasCreators) {
