@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
       .order('created_at', { ascending: false }),
     // [E9 案X / EO-DEC-0154] event では handover_notes を空配列で返す（第13章サイネージ側・仕様書22-3）
     //   signage.html は「引き継ぎ0件ならセクションと区切り線を非表示」処理を既に持つため無改修。
-    //   industry は safeGroup に出さない（既存ホワイトリストのまま）。
+    //   safeGroup には期限管理判定に必要な industry のみ追加で返す。
     //   通常グループ（industry !== 'event'）は従来どおり取得する。
     group.industry === 'event'
       ? Promise.resolve({ data: [], error: null })
@@ -323,6 +323,7 @@ Deno.serve(async (req: Request) => {
     id: group.id,
     group_id: group.group_id,
     group_name: group.group_name,
+    industry: group.industry,
     facility_id: group.facility_id,
     region: group.region,
     link_url: group.link_url,

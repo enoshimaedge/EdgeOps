@@ -117,7 +117,12 @@ function isExpiryManaged(group) {
     return false;
   }
   if (!(group.group_id || '').startsWith('SL-')) return false;
-  return group.facility_id === null && group.archived_at === null;
+  if (group.archived_at !== null) return false;
+  if (!('industry' in group)) {
+    console.warn('[EO-DEC-0267] isExpiryManaged: industry が未取得です。取得経路の修正対象です。', group.group_id);
+  }
+  if (group.industry === 'event') return true;
+  return group.facility_id === null;
 }
 
 // [EO-DEC-0247] 連絡一覧の表示範囲（日数）を返す。ST版60日／Plus版（施設配下）180日。
@@ -145,10 +150,6 @@ function formatGroupIdForDisplay(groupId, gidMasked) {
 function updateExpiryWarningBar() {
   const bar = document.getElementById('expiry-warning-bar');
   if (!bar) return;
-  // [EO-DEC-0180] event は期限で終わることが前提のため警告バーを出さない。
-  //   残り日数はプロフィール画面の「有効期限：◯（残り◯日）」で確認できる。
-  //   ★これにより下の [EO-DEC-0160] の event 用文言は到達しなくなるが、削除しない。
-  if (currentGroup?.industry === 'event') { bar.style.display = 'none'; return; }
   if (!isExpiryManaged(currentGroup)) { bar.style.display = 'none'; return; }
   if (!currentGroup?.expires_at) {
     bar.style.display = 'none';
