@@ -1498,7 +1498,7 @@ function escHtmlAdmin(str) {
 //   記録された当時の名称とは限らない。target_id も必ず併記する。
 // ═══════════════════════════════════════════
 
-// action の日本語ラベル（18値）
+// action の日本語ラベル（20値）
 const AUDIT_ACTION_LABELS = {
   manager_add: '施設管理者を追加',
   manager_remove: '施設管理者を外す',
@@ -1516,8 +1516,10 @@ const AUDIT_ACTION_LABELS = {
   contract_status_change: '契約状態を変更',
   invite_issue: '招待コードを発行',
   organization_create: '組織を作成',
+  data_export: 'データを書き出し',
   contract_cancel_request: '解約を申請',
-  contract_cancel_withdraw: '解約申請を撤回'
+  contract_cancel_withdraw: '解約申請を撤回',
+  facility_downgrade: 'グループをST版へ降格'
 };
 
 // actor_role の日本語ラベル（6値）
