@@ -2447,10 +2447,6 @@ function renderGroupList() {
       industrySelect.appendChild(option);
     });
     industrySelect.value = groupCreateDraft.industry || '';
-    industrySelect.addEventListener('change', (event) => {
-      groupCreateDraft.industry = event.target.value;
-      _toggleExpiry();
-    });
     form.appendChild(industrySelect);
 
     const expiryLabel = document.createElement('label');
@@ -2463,26 +2459,26 @@ function renderGroupList() {
     expiryInput.type = 'date';
     expiryInput.className = 'mg-group-input';
     expiryInput.style.display = 'none';
-    const _lim = new Date(); _lim.setFullYear(_lim.getFullYear() + 1);
-    expiryInput.max = _lim.getFullYear() + '-'
-      + String(_lim.getMonth() + 1).padStart(2, '0') + '-'
-      + String(_lim.getDate()).padStart(2, '0');
-    const _tdy = new Date();
-    expiryInput.min = _tdy.getFullYear() + '-'
-      + String(_tdy.getMonth() + 1).padStart(2, '0') + '-'
-      + String(_tdy.getDate()).padStart(2, '0');
+    const limitDate = new Date(); limitDate.setFullYear(limitDate.getFullYear() + 1);
+    expiryInput.max = formatDateInputValue(limitDate);
+    const todayDate = new Date();
+    expiryInput.min = formatDateInputValue(todayDate);
     expiryInput.value = groupCreateDraft.lastDay || '';
     expiryInput.addEventListener('input', (event) => {
       groupCreateDraft.lastDay = event.target.value;
     });
     form.appendChild(expiryInput);
 
-    const _toggleExpiry = () => {
+    const toggleExpiry = () => {
       const isEvent = (groupCreateDraft.industry === 'event');
       expiryLabel.style.display = isEvent ? '' : 'none';
       expiryInput.style.display = isEvent ? '' : 'none';
     };
-    _toggleExpiry();
+    industrySelect.addEventListener('change', (event) => {
+      groupCreateDraft.industry = event.target.value;
+      toggleExpiry();
+    });
+    toggleExpiry();
 
     const displayLabel = document.createElement('label');
     displayLabel.className = 'mg-group-form-label';
