@@ -2283,7 +2283,7 @@ function updateExpiryWarningBar() {
   }
   const _ind = currentGroupData?.industry;
   const _fac = currentGroupData?.facility_id;
-  if (_ind !== 'event' && _ind !== undefined && _ind !== null && _fac != null) {
+  if (_fac != null && _ind != null && _ind !== 'event') {
     bar.classList.remove('warning', 'danger');
     return;
   }

@@ -1913,6 +1913,7 @@ function buildGroupRow(group, options = {}) {
   if (group.industry === 'event') {
     if (group.expires_at) {
       const _d = new Date(group.expires_at);
+      // ★イベントの expires_at は利用最終日の翌日0時を指すため、表示上は1日引く。
       _d.setDate(_d.getDate() - 1);
       metaText += '   終了日: ' + _d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric' });
     }
