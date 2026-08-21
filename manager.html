@@ -763,7 +763,7 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dd id="facility-contract-status" class="mg-detail-value"></dd>
             <dd id="help-facility-contract-status" class="mg-detail-help" hidden></dd>
           </div>
-          <div class="mg-detail" id="facility-next-payment-row" hidden>
+          <div class="mg-detail" id="facility-next-payment-row" style="display:none;">
             <dt class="mg-detail-term">次回のお支払い日</dt>
             <dd id="facility-next-payment" class="mg-detail-value"></dd>
           </div>
@@ -1248,7 +1248,9 @@ function renderFacilityDetails() {
                   && String(facility.billing_source) === 'stripe')
     ? facilityPeriodEndJa(facility) : '';
   const nextPayRow = document.getElementById('facility-next-payment-row');
-  if (nextPayRow) nextPayRow.hidden = !nextPayJa;
+  // ★[EO-DEC-0274 是正] .mg-detail は display:grid のため hidden 属性は効かない。
+  //   お支払い方法の行（下）と同じ style.display で制御する。
+  if (nextPayRow) nextPayRow.style.display = nextPayJa ? '' : 'none';
   setFacilityValue('facility-next-payment', nextPayJa);
   // ★[EO-DEC-0266] お支払い方法。既知の2値のときだけ行を出す。
   //   NULL も未知値も行ごと消す（利用者に技術的な生値を見せないため）。
@@ -3138,7 +3140,7 @@ async function managerLogout() {
   setFacilityValue('facility-contract-status', '');
   setFacilityValue('facility-next-payment', '');
   const nextPaymentRow = document.getElementById('facility-next-payment-row');
-  if (nextPaymentRow) nextPaymentRow.hidden = true;
+  if (nextPaymentRow) nextPaymentRow.style.display = 'none';  // ★[EO-DEC-0274 是正] hidden は効かない
   setFacilityValue('facility-group-count', '');
   setFacilityValue('facility-archived-count', '');
   setFacilityValue('facility-noowner-count', '');
