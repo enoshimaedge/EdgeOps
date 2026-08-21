@@ -2566,6 +2566,9 @@ function renderGroupList() {
 
 const MANAGER_ERROR_MESSAGES = {
   LAST_MANAGER_CANNOT_BE_REMOVED: '施設の管理者が0人になるため、この操作はできません',
+  // ★[EO-DEC-0273] trigger_prevent_last_main_admin_change が発動したときの受け皿。
+  //   通常は繰り上がりが先に走るため発生しない。★「時間をおいて」は使わない（判定条件）。
+  LAST_MAIN_ADMIN_PROTECTED: '施設の主担当を変更できませんでした。管理者の状態を確認してください',
   ALREADY_MANAGER: 'この方はすでに施設管理者です',
   TARGET_NOT_APPROVED_MEMBER: 'この方は施設のグループに参加していないため追加できません',
   NOT_FACILITY_MANAGER: '権限がありません',
