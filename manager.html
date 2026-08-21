@@ -1099,6 +1099,8 @@ function renderContractSection() {
     strong.style.color = '#c0392b';
     strong.textContent = '解約のお申し込みを受け付けています。';
     lead.appendChild(strong);
+    // current_period_end は契約終了予定日の表示にも使う。
+    // 次回支払日の表示条件（active + stripe）とは分けて考える。
     const endJa = facilityPeriodEndJa(facility);
     lead.appendChild(document.createTextNode(endJa
       ? ('ご契約は ' + endJa + ' をもって終了します。この日までは通常どおりご利用いただけます。'
@@ -1345,6 +1347,7 @@ function buildFacilityHelpPanel(key) {
 }
 
 function bindFacilityHelpButtons() {
+  // ボタンは静的HTMLに置いてあり、init() で1回だけ束ねればよい。
   document.querySelectorAll('.mg-help-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.helpKey;
