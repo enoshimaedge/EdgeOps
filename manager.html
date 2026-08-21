@@ -1322,6 +1322,8 @@ const FACILITY_HELP_MG = {
   }
 };
 
+const FACILITY_HELP_SEPARATOR_MG = '＝';
+
 function buildFacilityHelpPanel(key) {
   const panel = document.getElementById('help-' + key);
   const def = FACILITY_HELP_MG[key];
@@ -1336,7 +1338,7 @@ function buildFacilityHelpPanel(key) {
     const strong = document.createElement('strong');
     strong.textContent = label;
     row.appendChild(strong);
-    row.appendChild(document.createTextNode('＝' + text));
+    row.appendChild(document.createTextNode(FACILITY_HELP_SEPARATOR_MG + text));
     panel.appendChild(row);
   });
   panel.dataset.built = '1';
@@ -1349,13 +1351,16 @@ function bindFacilityHelpButtons() {
       const panel = document.getElementById('help-' + key);
       if (!panel) return;
       buildFacilityHelpPanel(key);
-      const willOpen = panel.hidden;
-      panel.hidden = !willOpen;
-      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      const isCurrentlyHidden = panel.hidden;
+      panel.hidden = !isCurrentlyHidden;
+      btn.setAttribute('aria-expanded', isCurrentlyHidden ? 'true' : 'false');
     });
   });
 }
 
+// manager_get_my_facilities() は current_period_end を返し、
+// 施設管理画面では active + stripe のときだけ次回支払日として使う。
+// cancel_scheduled でも同じ値を契約終了予定日の表示に再利用する。
 function facilityPeriodEndJa(facility) {
   if (!facility || !facility.current_period_end) return '';
   const d = new Date(facility.current_period_end);
