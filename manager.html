@@ -233,6 +233,41 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
     word-break: break-word;
   }
 
+  .mg-help-btn {
+    margin-left: 6px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--eo-text-muted);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--eo-text-muted);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+
+  .mg-help-btn[aria-expanded="true"] {
+    background: var(--eo-text-muted);
+    color: #fff;
+  }
+
+  .mg-detail-help {
+    margin-top: var(--eo-space-1);
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--eo-text);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.8;
+  }
+
+  .mg-detail-help-item {
+    margin-top: 4px;
+  }
+
   .mg-actions-reserved {
     min-height: 44px;
     margin-top: var(--eo-space-4);
@@ -700,25 +735,37 @@ console.log('[EdgeOps manager] Environment:', CURRENT_ENV, '| hostname:', window
             <dd id="facility-name" class="mg-detail-value"></dd>
           </div>
           <div class="mg-detail">
-            <dt class="mg-detail-term">施設コード</dt>
+            <dt class="mg-detail-term">施設コード<button type="button" class="mg-help-btn"
+                data-help-key="facility-code" aria-expanded="false"
+                aria-controls="help-facility-code" aria-label="施設コードの説明">?</button></dt>
             <dd id="facility-code" class="mg-detail-value"></dd>
+            <dd id="help-facility-code" class="mg-detail-help" hidden></dd>
           </div>
           <div class="mg-detail">
-            <dt class="mg-detail-term">プラン</dt>
+            <dt class="mg-detail-term">プラン<button type="button" class="mg-help-btn"
+                data-help-key="facility-plan" aria-expanded="false"
+                aria-controls="help-facility-plan" aria-label="プランの説明">?</button></dt>
             <dd id="facility-plan" class="mg-detail-value"></dd>
+            <dd id="help-facility-plan" class="mg-detail-help" hidden></dd>
           </div>
           <!-- ★[EO-DEC-0266] お支払い方法。既知の2値のときだけ行ごと表示する -->
           <div class="mg-detail" id="facility-billing-row">
-            <dt class="mg-detail-term">お支払い方法</dt>
+            <dt class="mg-detail-term">お支払い方法<button type="button" class="mg-help-btn"
+                data-help-key="facility-billing-source" aria-expanded="false"
+                aria-controls="help-facility-billing-source" aria-label="お支払い方法の説明">?</button></dt>
             <dd id="facility-billing-source" class="mg-detail-value"></dd>
+            <dd id="help-facility-billing-source" class="mg-detail-help" hidden></dd>
           </div>
           <div class="mg-detail">
-            <dt class="mg-detail-term">契約ステータス</dt>
+            <dt class="mg-detail-term">契約ステータス<button type="button" class="mg-help-btn"
+                data-help-key="facility-contract-status" aria-expanded="false"
+                aria-controls="help-facility-contract-status" aria-label="契約ステータスの説明">?</button></dt>
             <dd id="facility-contract-status" class="mg-detail-value"></dd>
+            <dd id="help-facility-contract-status" class="mg-detail-help" hidden></dd>
           </div>
-          <div class="mg-detail">
-            <dt class="mg-detail-term">サブステータス</dt>
-            <dd id="facility-sub-status" class="mg-detail-value"></dd>
+          <div class="mg-detail" id="facility-next-payment-row" hidden>
+            <dt class="mg-detail-term">次回のお支払い日</dt>
+            <dd id="facility-next-payment" class="mg-detail-value"></dd>
           </div>
         </dl>
         <div class="mg-actions-reserved" aria-hidden="true">
@@ -1052,9 +1099,14 @@ function renderContractSection() {
     strong.style.color = '#c0392b';
     strong.textContent = '解約のお申し込みを受け付けています。';
     lead.appendChild(strong);
-    lead.appendChild(document.createTextNode(
-      'ご契約は契約期間の末日をもって終了します。末日までは通常どおりご利用いただけます。'
-      + '取り消したい場合は下のボタンからお手続きください。'));
+    // current_period_end は契約終了予定日の表示にも使う。
+    // 次回支払日の表示条件（active + stripe）とは分けて考える。
+    const endJa = facilityPeriodEndJa(facility);
+    lead.appendChild(document.createTextNode(endJa
+      ? ('ご契約は ' + endJa + ' をもって終了します。この日までは通常どおりご利用いただけます。'
+         + '取り消したい場合は下のボタンからお手続きください。')
+      : ('ご契約は契約期間の末日をもって終了します。末日までは通常どおりご利用いただけます。'
+         + '取り消したい場合は下のボタンからお手続きください。')));
     container.appendChild(lead);
     container.appendChild(_contractButton('解約を取り消す', 'resume'));
   } else {
@@ -1192,8 +1244,12 @@ function renderFacilityDetails() {
   setFacilityValue('facility-plan', labelOrRawMg(PLAN_LABELS_MG, facility.plan));
   setFacilityValue('facility-contract-status',
     labelOrRawMg(CONTRACT_STATUS_LABELS_MG, facility.contract_status));
-  // sub_status は表示のみ（凍結判定には使わない）。★[EO-DEC-0266] 変換せず生値のまま
-  setFacilityValue('facility-sub-status', facility.sub_status);
+  const nextPayJa = (String(facility.contract_status) === 'active'
+                  && String(facility.billing_source) === 'stripe')
+    ? facilityPeriodEndJa(facility) : '';
+  const nextPayRow = document.getElementById('facility-next-payment-row');
+  if (nextPayRow) nextPayRow.hidden = !nextPayJa;
+  setFacilityValue('facility-next-payment', nextPayJa);
   // ★[EO-DEC-0266] お支払い方法。既知の2値のときだけ行を出す。
   //   NULL も未知値も行ごと消す（利用者に技術的な生値を見せないため）。
   const billingLabelMg = BILLING_SOURCE_LABELS_MG[String(facility.billing_source)] || '';
@@ -1230,8 +1286,6 @@ function renderFacilityDetails() {
 
 // ── ★[EO-DEC-0266] 表示ラベル（2026/8/18）────────────────────────────
 // ★条件3＝既知値は日本語、未知値は元の生値をそのまま出す。空欄にしない。
-// ★sub_status は変換しない。Stripe の subscription.status そのものであり、
-//   サポート時に Stripe 画面と突き合わせる材料になるため、生値のまま残す。
 const PLAN_LABELS_MG = {
   plus: 'Plus'
 };
@@ -1242,6 +1296,82 @@ const CONTRACT_STATUS_LABELS_MG = {
   suspended:        '停止中',
   ended:            '契約終了'
 };
+
+const FACILITY_HELP_MG = {
+  'facility-code': {
+    lead: 'この施設を表す番号です。お問い合わせのときにお伝えいただくと、やりとりがスムーズです。',
+    items: []
+  },
+  'facility-plan': {
+    lead: 'ご契約中のプランです。',
+    items: [['Plus', '施設単位でご利用いただくプランです。']]
+  },
+  'facility-billing-source': {
+    lead: 'お支払いの方法です。',
+    items: [
+      ['カード決済', 'クレジットカードで毎月自動でお支払いいただきます。'],
+      ['請求書（郵送）', '請求書をお送りし、お振り込みいただきます。']
+    ]
+  },
+  'facility-contract-status': {
+    lead: 'ご契約の状態です。',
+    items: [
+      ['利用中', '通常どおりご利用いただけます。'],
+      ['解約予約中', '解約のお申し込みを受け付けており、契約期間の末日で終了します。'],
+      ['停止中', '現在、一時的にご利用を停止しています。'],
+      ['契約終了', 'ご契約は終了しています。']
+    ]
+  }
+};
+
+// 全角イコール（＝）を説明文の区切りとして使う。
+const FACILITY_HELP_SEPARATOR_MG = '＝';
+
+function buildFacilityHelpPanel(key) {
+  const panel = document.getElementById('help-' + key);
+  const def = FACILITY_HELP_MG[key];
+  if (!panel || !def || panel.dataset.built === '1') return;
+  panel.replaceChildren();
+  const lead = document.createElement('div');
+  lead.textContent = def.lead;
+  panel.appendChild(lead);
+  def.items.forEach(([label, text]) => {
+    const row = document.createElement('div');
+    row.className = 'mg-detail-help-item';
+    const strong = document.createElement('strong');
+    strong.textContent = label;
+    row.appendChild(strong);
+    row.appendChild(document.createTextNode(FACILITY_HELP_SEPARATOR_MG + text));
+    panel.appendChild(row);
+  });
+  panel.dataset.built = '1';
+}
+
+function bindFacilityHelpButtons() {
+  // ボタンは静的HTMLに置いてあり、init() で1回だけ束ねればよい。
+  document.querySelectorAll('.mg-help-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.helpKey;
+      const panel = document.getElementById('help-' + key);
+      if (!panel) return;
+      buildFacilityHelpPanel(key);
+      const isCurrentlyHidden = panel.hidden;
+      panel.hidden = !isCurrentlyHidden;
+      btn.setAttribute('aria-expanded', isCurrentlyHidden ? 'true' : 'false');
+    });
+  });
+}
+
+// manager_get_my_facilities() は current_period_end を返し、
+// 施設管理画面では active + stripe のときだけ次回支払日として使う。
+// cancel_scheduled でも同じ値を契約終了予定日の表示に再利用する。
+function facilityPeriodEndJa(facility) {
+  if (!facility || !facility.current_period_end) return '';
+  const d = new Date(facility.current_period_end);
+  if (Number.isNaN(d.getTime())) return '';
+  const ymd = getJstYmd(d);
+  return ymd ? formatYmdJa(ymd) : '';
+}
 
 // ★お支払い方法。★既知の2値だけを持つ。NULL・未知値は行ごと出さない（判定記録 第5節）。
 const BILLING_SOURCE_LABELS_MG = {
@@ -2900,6 +3030,7 @@ async function init() {
   // [EO-DEC-0208] liff.init 成功直後に1回だけ判定する。
   //   これ以降のすべての screen-denied 経路より前に置くこと。
   applyBackToEdgeOpsVisibility();
+  bindFacilityHelpButtons();
 
   if (!liff.isLoggedIn()) {
     liff.login({ redirectUri: window.location.href });
@@ -3003,8 +3134,11 @@ async function managerLogout() {
   setFacilityValue('facility-name', '');
   setFacilityValue('facility-code', '');
   setFacilityValue('facility-plan', '');
+  setFacilityValue('facility-billing-source', '');
   setFacilityValue('facility-contract-status', '');
-  setFacilityValue('facility-sub-status', '');
+  setFacilityValue('facility-next-payment', '');
+  const nextPaymentRow = document.getElementById('facility-next-payment-row');
+  if (nextPaymentRow) nextPaymentRow.hidden = true;
   setFacilityValue('facility-group-count', '');
   setFacilityValue('facility-archived-count', '');
   setFacilityValue('facility-noowner-count', '');
